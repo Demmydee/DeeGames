@@ -1,0 +1,12 @@
+node_modules/
+build/
+dist/
+coverage/
+draft/
+Lib/
+Scripts/
+pyvenv.cfg
+.DS_Store
+*.log
+.env*
+!.env.example
