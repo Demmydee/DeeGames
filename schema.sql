@@ -93,3 +93,23 @@ BEGIN
     RETURN v_result;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- RPC Function to get email by username (needed for login with username using anon key)
+CREATE OR REPLACE FUNCTION public.get_user_email_by_username(p_username text)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+    v_email text;
+BEGIN
+    SELECT u.email
+    INTO v_email
+    FROM public.users u
+    WHERE u.username = p_username
+    LIMIT 1;
+
+    RETURN v_email;
+END;
+$$;

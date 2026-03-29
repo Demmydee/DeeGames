@@ -62,16 +62,14 @@ export const loginUser = async (identifier: string, password: string) => {
   // If the identifier is a username, we first need to find the email
   let email = identifier;
   if (!identifier.includes('@')) {
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('email')
-      .eq('username', identifier)
-      .single();
-    
-    if (userError || !userData) {
+    const { data: userEmail, error: userError } = await supabase
+      .rpc('get_user_email_by_username', { p_username: identifier });
+
+    if (userError || !userEmail) {
+      console.error('Username lookup error:', userError);
       throw { status: 401, message: 'User not found' };
     }
-    email = userData.email;
+    email = userEmail;
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
