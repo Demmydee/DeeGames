@@ -3,13 +3,17 @@ import { supabase } from '../config/supabase';
 export const registerUser = async (userData: any) => {
   const { username, email, phone, password, isAdultConfirmed, termsAccepted } = userData;
 
+  // Case-insensitive check
+  const lowerUsername = username.toLowerCase();
+  const lowerEmail = email.toLowerCase();
+
   // Check uniqueness in public.users before attempting Auth signup
   // This prevents "Database error saving new user" which is often a trigger failure due to unique constraints
   // We use an RPC function because the anon key cannot read other users' data due to RLS
   const { data: uniqueness, error: checkError } = await supabase
     .rpc('check_user_uniqueness', {
-      p_username: username,
-      p_email: email,
+      p_username: lowerUsername,
+      p_email: lowerEmail,
       p_phone: phone
     });
 
@@ -26,11 +30,11 @@ export const registerUser = async (userData: any) => {
   // Sign up with Supabase Auth
   // We use the metadata (options.data) to pass extra fields to our trigger
   const { data, error } = await supabase.auth.signUp({
-    email,
+    email: lowerEmail,
     password,
     options: {
       data: {
-        username,
+        username: lowerUsername,
         phone,
         isAdultConfirmed,
         termsAccepted
@@ -40,9 +44,14 @@ export const registerUser = async (userData: any) => {
 
   if (error) {
     console.error('Registration Error:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-    throw { 
-      status: 400, 
-      message: error.message 
+    // Improve error message from Supabase Auth if uniqueness check missed it
+    let message = error.message;
+    if (message === 'User already registered') {
+      message = 'Email is already registered';
+    }
+    throw {
+      status: 400,
+      message
     };
   }
 
@@ -52,18 +61,21 @@ export const registerUser = async (userData: any) => {
 
   return {
     message: 'User registered successfully. Please check your email for confirmation.',
-    user: { id: data.user.id, username, email: data.user.email },
+    user: { id: data.user.id, username: lowerUsername, email: data.user.email },
     session: data.session
   };
 };
 
 export const loginUser = async (identifier: string, password: string) => {
+  // Case-insensitive identifier
+  const lowerIdentifier = identifier.toLowerCase();
+
   // Supabase Auth requires email for signInWithPassword
   // If the identifier is a username, we first need to find the email
-  let email = identifier;
-  if (!identifier.includes('@')) {
+  let email = lowerIdentifier;
+  if (!lowerIdentifier.includes('@')) {
     const { data: userEmail, error: userError } = await supabase
-      .rpc('get_user_email_by_username', { p_username: identifier });
+      .rpc('get_user_email_by_username', { p_username: lowerIdentifier });
 
     if (userError || !userEmail) {
       console.error('Username lookup error:', userError);
@@ -79,7 +91,12 @@ export const loginUser = async (identifier: string, password: string) => {
 
   if (error) {
     console.error('Login Error:', error);
-    throw { status: 401, message: error.message };
+    // Improve error message
+    let message = error.message;
+    if (message === 'Invalid login credentials') {
+      message = 'Incorrect password';
+    }
+    throw { status: 401, message };
   }
 
   return {
