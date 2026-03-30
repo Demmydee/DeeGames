@@ -86,8 +86,8 @@ DECLARE
     v_result JSONB;
 BEGIN
     SELECT jsonb_build_object(
-        'username_exists', EXISTS(SELECT 1 FROM public.users WHERE username = p_username),
-        'email_exists', EXISTS(SELECT 1 FROM public.users WHERE email = p_email),
+        'username_exists', EXISTS(SELECT 1 FROM public.users WHERE LOWER(username) = LOWER(p_username)),
+        'email_exists', EXISTS(SELECT 1 FROM public.users WHERE LOWER(email) = LOWER(p_email)),
         'phone_exists', EXISTS(SELECT 1 FROM public.users WHERE phone = p_phone AND p_phone IS NOT NULL)
     ) INTO v_result;
     RETURN v_result;
@@ -107,7 +107,7 @@ BEGIN
     SELECT u.email
     INTO v_email
     FROM public.users u
-    WHERE u.username = p_username
+    WHERE LOWER(u.username) = LOWER(p_username)
     LIMIT 1;
 
     RETURN v_email;

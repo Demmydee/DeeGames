@@ -1,15 +1,40 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
-import { Wallet, Trophy, History, Settings, Gamepad2, ArrowUpRight, ArrowDownLeft, User } from 'lucide-react';
+import { Wallet, Trophy, History, Settings, Gamepad2, ArrowUpRight, ArrowDownLeft, User, ChevronRight, Building2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import apiClient from '../api/client';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const [wallet, setWallet] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchWallet = async () => {
+      try {
+        const response = await apiClient.get('/api/wallet');
+        setWallet(response.data.wallet);
+      } catch (error) {
+        console.error('Failed to fetch wallet', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchWallet();
+  }, []);
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+    }).format(amount);
+  };
 
   const stats = [
-    { label: 'Wallet Balance', value: '₦0.00', icon: Wallet, color: 'text-green-500' },
-    { label: 'Games Won', value: '0', icon: Trophy, color: 'text-orange-500' },
-    { label: 'Total Wagered', value: '₦0.00', icon: History, color: 'text-blue-500' },
+    { label: 'Wallet Balance', value: loading ? '...' : formatCurrency(wallet?.available_balance || 0), icon: Wallet, color: 'text-green-500', link: '/wallet' },
+    { label: 'Games Won', value: '0', icon: Trophy, color: 'text-orange-500', link: '#' },
+    { label: 'Total Wagered', value: '₦0.00', icon: History, color: 'text-blue-500', link: '#' },
   ];
 
   return (
@@ -33,15 +58,18 @@ const Dashboard = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="bg-neutral-900 border border-neutral-800 p-6 rounded-3xl"
+            className="bg-neutral-900 border border-neutral-800 p-6 rounded-3xl group hover:border-orange-500/50 transition-all"
           >
-            <div className="flex justify-between items-start mb-4">
-              <div className={`p-3 rounded-2xl bg-neutral-950 ${stat.color}`}>
-                <stat.icon className="w-6 h-6" />
+            <Link to={stat.link} className="block">
+              <div className="flex justify-between items-start mb-4">
+                <div className={`p-3 rounded-2xl bg-neutral-950 ${stat.color}`}>
+                  <stat.icon className="w-6 h-6" />
+                </div>
+                <ArrowUpRight className="w-5 h-5 text-neutral-700 group-hover:text-orange-500 transition-colors" />
               </div>
-            </div>
-            <p className="text-neutral-500 text-sm font-medium mb-1">{stat.label}</p>
-            <p className="text-3xl font-black">{stat.value}</p>
+              <p className="text-neutral-500 text-sm font-medium mb-1">{stat.label}</p>
+              <p className="text-3xl font-black">{stat.value}</p>
+            </Link>
           </motion.div>
         ))}
       </div>
@@ -55,7 +83,7 @@ const Dashboard = () => {
               Active Game Rooms
             </h2>
             <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-12 text-center">
-              <p className="text-neutral-500 mb-6">No active game rooms available in Phase 1.</p>
+              <p className="text-neutral-500 mb-6">No active game rooms available in Phase 2.</p>
               <button className="bg-neutral-800 text-neutral-400 px-6 py-3 rounded-full font-bold cursor-not-allowed">
                 Coming Soon
               </button>
@@ -69,7 +97,7 @@ const Dashboard = () => {
             </h2>
             <div className="bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden">
               <div className="p-8 text-center text-neutral-500">
-                Your recent game and transaction history will appear here.
+                Your recent game and transaction history will appear in the <Link to="/wallet" className="text-orange-500 hover:underline">Wallet</Link> section.
               </div>
             </div>
           </section>
@@ -80,10 +108,13 @@ const Dashboard = () => {
           <div className="bg-orange-600 rounded-3xl p-6 text-white">
             <h3 className="text-xl font-black uppercase mb-4">Quick Deposit</h3>
             <p className="text-orange-100 text-sm mb-6">Fund your wallet to start wagering against other players.</p>
-            <button className="w-full bg-white text-orange-600 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-orange-50 transition-colors">
+            <Link 
+              to="/deposit"
+              className="w-full bg-white text-orange-600 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-orange-50 transition-colors"
+            >
               <ArrowUpRight className="w-5 h-5" />
               Deposit Now
-            </button>
+            </Link>
           </div>
 
           <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6">
@@ -95,6 +126,18 @@ const Dashboard = () => {
                 </span>
                 <ChevronRight className="w-4 h-4" />
               </button>
+              <Link to="/wallet" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
+                <span className="flex items-center gap-3">
+                  <Wallet className="w-5 h-5" /> Wallet
+                </span>
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+              <Link to="/payout-accounts" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
+                <span className="flex items-center gap-3">
+                  <Building2 className="w-5 h-5" /> Payout Accounts
+                </span>
+                <ChevronRight className="w-4 h-4" />
+              </Link>
               <button className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
                 <span className="flex items-center gap-3">
                   <Settings className="w-5 h-5" /> Security
@@ -108,11 +151,5 @@ const Dashboard = () => {
     </div>
   );
 };
-
-const ChevronRight = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-  </svg>
-);
 
 export default Dashboard;

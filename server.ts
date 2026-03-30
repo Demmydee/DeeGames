@@ -6,6 +6,9 @@ import path from "path";
 import cors from "cors";
 import { createServer as createViteServer } from "vite";
 import authRoutes from "./server/routes/authRoutes";
+import walletRoutes from "./server/routes/walletRoutes";
+import payoutAccountRoutes from "./server/routes/payoutAccountRoutes";
+import kycRoutes from "./server/routes/kycRoutes";
 
 async function startServer() {
   const app = express();
@@ -22,6 +25,9 @@ async function startServer() {
 
   // API Routes
   app.use("/api/auth", authRoutes);
+  app.use("/api/wallet", walletRoutes);
+  app.use("/api/payout-accounts", payoutAccountRoutes);
+  app.use("/api/kyc", kycRoutes);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
