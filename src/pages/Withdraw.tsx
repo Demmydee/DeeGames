@@ -41,7 +41,7 @@ const Withdraw = () => {
         ]);
         setPayoutAccounts(accountsRes.data.accounts);
         setWallet(walletRes.data.wallet);
-
+        
         const defaultAccount = accountsRes.data.accounts.find((a: any) => a.is_default);
         if (defaultAccount) {
           setSelectedAccountId(defaultAccount.id);
@@ -77,7 +77,7 @@ const Withdraw = () => {
     }
 
     try {
-      await apiClient.post('/api/wallet/withdraw', {
+      await apiClient.post('/api/wallet/withdraw', { 
         amount: withdrawAmount,
         payoutAccountId: selectedAccountId
       });

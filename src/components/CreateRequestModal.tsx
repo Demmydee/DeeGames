@@ -1,0 +1,238 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  X, 
+  Gamepad2, 
+  Users, 
+  Wallet, 
+  Trophy, 
+  AlertCircle,
+  Loader2,
+  CheckCircle2
+} from 'lucide-react';
+import { lobbyApi, gameRequestApi } from '../services/multiplayerApi';
+import { RoomCategory, GameType } from '../types/multiplayer';
+
+interface Props {
+  room: RoomCategory;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
+  const [gameTypes, setGameTypes] = useState<GameType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const [formData, setFormData] = useState({
+    game_type_id: '',
+    category: 'casual' as 'casual' | 'ranked',
+    pay_mode: 'wallet' as 'wallet' | 'bonus',
+    amount: room.min_wager,
+    required_players: 2
+  });
+
+  useEffect(() => {
+    const fetchGameTypes = async () => {
+      try {
+        const data = await lobbyApi.getGameTypes();
+        setGameTypes(data);
+        if (data.length > 0) {
+          setFormData(prev => ({ ...prev, game_type_id: data[0].id }));
+        }
+      } catch (err: any) {
+        setError('Failed to load game types');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGameTypes();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      await gameRequestApi.create({
+        ...formData,
+        room_category_id: room.id
+      });
+      setSuccess(true);
+      setTimeout(() => {
+        onSuccess();
+      }, 2000);
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.message);
+      setSubmitting(false);
+    }
+  };
+
+  const selectedGame = gameTypes.find(g => g.id === formData.game_type_id);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="relative w-full max-w-lg bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <Plus className="w-5 h-5" />
+            </div>
+            <h2 className="text-xl font-black text-white uppercase italic tracking-tight">
+              Create Game Request
+            </h2>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-white/5 transition-colors text-gray-500 hover:text-white"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {success ? (
+          <div className="p-12 text-center">
+            <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/20">
+              <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-2">Request Created!</h3>
+            <p className="text-gray-400">Your game request is now live in the lobby.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            {error && (
+              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-400 text-sm">
+                <AlertCircle className="w-5 h-5 shrink-0" />
+                <p>{error}</p>
+              </div>
+            )}
+
+            {/* Game Type */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                <Gamepad2 className="w-3 h-3" />
+                Select Game
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {loading ? (
+                  <div className="col-span-2 py-4 flex justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+                  </div>
+                ) : (
+                  gameTypes.map((game) => (
+                    <button
+                      key={game.id}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, game_type_id: game.id })}
+                      className={`p-4 rounded-xl border-2 text-left transition-all ${
+                        formData.game_type_id === game.id 
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white' 
+                          : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
+                      }`}
+                    >
+                      <div className="font-bold text-sm mb-1">{game.name}</div>
+                      <div className="text-[10px] opacity-60 uppercase tracking-wider">
+                        {game.min_players}-{game.max_players} Players
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Players & Category */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                  <Users className="w-3 h-3" />
+                  Players
+                </label>
+                <select
+                  value={formData.required_players}
+                  onChange={(e) => setFormData({ ...formData, required_players: parseInt(e.target.value) })}
+                  className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+                >
+                  {[2, 3, 4].map(num => (
+                    <option key={num} value={num} className="bg-[#0a0a0a]">{num} Players</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                  <Trophy className="w-3 h-3" />
+                  Category
+                </label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
+                  className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+                >
+                  <option value="casual" className="bg-[#0a0a0a]">Casual</option>
+                  <option value="ranked" className="bg-[#0a0a0a]">Ranked</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Wager Amount */}
+            {!room.is_free && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                  <Wallet className="w-3 h-3" />
+                  Wager Amount (₦)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({ ...formData, amount: parseInt(e.target.value) || 0 })}
+                    min={room.min_wager}
+                    max={room.max_wager || undefined}
+                    className="w-full p-4 pl-10 rounded-xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:border-emerald-500/50 transition-colors"
+                  />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">₦</span>
+                </div>
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider">
+                  Min: ₦{room.min_wager.toLocaleString()} {room.max_wager ? `| Max: ₦${room.max_wager.toLocaleString()}` : ''}
+                </p>
+              </div>
+            )}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={submitting || loading}
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-black uppercase italic tracking-widest transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Creating...</span>
+                </>
+              ) : (
+                <span>Create Request</span>
+              )}
+            </button>
+          </form>
+        )}
+      </motion.div>
+    </div>
+  );
+};
+
+export default CreateRequestModal;
+
+// Helper component for Plus icon
+const Plus = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+  </svg>
+);

@@ -11,6 +11,9 @@ import DepositCallback from './pages/DepositCallback';
 import Withdraw from './pages/Withdraw';
 import PayoutAccounts from './pages/PayoutAccounts';
 import Transactions from './pages/Transactions';
+import Lobby from './pages/Lobby';
+import Room from './pages/Room';
+import GameRoomShell from './pages/GameRoomShell';
 import Navbar from './components/layout/Navbar';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -42,6 +45,9 @@ export default function App() {
         <Route path="/withdraw" element={<ProtectedRoute><Withdraw /></ProtectedRoute>} />
         <Route path="/payout-accounts" element={<ProtectedRoute><PayoutAccounts /></ProtectedRoute>} />
         <Route path="/transactions" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
+        <Route path="/lobby" element={<ProtectedRoute><Lobby /></ProtectedRoute>} />
+        <Route path="/lobby/room/:id" element={<ProtectedRoute><Room /></ProtectedRoute>} />
+        <Route path="/match/:id" element={<ProtectedRoute><GameRoomShell /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </div>

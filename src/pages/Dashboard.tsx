@@ -1,27 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
-import { Wallet, Trophy, History, Settings, Gamepad2, ArrowUpRight, ArrowDownLeft, User, ChevronRight, Building2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Wallet, Trophy, History, Settings, Gamepad2, ArrowUpRight, ArrowDownLeft, User, ChevronRight, Building2, Loader2, AlertCircle, Play } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '../api/client';
+import { dashboardApi } from '../services/multiplayerApi';
+import { DashboardStatus } from '../types/multiplayer';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [wallet, setWallet] = useState<any>(null);
+  const [status, setStatus] = useState<DashboardStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchWallet = async () => {
+    const fetchData = async () => {
       try {
-        const response = await apiClient.get('/api/wallet');
-        setWallet(response.data.wallet);
+        const [walletRes, statusRes] = await Promise.all([
+          apiClient.get('/api/wallet'),
+          dashboardApi.getStatus()
+        ]);
+        setWallet(walletRes.data.wallet);
+        setStatus(statusRes);
       } catch (error) {
-        console.error('Failed to fetch wallet', error);
+        console.error('Failed to fetch dashboard data', error);
       } finally {
         setLoading(false);
       }
     };
-    fetchWallet();
+    fetchData();
   }, []);
 
   const formatCurrency = (amount: number) => {
@@ -80,14 +88,42 @@ const Dashboard = () => {
           <section>
             <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
               <Gamepad2 className="w-6 h-6 text-orange-500" />
-              Active Game Rooms
+              Multiplayer Arena
             </h2>
-            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-12 text-center">
-              <p className="text-neutral-500 mb-6">No active game rooms available in Phase 2.</p>
-              <button className="bg-neutral-800 text-neutral-400 px-6 py-3 rounded-full font-bold cursor-not-allowed">
-                Coming Soon
-              </button>
-            </div>
+            
+            {status?.active ? (
+              <div className="bg-neutral-900 border border-orange-500/30 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-6">
+                  <div className="p-4 rounded-2xl bg-orange-500/10 text-orange-500">
+                    {status.type === 'match' ? <Play className="w-8 h-8" /> : <Loader2 className="w-8 h-8 animate-spin" />}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-1">
+                      {status.type === 'match' ? 'Active Match' : 'Awaiting Opponents'}
+                    </h3>
+                    <p className="text-neutral-400 text-sm">
+                      {status.details?.game_type?.name} in {status.details?.room?.name}
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => navigate(status.type === 'match' ? `/match/${status.id}` : `/lobby/room/${status.details?.room_category_id}`)}
+                  className="px-8 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-orange-900/20"
+                >
+                  {status.type === 'match' ? 'Rejoin Match' : 'View Request'}
+                </button>
+              </div>
+            ) : (
+              <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-12 text-center">
+                <p className="text-neutral-500 mb-6">You are not currently in any active game or request.</p>
+                <Link 
+                  to="/lobby"
+                  className="inline-block bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 rounded-full font-bold transition-all shadow-lg shadow-orange-900/20"
+                >
+                  Enter Lobby
+                </Link>
+              </div>
+            )}
           </section>
 
           <section>

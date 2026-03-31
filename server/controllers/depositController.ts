@@ -26,14 +26,14 @@ export const handleCallback = async (req: Request, res: Response) => {
   try {
     const { trxref, reference } = req.query;
     const ref = (reference || trxref) as string;
-
+    
     if (!ref) {
       return res.redirect(`${config.frontendUrl}/deposit/callback?error=No reference provided`);
     }
 
     // Verify the deposit to ensure the wallet is credited before the user sees the result
     await depositService.verifyDeposit(ref);
-
+    
     // Redirect to the frontend callback page
     res.redirect(`${config.frontendUrl}/deposit/callback?reference=${ref}`);
   } catch (error: any) {

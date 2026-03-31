@@ -13,7 +13,13 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('dee_token');
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    if (config.headers) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    } else {
+      config.headers = {
+        'Authorization': `Bearer ${token}`
+      } as any;
+    }
   }
   return config;
 });

@@ -9,6 +9,10 @@ import authRoutes from "./server/routes/authRoutes";
 import walletRoutes from "./server/routes/walletRoutes";
 import payoutAccountRoutes from "./server/routes/payoutAccountRoutes";
 import kycRoutes from "./server/routes/kycRoutes";
+import lobbyRoutes from "./server/routes/lobbyRoutes";
+import gameRequestRoutes from "./server/routes/gameRequestRoutes";
+import matchRoutes from "./server/routes/matchRoutes";
+import dashboardRoutes from "./server/routes/dashboardRoutes";
 
 async function startServer() {
   const app = express();
@@ -28,6 +32,10 @@ async function startServer() {
   app.use("/api/wallet", walletRoutes);
   app.use("/api/payout-accounts", payoutAccountRoutes);
   app.use("/api/kyc", kycRoutes);
+  app.use("/api/lobby", lobbyRoutes);
+  app.use("/api/game-requests", gameRequestRoutes);
+  app.use("/api/matches", matchRoutes);
+  app.use("/api/dashboard", dashboardRoutes);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
