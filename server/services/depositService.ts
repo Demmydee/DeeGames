@@ -73,41 +73,23 @@ export const verifyDeposit = async (reference: string) => {
   const paystackData = await paystackService.verifyTransaction(deposit.paystack_reference || reference);
   
   if (paystackData.data.status === 'success') {
-    // 4. Update deposit status
-    const { error: updateError } = await supabase
-      .from('deposits')
-      .update({
-        status: 'successful',
-        verified_at: new Date().toISOString(),
-        paid_at: paystackData.data.paid_at,
-        channel: paystackData.data.channel,
-        metadata: paystackData.data
-      })
-      .eq('id', deposit.id);
-
-    if (updateError) {
-      console.error('Update Deposit Status Error:', updateError);
-      throw new Error('Failed to update deposit status');
-    }
-
-    // 5. Credit wallet
-    const wallet = await walletService.getWalletByUserId(deposit.user_id);
-    await walletService.updateWalletBalance(deposit.user_id, deposit.amount, 'available', 'increase');
-
-    // 6. Create transaction record
-    await walletService.createTransaction({
-      wallet_id: wallet.id,
-      user_id: deposit.user_id,
-      transaction_type: 'deposit',
-      direction: 'credit',
-      amount: deposit.amount,
-      status: 'successful',
-      reference: deposit.internal_reference,
-      description: `Deposit via Paystack (${paystackData.data.channel})`,
-      related_deposit_id: deposit.id
+    // 4. Process success atomically via RPC
+    const { data: result, error: rpcError } = await supabase.rpc('process_deposit_success', {
+      p_deposit_id: deposit.id,
+      p_user_id: deposit.user_id,
+      p_amount: deposit.amount,
+      p_reference: deposit.internal_reference,
+      p_metadata: paystackData.data,
+      p_paid_at: paystackData.data.paid_at,
+      p_channel: paystackData.data.channel
     });
 
-    return { status: 'successful', message: 'Deposit successful' };
+    if (rpcError) {
+      console.error('Process Deposit RPC Error:', rpcError);
+      throw new Error(rpcError.message || 'Failed to record transaction');
+    }
+
+    return { status: 'successful', message: result.message || 'Deposit successful' };
   } else {
     // Update status to failed if Paystack says so
     await supabase

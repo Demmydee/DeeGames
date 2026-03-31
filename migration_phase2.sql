@@ -122,6 +122,8 @@ CREATE POLICY "Users can insert own withdrawals" ON public.withdrawals FOR INSER
 ALTER TABLE public.wallet_transactions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own transactions" ON public.wallet_transactions;
 CREATE POLICY "Users can view own transactions" ON public.wallet_transactions FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own transactions" ON public.wallet_transactions;
+CREATE POLICY "Users can insert own transactions" ON public.wallet_transactions FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- 8. Functions & Triggers
 
@@ -176,7 +178,7 @@ DECLARE
 BEGIN
     -- Lock the wallet row for update to prevent concurrent modifications
     SELECT * INTO v_wallet FROM public.wallets WHERE user_id = p_user_id FOR UPDATE;
-    
+
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Wallet not found for user %', p_user_id;
     END IF;
@@ -205,5 +207,147 @@ BEGIN
 
     SELECT jsonb_build_object('success', true) INTO v_result;
     RETURN v_result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 11. Process Deposit Success (Atomic)
+CREATE OR REPLACE FUNCTION public.process_deposit_success(
+    p_deposit_id UUID,
+    p_user_id UUID,
+    p_amount DECIMAL,
+    p_reference TEXT,
+    p_metadata JSONB,
+    p_paid_at TIMESTAMPTZ,
+    p_channel TEXT
+)
+RETURNS JSONB AS $$
+DECLARE
+    v_wallet_id UUID;
+    v_result JSONB;
+    v_deposit_status TEXT;
+BEGIN
+    -- Lock both deposit and wallet to prevent race conditions
+    SELECT status INTO v_deposit_status FROM public.deposits WHERE id = p_deposit_id FOR UPDATE;
+    SELECT id INTO v_wallet_id FROM public.wallets WHERE user_id = p_user_id FOR UPDATE;
+
+    IF v_deposit_status = 'successful' THEN
+        RETURN jsonb_build_object('success', true, 'message', 'Already processed');
+    END IF;
+
+    -- 1. Update deposit status
+    UPDATE public.deposits SET
+        status = 'successful',
+        verified_at = NOW(),
+        paid_at = p_paid_at,
+        channel = p_channel,
+        metadata = p_metadata,
+        updated_at = NOW()
+    WHERE id = p_deposit_id;
+
+    -- 2. Credit wallet
+    UPDATE public.wallets SET
+        available_balance = available_balance + p_amount,
+        updated_at = NOW()
+    WHERE id = v_wallet_id;
+
+    -- 3. Create transaction record
+    INSERT INTO public.wallet_transactions (
+        wallet_id,
+        user_id,
+        transaction_type,
+        direction,
+        amount,
+        status,
+        reference,
+        description,
+        related_deposit_id
+    ) VALUES (
+        v_wallet_id,
+        p_user_id,
+        'deposit',
+        'credit',
+        p_amount,
+        'successful',
+        p_reference,
+        'Deposit via Paystack (' || p_channel || ')',
+        p_deposit_id
+    );
+
+    RETURN jsonb_build_object('success', true);
+EXCEPTION WHEN OTHERS THEN
+    RAISE EXCEPTION 'Failed to process deposit: %', SQLERRM;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 12. Request Withdrawal (Atomic)
+CREATE OR REPLACE FUNCTION public.request_withdrawal_atomic(
+    p_user_id UUID,
+    p_amount DECIMAL,
+    p_payout_account_id UUID,
+    p_reference TEXT
+)
+RETURNS JSONB AS $$
+DECLARE
+    v_wallet_id UUID;
+    v_available_balance DECIMAL;
+    v_withdrawal_id UUID;
+    v_result JSONB;
+BEGIN
+    -- Lock wallet for update
+    SELECT id, available_balance INTO v_wallet_id, v_available_balance
+    FROM public.wallets WHERE user_id = p_user_id FOR UPDATE;
+
+    IF v_available_balance < p_amount THEN
+        RAISE EXCEPTION 'Insufficient available balance';
+    END IF;
+
+    -- 1. Update wallet balance
+    UPDATE public.wallets SET
+        available_balance = available_balance - p_amount,
+        locked_balance = locked_balance + p_amount,
+        updated_at = NOW()
+    WHERE id = v_wallet_id;
+
+    -- 2. Create withdrawal record
+    INSERT INTO public.withdrawals (
+        user_id,
+        payout_account_id,
+        amount,
+        internal_reference,
+        status
+    ) VALUES (
+        p_user_id,
+        p_payout_account_id,
+        p_amount,
+        p_reference,
+        'pending'
+    ) RETURNING id INTO v_withdrawal_id;
+
+    -- 3. Create transaction record
+    INSERT INTO public.wallet_transactions (
+        wallet_id,
+        user_id,
+        transaction_type,
+        direction,
+        amount,
+        status,
+        reference,
+        description,
+        related_withdrawal_id
+    ) VALUES (
+        v_wallet_id,
+        p_user_id,
+        'withdrawal',
+        'debit',
+        p_amount,
+        'pending',
+        p_reference,
+        'Withdrawal request initiated',
+        v_withdrawal_id
+    );
+
+    RETURN jsonb_build_object('success', true, 'withdrawal_id', v_withdrawal_id);
+EXCEPTION WHEN OTHERS THEN
+    RAISE EXCEPTION 'Failed to request withdrawal: %', SQLERRM;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Building2, Plus, Trash2, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import { Building2, Plus, Trash2, AlertCircle, Loader2, CheckCircle2, ArrowLeft } from 'lucide-react';
 import apiClient from '../api/client';
+import { useNavigate } from 'react-router-dom';
 
 const PayoutAccounts = () => {
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -78,6 +80,15 @@ const PayoutAccounts = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="mb-6">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors font-bold uppercase tracking-wider text-xs"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+      </div>
+
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-4xl font-black uppercase italic flex items-center gap-3">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Minus, Building2, AlertCircle, ArrowRight, Loader2, Plus } from 'lucide-react';
+import { Minus, Building2, AlertCircle, ArrowRight, Loader2, Plus, ArrowLeft } from 'lucide-react';
 import apiClient from '../api/client';
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -23,7 +23,7 @@ const Withdraw = () => {
         ]);
         setPayoutAccounts(accountsRes.data.accounts);
         setWallet(walletRes.data.wallet);
-        
+
         const defaultAccount = accountsRes.data.accounts.find((a: any) => a.is_default);
         if (defaultAccount) {
           setSelectedAccountId(defaultAccount.id);
@@ -59,7 +59,7 @@ const Withdraw = () => {
     }
 
     try {
-      await apiClient.post('/api/wallet/withdraw', { 
+      await apiClient.post('/api/wallet/withdraw', {
         amount: withdrawAmount,
         payoutAccountId: selectedAccountId
       });
@@ -78,7 +78,16 @@ const Withdraw = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-12">
+    <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md mb-6">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors font-bold uppercase tracking-wider text-xs"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

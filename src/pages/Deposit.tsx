@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Plus, CreditCard, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { Plus, CreditCard, AlertCircle, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
 import apiClient from '../api/client';
 import { useNavigate } from 'react-router-dom';
 
@@ -33,7 +33,16 @@ const Deposit = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-12">
+    <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md mb-6">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors font-bold uppercase tracking-wider text-xs"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

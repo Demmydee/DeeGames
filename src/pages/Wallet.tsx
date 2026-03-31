@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Wallet as WalletIcon, Plus, Minus, History, CreditCard, ShieldCheck } from 'lucide-react';
+import { Wallet as WalletIcon, Plus, Minus, History, CreditCard, ShieldCheck, ArrowLeft } from 'lucide-react';
 import apiClient from '../api/client';
 import WalletSummary from '../components/wallet/WalletSummary';
 import TransactionList from '../components/wallet/TransactionList';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Wallet = () => {
+  const navigate = useNavigate();
   const [wallet, setWallet] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [kycStatus, setKycStatus] = useState<any>(null);
@@ -44,6 +45,15 @@ const Wallet = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="mb-6">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors font-bold uppercase tracking-wider text-xs"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+        </button>
+      </div>
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-4xl font-black uppercase italic flex items-center gap-3">

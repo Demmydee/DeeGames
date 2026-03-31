@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { History, Search, Filter, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { History, Search, Filter, Loader2, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import apiClient from '../api/client';
 import TransactionList from '../components/wallet/TransactionList';
+import { useNavigate } from 'react-router-dom';
 
 const Transactions = () => {
+  const navigate = useNavigate();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -31,6 +33,15 @@ const Transactions = () => {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
+      <div className="mb-6">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors font-bold uppercase tracking-wider text-xs"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+      </div>
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-4xl font-black uppercase italic flex items-center gap-3">

@@ -28,44 +28,25 @@ export const requestWithdrawal = async (userId: string, amount: number, payoutAc
 
   const internalReference = `WITH_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-  // 3. Reserve funds (atomic update)
-  // Decrease available, increase locked
-  await walletService.updateWalletBalance(userId, amount, 'available', 'decrease');
-  await walletService.updateWalletBalance(userId, amount, 'locked', 'increase');
+  // 3. Process withdrawal atomically via RPC
+  const { data: result, error: rpcError } = await supabase.rpc('request_withdrawal_atomic', {
+    p_user_id: userId,
+    p_amount: amount,
+    p_payout_account_id: payoutAccountId,
+    p_reference: internalReference
+  });
 
-  // 4. Create withdrawal record
-  const { data: withdrawal, error: withdrawalError } = await supabase
-    .from('withdrawals')
-    .insert([{
-      user_id: userId,
-      payout_account_id: payoutAccountId,
-      amount,
-      internal_reference: internalReference,
-      status: 'pending'
-    }])
-    .select()
-    .single();
-
-  if (withdrawalError) {
-    // Rollback balance changes if record creation fails
-    await walletService.updateWalletBalance(userId, amount, 'available', 'increase');
-    await walletService.updateWalletBalance(userId, amount, 'locked', 'decrease');
-    console.error('Create Withdrawal Error:', withdrawalError);
-    throw new Error('Failed to create withdrawal request');
+  if (rpcError) {
+    console.error('Request Withdrawal RPC Error:', rpcError);
+    throw new Error(rpcError.message || 'Failed to record transaction');
   }
 
-  // 5. Create transaction record (ledger)
-  await walletService.createTransaction({
-    wallet_id: wallet.id,
-    user_id: userId,
-    transaction_type: 'withdrawal',
-    direction: 'debit',
-    amount,
-    status: 'pending',
-    reference: internalReference,
-    description: 'Withdrawal request initiated',
-    related_withdrawal_id: withdrawal.id
-  });
+  // Fetch the created withdrawal to return it
+  const { data: withdrawal } = await supabase
+    .from('withdrawals')
+    .select('*')
+    .eq('id', result.withdrawal_id)
+    .single();
 
   return withdrawal;
 };
