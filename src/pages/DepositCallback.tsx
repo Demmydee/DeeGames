@@ -31,6 +31,13 @@ const DepositCallback = () => {
   useEffect(() => {
     const verifyPayment = async () => {
       const reference = searchParams.get('reference') || searchParams.get('trxref');
+      const errorParam = searchParams.get('error');
+
+      if (errorParam) {
+        setStatus('failed');
+        setMessage(decodeURIComponent(errorParam));
+        return;
+      }
 
       if (!reference) {
         setStatus('failed');
@@ -123,3 +130,4 @@ const DepositCallback = () => {
 };
 
 export default DepositCallback;
+git add

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as depositService from '../services/depositService';
+import { config } from '../config';
 
 export const initiateDeposit = async (req: any, res: Response) => {
   try {
@@ -25,15 +26,22 @@ export const handleCallback = async (req: Request, res: Response) => {
   try {
     const { trxref, reference } = req.query;
     const ref = (reference || trxref) as string;
-    
+
     if (!ref) {
-      return res.status(400).json({ error: 'No reference provided' });
+      return res.redirect(`${config.frontendUrl}/deposit/callback?error=No reference provided`);
     }
 
-    const result = await depositService.verifyDeposit(ref);
-    res.status(200).json(result);
+    // Verify the deposit to ensure the wallet is credited before the user sees the result
+    await depositService.verifyDeposit(ref);
+
+    // Redirect to the frontend callback page
+    res.redirect(`${config.frontendUrl}/deposit/callback?reference=${ref}`);
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    console.error('Callback Error:', error.message);
+    // Even if verification fails here, redirect to frontend so it can show the error message
+    const { trxref, reference } = req.query;
+    const ref = (reference || trxref) as string;
+    res.redirect(`${config.frontendUrl}/deposit/callback?reference=${ref}&error=${encodeURIComponent(error.message)}`);
   }
 };
 
