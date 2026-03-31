@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Minus, Building2, AlertCircle, ArrowRight, Loader2, Plus, ArrowLeft } from 'lucide-react';
+import { Minus, Building2, AlertCircle, ArrowRight, Loader2, Plus, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import apiClient from '../api/client';
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -13,6 +13,24 @@ const Withdraw = () => {
   const [fetchingAccounts, setFetchingAccounts] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [wallet, setWallet] = useState<any>(null);
+  const [success, setSuccess] = useState(false);
+  const [countdown, setCountdown] = useState(3);
+
+  useEffect(() => {
+    if (success) {
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            navigate('/wallet');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [success, navigate]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -63,7 +81,7 @@ const Withdraw = () => {
         amount: withdrawAmount,
         payoutAccountId: selectedAccountId
       });
-      navigate('/wallet');
+      setSuccess(true);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to submit withdrawal request. Please try again.');
       setLoading(false);
@@ -93,22 +111,44 @@ const Withdraw = () => {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md bg-neutral-900 border border-neutral-800 p-8 rounded-3xl shadow-2xl"
       >
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-orange-600/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Minus className="w-8 h-8 text-orange-500" />
+        {success ? (
+          <div className="text-center py-8">
+            <div className="w-20 h-20 bg-green-600/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle2 className="w-10 h-10 text-green-500" />
+            </div>
+            <h2 className="text-3xl font-black uppercase italic mb-4">Request Submitted!</h2>
+            <p className="text-neutral-400 mb-8">
+              Your withdrawal request has been received and is being processed.
+            </p>
+            <p className="text-sm text-neutral-500">Redirecting to Wallet in {countdown}s...</p>
+            <div className="pt-6">
+              <Link
+                to="/wallet"
+                className="w-full bg-neutral-800 hover:bg-neutral-700 text-white font-black uppercase tracking-widest py-4 rounded-xl transition-all flex items-center justify-center gap-2"
+              >
+                Go to Wallet Now <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
           </div>
-          <h2 className="text-3xl font-black uppercase italic mb-2">Withdraw Funds</h2>
-          <p className="text-neutral-400">Transfer money to your bank account</p>
-        </div>
+        ) : (
+          <>
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-orange-600/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Minus className="w-8 h-8 text-orange-500" />
+              </div>
+              <h2 className="text-3xl font-black uppercase italic mb-2">Withdraw Funds</h2>
+              <p className="text-neutral-400">Transfer money to your bank account</p>
+            </div>
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-xl flex items-center gap-3 text-red-500 text-sm">
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            {error}
-          </div>
-        )}
+            {error && (
+              <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-xl flex items-center gap-3 text-red-500 text-sm">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                {error}
+              </div>
+            )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* ... form content ... */}
           <div>
             <div className="flex justify-between mb-2">
               <label className="text-sm font-bold uppercase tracking-wider text-neutral-500 block">Amount (NGN)</label>
@@ -191,6 +231,8 @@ const Withdraw = () => {
         <p className="text-center mt-6 text-neutral-500 text-xs">
           Withdrawal requests are processed within 24-48 hours. Minimum withdrawal is ₦500.
         </p>
+          </>
+        )}
       </motion.div>
     </div>
   );

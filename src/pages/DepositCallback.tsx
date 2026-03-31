@@ -9,11 +9,29 @@ const DepositCallback = () => {
   const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'success' | 'failed'>('loading');
   const [message, setMessage] = useState('Verifying your payment...');
+  const [countdown, setCountdown] = useState(3);
+
+  useEffect(() => {
+    if (status === 'success' || status === 'failed') {
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            // On success, go to wallet. On failure, go back to deposit page to try again.
+            navigate(status === 'success' ? '/wallet' : '/deposit');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [status, navigate]);
 
   useEffect(() => {
     const verifyPayment = async () => {
       const reference = searchParams.get('reference') || searchParams.get('trxref');
-      
+
       if (!reference) {
         setStatus('failed');
         setMessage('No transaction reference found.');
@@ -59,6 +77,7 @@ const DepositCallback = () => {
             <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto" />
             <h2 className="text-2xl font-black uppercase italic">Payment Successful!</h2>
             <p className="text-neutral-400">{message}</p>
+            <p className="text-sm text-neutral-500">Redirecting in {countdown}s...</p>
             <div className="pt-6 space-y-3">
               <Link
                 to="/wallet"
@@ -81,6 +100,7 @@ const DepositCallback = () => {
             <XCircle className="w-16 h-16 text-red-500 mx-auto" />
             <h2 className="text-2xl font-black uppercase italic">Payment Failed</h2>
             <p className="text-neutral-400">{message}</p>
+            <p className="text-sm text-neutral-500">Redirecting back in {countdown}s...</p>
             <div className="pt-6 space-y-3">
               <Link
                 to="/deposit"
