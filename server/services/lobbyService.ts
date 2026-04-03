@@ -41,7 +41,7 @@ export const getRoomCategoryById = async (id: string) => {
 
 export const getRoomOccupancy = async (roomId: string) => {
   // occupancy count based on active matches and pending requests
-  
+
   // 1. Get active requests in this room
   const { data: requests, error: requestsError } = await supabase
     .from('game_requests')
@@ -59,7 +59,7 @@ export const getRoomOccupancy = async (roomId: string) => {
       .from('game_request_participants')
       .select('*', { count: 'exact', head: true })
       .in('game_request_id', requestIds);
-    
+
     if (error) throw new Error('Failed to fetch request participants for occupancy');
     requestsParticipantsCount = count || 0;
   }
@@ -85,7 +85,7 @@ export const getRoomOccupancy = async (roomId: string) => {
     if (error) throw new Error('Failed to fetch match participants for occupancy');
     matchesParticipantsCount = count || 0;
   }
-  
+
   return requestsParticipantsCount + matchesParticipantsCount;
 };
 
@@ -97,7 +97,12 @@ export const getRoomGames = async (roomId: string) => {
       *,
       game_type:game_types(*),
       requester:users(username),
-      participants:game_request_participants(user_id, status, joined_at)
+      participants:game_request_participants(
+        user_id,
+        status,
+        joined_at,
+        users(username)
+      )
     `)
     .eq('room_category_id', roomId)
     .in('status', ['awaiting_opponents', 'ready_to_start'])
@@ -110,7 +115,12 @@ export const getRoomGames = async (roomId: string) => {
       *,
       game_type:game_types(*),
       started_by:users(username),
-      participants:match_participants(user_id, status, joined_at)
+      participants:match_participants(
+        user_id,
+        status,
+        joined_at,
+        users(username)
+      )
     `)
     .eq('room_category_id', roomId)
     .in('status', ['waiting', 'in_progress'])

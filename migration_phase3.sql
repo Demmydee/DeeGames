@@ -101,25 +101,39 @@ ON CONFLICT (code) DO NOTHING;
 
 -- 8. RLS Policies
 ALTER TABLE public.room_categories ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view active room categories" ON public.room_categories;
 CREATE POLICY "Anyone can view active room categories" ON public.room_categories FOR SELECT USING (is_active = TRUE);
 
 ALTER TABLE public.game_types ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view active game types" ON public.game_types;
 CREATE POLICY "Anyone can view active game types" ON public.game_types FOR SELECT USING (is_active = TRUE);
 
 ALTER TABLE public.game_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view active game requests" ON public.game_requests;
 CREATE POLICY "Anyone can view active game requests" ON public.game_requests FOR SELECT USING (status IN ('awaiting_opponents', 'ready_to_start', 'started'));
+DROP POLICY IF EXISTS "Users can create game requests" ON public.game_requests;
 CREATE POLICY "Users can create game requests" ON public.game_requests FOR INSERT WITH CHECK (auth.uid() = requester_user_id);
+DROP POLICY IF EXISTS "Requesters can update their own requests" ON public.game_requests;
 CREATE POLICY "Requesters can update their own requests" ON public.game_requests FOR UPDATE USING (auth.uid() = requester_user_id);
+DROP POLICY IF EXISTS "Requesters can delete their own requests" ON public.game_requests;
+CREATE POLICY "Requesters can delete their own requests" ON public.game_requests FOR DELETE USING (auth.uid() = requester_user_id);
 
 ALTER TABLE public.game_request_participants ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view request participants" ON public.game_request_participants;
 CREATE POLICY "Anyone can view request participants" ON public.game_request_participants FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Users can join requests" ON public.game_request_participants;
 CREATE POLICY "Users can join requests" ON public.game_request_participants FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can leave requests" ON public.game_request_participants;
 CREATE POLICY "Users can leave requests" ON public.game_request_participants FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete their own participation" ON public.game_request_participants;
+CREATE POLICY "Users can delete their own participation" ON public.game_request_participants FOR DELETE USING (auth.uid() = user_id);
 
 ALTER TABLE public.matches ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view matches" ON public.matches;
 CREATE POLICY "Anyone can view matches" ON public.matches FOR SELECT USING (TRUE);
 
 ALTER TABLE public.match_participants ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view match participants" ON public.match_participants;
 CREATE POLICY "Anyone can view match participants" ON public.match_participants FOR SELECT USING (TRUE);
 
 -- 9. Atomic Start Game Request Function
@@ -137,24 +151,24 @@ DECLARE
 BEGIN
     -- 1. Lock request for update
     SELECT * INTO v_request FROM public.game_requests WHERE id = p_request_id FOR UPDATE;
-    
+
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Game request not found';
     END IF;
-    
+
     IF v_request.status != 'awaiting_opponents' AND v_request.status != 'ready_to_start' THEN
         RAISE EXCEPTION 'Game request is not in a startable state: %', v_request.status;
     END IF;
-    
+
     IF v_request.requester_user_id != p_started_by_user_id THEN
         RAISE EXCEPTION 'Only the requester can start the game';
     END IF;
-    
+
     -- 2. Verify participant count
     IF (SELECT count(*) FROM public.game_request_participants WHERE game_request_id = p_request_id AND status = 'joined') < v_request.required_players THEN
         RAISE EXCEPTION 'Not enough players to start the game';
     END IF;
-    
+
     -- 3. Create Match
     INSERT INTO public.matches (
         game_request_id,
@@ -177,7 +191,7 @@ BEGIN
         'in_progress',
         NOW()
     ) RETURNING id INTO v_match_id;
-    
+
     -- 4. Process each participant
     FOR v_participant IN (SELECT * FROM public.game_request_participants WHERE game_request_id = p_request_id AND status = 'joined' ORDER BY joined_at ASC) LOOP
         -- Add to match_participants
@@ -192,23 +206,23 @@ BEGIN
             (SELECT count(*) + 1 FROM public.match_participants WHERE match_id = v_match_id),
             'active'
         );
-        
+
         -- Wager Locking (if amount > 0)
         IF v_request.amount > 0 THEN
             -- Lock wallet row
             SELECT id INTO v_wallet_id FROM public.wallets WHERE user_id = v_participant.user_id FOR UPDATE;
-            
+
             -- Check balance and update
             IF (SELECT available_balance FROM public.wallets WHERE id = v_wallet_id) < v_request.amount THEN
                 RAISE EXCEPTION 'User % has insufficient balance', v_participant.user_id;
             END IF;
-            
+
             UPDATE public.wallets SET
                 available_balance = available_balance - v_request.amount,
                 locked_balance = locked_balance + v_request.amount,
                 updated_at = NOW()
             WHERE id = v_wallet_id;
-            
+
             -- Create transaction record
             INSERT INTO public.wallet_transactions (
                 wallet_id,
@@ -232,21 +246,91 @@ BEGIN
                 jsonb_build_object('match_id', v_match_id, 'request_id', p_request_id)
             );
         END IF;
-        
+
         -- Update participant status in request
         UPDATE public.game_request_participants SET status = 'locked_in' WHERE id = v_participant.id;
     END LOOP;
-    
+
     -- 5. Update request status
     UPDATE public.game_requests SET status = 'started', started_at = NOW() WHERE id = p_request_id;
-    
+
     RETURN jsonb_build_object('success', true, 'match_id', v_match_id);
 EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'Failed to start game: %', SQLERRM;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 10. Check Active Participation Function
+-- 10. Cancel Game Request Function
+CREATE OR REPLACE FUNCTION public.cancel_game_request(
+    p_request_id UUID,
+    p_user_id UUID
+)
+RETURNS JSONB AS $$
+DECLARE
+    v_request RECORD;
+BEGIN
+    SELECT * INTO v_request FROM public.game_requests WHERE id = p_request_id FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Game request not found';
+    END IF;
+
+    IF v_request.requester_user_id != p_user_id THEN
+        RAISE EXCEPTION 'Only the requester can cancel the request';
+    END IF;
+
+    IF v_request.status = 'started' THEN
+        RAISE EXCEPTION 'Cannot cancel a game that has already started';
+    END IF;
+
+    UPDATE public.game_requests SET
+        status = 'cancelled',
+        cancelled_at = NOW(),
+        updated_at = NOW()
+    WHERE id = p_request_id;
+
+    RETURN jsonb_build_object('success', true);
+EXCEPTION WHEN OTHERS THEN
+    RAISE EXCEPTION 'Failed to cancel game request: %', SQLERRM;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 11. Leave Game Request Function
+CREATE OR REPLACE FUNCTION public.leave_game_request(
+    p_request_id UUID,
+    p_user_id UUID
+)
+RETURNS JSONB AS $$
+DECLARE
+    v_participant RECORD;
+    v_request RECORD;
+BEGIN
+    SELECT * INTO v_participant FROM public.game_request_participants
+    WHERE game_request_id = p_request_id AND user_id = p_user_id FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Participation not found';
+    END IF;
+
+    IF v_participant.role = 'requester' THEN
+        RAISE EXCEPTION 'Requester should cancel the request instead of leaving';
+    END IF;
+
+    DELETE FROM public.game_request_participants WHERE id = v_participant.id;
+
+    -- Update request status back to awaiting_opponents if it was ready_to_start
+    UPDATE public.game_requests SET
+        status = 'awaiting_opponents',
+        updated_at = NOW()
+    WHERE id = p_request_id AND status = 'ready_to_start';
+
+    RETURN jsonb_build_object('success', true);
+EXCEPTION WHEN OTHERS THEN
+    RAISE EXCEPTION 'Failed to leave game request: %', SQLERRM;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 12. Check Active Participation Function
 CREATE OR REPLACE FUNCTION public.check_user_active_participation(p_user_id UUID)
 RETURNS JSONB AS $$
 DECLARE

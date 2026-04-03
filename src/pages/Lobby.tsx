@@ -135,7 +135,7 @@ const Lobby: React.FC = () => {
                 {room.is_free ? (
                   'No Entry Fee'
                 ) : (
-                  `Wager: ₦${room.min_wager.toLocaleString()} ${room.max_wager ? `- ₦${room.max_wager.toLocaleString()}` : '+'}`
+                  `Wager Range: ₦${room.min_wager.toLocaleString()} ${room.max_wager ? `- ₦${room.max_wager.toLocaleString()}` : '+'}`
                 )}
               </div>
               <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

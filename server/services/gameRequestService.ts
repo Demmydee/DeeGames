@@ -43,6 +43,18 @@ export const createGameRequest = async (userId: string, requestData: any) => {
     if (amount < room.min_wager || (room.max_wager && amount > room.max_wager)) {
       throw new Error(`Wager amount must be between ${room.min_wager} and ${room.max_wager || 'above'}`);
     }
+
+    // Precheck balance for paid rooms
+    const { data: wallet, error: walletError } = await supabase
+      .from('wallets')
+      .select('available_balance')
+      .eq('user_id', userId)
+      .single();
+
+    if (walletError || !wallet) throw new Error('Wallet not found');
+    if (wallet.available_balance < amount) {
+      throw new Error(`Insufficient balance. You need ₦${amount.toLocaleString()} to create this game.`);
+    }
   } else if (amount > 0) {
     throw new Error('Wager amount must be 0 for free rooms');
   }
@@ -74,7 +86,11 @@ export const createGameRequest = async (userId: string, requestData: any) => {
       status: 'joined'
     }]);
 
-  if (participantError) throw new Error('Failed to add requester to participants');
+  if (participantError) {
+    // Rollback request if participant creation fails
+    await supabase.from('game_requests').delete().eq('id', request.id);
+    throw new Error('Failed to add requester to participants');
+  }
 
   return request;
 };
@@ -141,52 +157,23 @@ export const joinGameRequest = async (userId: string, requestId: string) => {
 };
 
 export const cancelGameRequest = async (userId: string, requestId: string) => {
-  const { data: request, error: requestError } = await supabase
-    .from('game_requests')
-    .select('*')
-    .eq('id', requestId)
-    .single();
+  const { data, error } = await supabase.rpc('cancel_game_request', {
+    p_request_id: requestId,
+    p_user_id: userId
+  });
 
-  if (requestError || !request) throw new Error('Game request not found');
-  if (request.requester_user_id !== userId) throw new Error('Only the requester can cancel the request');
-  if (request.status === 'started') throw new Error('Cannot cancel a game that has already started');
-
-  const { error: cancelError } = await supabase
-    .from('game_requests')
-    .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
-    .eq('id', requestId);
-
-  if (cancelError) throw new Error('Failed to cancel game request');
-
-  return { success: true };
+  if (error) throw new Error(error.message || 'Failed to cancel game request');
+  return data;
 };
 
 export const leaveGameRequest = async (userId: string, requestId: string) => {
-  const { data: participant, error: participantError } = await supabase
-    .from('game_request_participants')
-    .select('*')
-    .eq('game_request_id', requestId)
-    .eq('user_id', userId)
-    .single();
+  const { data, error } = await supabase.rpc('leave_game_request', {
+    p_request_id: requestId,
+    p_user_id: userId
+  });
 
-  if (participantError || !participant) throw new Error('Participation not found');
-  if (participant.role === 'requester') throw new Error('Requester should cancel the request instead of leaving');
-
-  const { error: leaveError } = await supabase
-    .from('game_request_participants')
-    .delete()
-    .eq('id', participant.id);
-
-  if (leaveError) throw new Error('Failed to leave game request');
-
-  // Update request status back to awaiting_opponents if it was ready_to_start
-  await supabase
-    .from('game_requests')
-    .update({ status: 'awaiting_opponents' })
-    .eq('id', requestId)
-    .eq('status', 'ready_to_start');
-
-  return { success: true };
+  if (error) throw new Error(error.message || 'Failed to leave game request');
+  return data;
 };
 
 export const startGameRequest = async (userId: string, requestId: string) => {

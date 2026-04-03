@@ -67,7 +67,7 @@ const MatchCard: React.FC<Props> = ({ match }) => {
             <span className="text-[10px] font-bold uppercase tracking-widest">Prize Pool</span>
           </div>
           <div className="text-sm font-bold text-emerald-400">
-            ₦{((match.participants?.length || 0) * (match.game_request_id ? 1000 : 0)).toLocaleString()}
+            {match.amount > 0 ? `₦${(match.amount * (match.participants?.length || 0)).toLocaleString()}` : 'FREE'}
           </div>
         </div>
       </div>
