@@ -1,9 +1,30 @@
 import { supabase } from '../config/supabase';
 
 export const createGameRequest = async (userId: string, requestData: any) => {
-  const { room_category_id, game_type_id, category, pay_mode, amount, required_players } = requestData;
+  let { room_category_id, game_type_id, category, pay_mode, amount, required_players } = requestData;
 
-  // 1. Check active participation
+  // 1. Validate category and pay_mode rules
+  if (category === 'duel') {
+    pay_mode = 'knockout'; // Duel is always knockout
+    required_players = 2; // Duel is always 2 players
+  }
+
+  if (category === 'arena') {
+    if (!['knockout', 'split'].includes(pay_mode)) {
+      throw new Error('Arena must be knockout or split');
+    }
+    // Arena can have more than 2 players
+  }
+
+  if (pay_mode === 'split') {
+    // Split mode must only be available where player count and game mode are valid
+    // For now, let's say split is only for arena with > 2 players
+    if (category !== 'arena' || required_players <= 2) {
+      throw new Error('Split mode is only available for Arena with more than 2 players');
+    }
+  }
+
+  // 2. Check active participation
   const { data: participation, error: participationError } = await supabase.rpc('check_user_active_participation', { p_user_id: userId });
   if (participationError) throw new Error('Failed to check active participation');
   if (participation.active) {
@@ -76,6 +97,20 @@ export const joinGameRequest = async (userId: string, requestId: string) => {
   if (requestError || !request) throw new Error('Game request not found');
   if (request.status !== 'awaiting_opponents' && request.status !== 'ready_to_start') {
     throw new Error('Game request is no longer open');
+  }
+
+  // 3. Precheck balance if paid room
+  if (request.amount > 0) {
+    const { data: wallet, error: walletError } = await supabase
+      .from('wallets')
+      .select('available_balance')
+      .eq('user_id', userId)
+      .single();
+
+    if (walletError || !wallet) throw new Error('Wallet not found');
+    if (wallet.available_balance < request.amount) {
+      throw new Error(`Insufficient balance. You need ₦${request.amount.toLocaleString()} to join this game.`);
+    }
   }
 
   if (request.participants.length >= request.required_players) {

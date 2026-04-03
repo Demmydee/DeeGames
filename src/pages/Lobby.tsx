@@ -106,15 +106,21 @@ const Lobby: React.FC = () => {
               <div className="p-3 rounded-xl bg-black/40 border border-white/10 group-hover:border-white/20 transition-colors">
                 {getIcon(room.icon_name)}
               </div>
-              {room.is_free ? (
-                <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider border border-emerald-500/30">
-                  Free to Play
-                </span>
-              ) : (
-                <span className="px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold uppercase tracking-wider border border-orange-500/30">
-                  Paid Wagers
-                </span>
-              )}
+              <div className="flex flex-col items-end gap-2">
+                {room.is_free ? (
+                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider border border-emerald-500/30">
+                    Free to Play
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold uppercase tracking-wider border border-orange-500/30">
+                    Paid Wagers
+                  </span>
+                )}
+                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest opacity-60">
+                  <Users className="w-3 h-3" />
+                  <span>{(room as any).occupancy || 0} Players</span>
+                </div>
+              </div>
             </div>
 
             <h3 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tight">

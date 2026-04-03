@@ -26,8 +26,8 @@ export interface GameRequest {
   room_category_id: string;
   game_type_id: string;
   requester_user_id: string;
-  category: 'casual' | 'ranked';
-  pay_mode: 'wallet' | 'bonus';
+  category: 'duel' | 'arena';
+  pay_mode: 'knockout' | 'split';
   amount: number;
   required_players: number;
   status: GameRequestStatus;

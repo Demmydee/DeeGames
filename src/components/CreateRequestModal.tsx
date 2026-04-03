@@ -28,8 +28,8 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
 
   const [formData, setFormData] = useState({
     game_type_id: '',
-    category: 'casual' as 'casual' | 'ranked',
-    pay_mode: 'wallet' as 'wallet' | 'bonus',
+    category: 'duel' as 'duel' | 'arena',
+    pay_mode: 'knockout' as 'knockout' | 'split',
     amount: room.min_wager,
     required_players: 2
   });
@@ -40,7 +40,11 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
         const data = await lobbyApi.getGameTypes();
         setGameTypes(data);
         if (data.length > 0) {
-          setFormData(prev => ({ ...prev, game_type_id: data[0].id }));
+          setFormData(prev => ({
+            ...prev,
+            game_type_id: data[0].id,
+            required_players: data[0].min_players
+          }));
         }
       } catch (err: any) {
         setError('Failed to load game types');
@@ -74,6 +78,26 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
 
   const selectedGame = gameTypes.find(g => g.id === formData.game_type_id);
 
+  // Enforce rules when category or game type changes
+  useEffect(() => {
+    if (formData.category === 'duel') {
+      setFormData(prev => ({
+        ...prev,
+        pay_mode: 'knockout',
+        required_players: 2
+      }));
+    }
+  }, [formData.category]);
+
+  useEffect(() => {
+    if (selectedGame) {
+      setFormData(prev => ({
+        ...prev,
+        required_players: Math.max(selectedGame.min_players, Math.min(prev.required_players, selectedGame.max_players))
+      }));
+    }
+  }, [formData.game_type_id, selectedGame]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
       <motion.div
@@ -91,7 +115,7 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
               Create Game Request
             </h2>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-white/5 transition-colors text-gray-500 hover:text-white"
           >
@@ -134,8 +158,8 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
                       type="button"
                       onClick={() => setFormData({ ...formData, game_type_id: game.id })}
                       className={`p-4 rounded-xl border-2 text-left transition-all ${
-                        formData.game_type_id === game.id 
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white' 
+                        formData.game_type_id === game.id
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white'
                           : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
                       }`}
                     >
@@ -158,12 +182,19 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
                 </label>
                 <select
                   value={formData.required_players}
+                  disabled={formData.category === 'duel'}
                   onChange={(e) => setFormData({ ...formData, required_players: parseInt(e.target.value) })}
-                  className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+                  className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
                 >
-                  {[2, 3, 4].map(num => (
-                    <option key={num} value={num} className="bg-[#0a0a0a]">{num} Players</option>
-                  ))}
+                  {selectedGame ? (
+                    Array.from({ length: selectedGame.max_players - selectedGame.min_players + 1 }, (_, i) => selectedGame.min_players + i).map(num => (
+                      <option key={num} value={num} className="bg-[#0a0a0a]">{num} Players</option>
+                    ))
+                  ) : (
+                    [2, 3, 4].map(num => (
+                      <option key={num} value={num} className="bg-[#0a0a0a]">{num} Players</option>
+                    ))
+                  )}
                 </select>
               </div>
               <div className="space-y-2">
@@ -176,10 +207,48 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
                   onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
                   className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
                 >
-                  <option value="casual" className="bg-[#0a0a0a]">Casual</option>
-                  <option value="ranked" className="bg-[#0a0a0a]">Ranked</option>
+                  <option value="duel" className="bg-[#0a0a0a]">Duel (1v1)</option>
+                  <option value="arena" className="bg-[#0a0a0a]">Arena (Multiplayer)</option>
                 </select>
               </div>
+            </div>
+
+            {/* Pay Mode */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                <Wallet className="w-3 h-3" />
+                Payout Mode
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, pay_mode: 'knockout' })}
+                  className={`p-3 rounded-xl border-2 text-center transition-all ${
+                    formData.pay_mode === 'knockout'
+                      ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                      : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
+                  }`}
+                >
+                  <div className="font-bold text-sm">Knockout</div>
+                  <div className="text-[10px] opacity-60 uppercase tracking-wider">Winner takes all</div>
+                </button>
+                <button
+                  type="button"
+                  disabled={formData.category === 'duel' || formData.required_players <= 2}
+                  onClick={() => setFormData({ ...formData, pay_mode: 'split' })}
+                  className={`p-3 rounded-xl border-2 text-center transition-all ${
+                    formData.pay_mode === 'split'
+                      ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                      : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10 disabled:opacity-30'
+                  }`}
+                >
+                  <div className="font-bold text-sm">Split</div>
+                  <div className="text-[10px] opacity-60 uppercase tracking-wider">Top players share</div>
+                </button>
+              </div>
+              {formData.category === 'duel' && (
+                <p className="text-[10px] text-emerald-500/60 uppercase tracking-wider">Duel is always knockout</p>
+              )}
             </div>
 
             {/* Wager Amount */}

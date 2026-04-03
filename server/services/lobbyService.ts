@@ -1,25 +1,42 @@
 import { supabase } from '../config/supabase';
 
 export const getRoomCategories = async () => {
-  const { data, error } = await supabase
+  const { data: rooms, error } = await supabase
     .from('room_categories')
     .select('*')
     .eq('is_active', true)
     .order('sort_order', { ascending: true });
 
   if (error) throw new Error('Failed to fetch room categories');
-  return data;
+
+  // Add occupancy to each room
+  const roomsWithOccupancy = await Promise.all(rooms.map(async (room) => {
+    try {
+      const occupancy = await getRoomOccupancy(room.id);
+      return { ...room, occupancy };
+    } catch (err) {
+      return { ...room, occupancy: 0 };
+    }
+  }));
+
+  return roomsWithOccupancy;
 };
 
 export const getRoomCategoryById = async (id: string) => {
-  const { data, error } = await supabase
+  const { data: room, error } = await supabase
     .from('room_categories')
     .select('*')
     .eq('id', id)
     .single();
 
-  if (error) throw new Error('Room category not found');
-  return data;
+  if (error || !room) throw new Error('Room category not found');
+
+  try {
+    const occupancy = await getRoomOccupancy(room.id);
+    return { ...room, occupancy };
+  } catch (err) {
+    return { ...room, occupancy: 0 };
+  }
 };
 
 export const getRoomOccupancy = async (roomId: string) => {
