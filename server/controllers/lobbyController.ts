@@ -45,3 +45,14 @@ export const getGameTypes = async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+export const updatePresence = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const roomId = req.params.id;
+    await lobbyService.updateRoomPresence(roomId, userId);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};

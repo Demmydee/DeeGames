@@ -11,5 +11,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase credentials missing. Database operations will fail.');
 }
 
-// Use service role key if available for backend operations to bypass RLS
-export const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey);
+// Use service role key for backend operations to bypass RLS
+// We use a dedicated admin client to avoid session cross-talk
+export const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
+
+// Separate client for auth operations if needed
+export const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);

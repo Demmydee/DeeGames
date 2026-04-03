@@ -13,7 +13,8 @@ import {
   Search,
   Filter,
   Lock,
-  Unlock
+  Unlock,
+  X
 } from 'lucide-react';
 import { lobbyApi, gameRequestApi } from '../services/multiplayerApi';
 import { RoomCategory, GameRequest, Match } from '../types/multiplayer';
@@ -59,15 +60,35 @@ const Room: React.FC = () => {
     fetchData();
     // Set up polling for real-time updates (every 5 seconds)
     const interval = setInterval(() => fetchData(true), 5000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+
+    // Presence tracking
+    const updatePresence = async () => {
+      if (id) {
+        try {
+          await lobbyApi.updatePresence(id);
+        } catch (err) {
+          console.error('Failed to update presence');
+        }
+      }
+    };
+
+    updatePresence();
+    const presenceInterval = setInterval(updatePresence, 20000); // Every 20 seconds
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(presenceInterval);
+    };
+  }, [fetchData, id]);
 
   const handleJoinRequest = async (requestId: string) => {
     try {
       await gameRequestApi.join(requestId);
       fetchData(true);
+      setError(null);
     } catch (err: any) {
-      alert(err.response?.data?.error || err.message);
+      const msg = err.response?.data?.error || err.message;
+      setError(msg);
     }
   };
 
@@ -75,8 +96,9 @@ const Room: React.FC = () => {
     try {
       await gameRequestApi.cancel(requestId);
       fetchData(true);
+      setError(null);
     } catch (err: any) {
-      alert(err.response?.data?.error || err.message);
+      setError(err.response?.data?.error || err.message);
     }
   };
 
@@ -84,8 +106,9 @@ const Room: React.FC = () => {
     try {
       await gameRequestApi.leave(requestId);
       fetchData(true);
+      setError(null);
     } catch (err: any) {
-      alert(err.response?.data?.error || err.message);
+      setError(err.response?.data?.error || err.message);
     }
   };
 
@@ -94,7 +117,7 @@ const Room: React.FC = () => {
       const { match_id } = await gameRequestApi.start(requestId);
       navigate(`/match/${match_id}`);
     } catch (err: any) {
-      alert(err.response?.data?.error || err.message);
+      setError(err.response?.data?.error || err.message);
     }
   };
 
@@ -124,6 +147,39 @@ const Room: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
+      {/* Error Message */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="mb-8 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex flex-col sm:flex-row items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-3 text-red-400">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <p className="text-sm font-medium">{error}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {error.toLowerCase().includes('balance') && (
+                <button
+                  onClick={() => navigate('/wallet')}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all"
+                >
+                  Deposit Now
+                </button>
+              )}
+              <button
+                onClick={() => setError(null)}
+                className="p-2 hover:bg-white/5 rounded-lg text-gray-500 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div className="flex items-center gap-4">

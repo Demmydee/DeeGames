@@ -40,53 +40,33 @@ export const getRoomCategoryById = async (id: string) => {
 };
 
 export const getRoomOccupancy = async (roomId: string) => {
-  // occupancy count based on active matches and pending requests
+  // Prune old presence first
+  await supabase.rpc('prune_room_presence');
 
-  // 1. Get active requests in this room
-  const { data: requests, error: requestsError } = await supabase
-    .from('game_requests')
-    .select('id')
-    .eq('room_category_id', roomId)
-    .in('status', ['awaiting_opponents', 'ready_to_start']);
+  // Count active users in this room from room_presence table
+  const { count, error } = await supabase
+    .from('room_presence')
+    .select('*', { count: 'exact', head: true })
+    .eq('room_id', roomId);
 
-  if (requestsError) throw new Error('Failed to fetch requests for occupancy');
-
-  const requestIds = requests.map(r => r.id);
-  let requestsParticipantsCount = 0;
-
-  if (requestIds.length > 0) {
-    const { count, error } = await supabase
-      .from('game_request_participants')
-      .select('*', { count: 'exact', head: true })
-      .in('game_request_id', requestIds);
-
-    if (error) throw new Error('Failed to fetch request participants for occupancy');
-    requestsParticipantsCount = count || 0;
+  if (error) {
+    console.error('Fetch Occupancy Error:', error);
+    return 0;
   }
 
-  // 2. Get active matches in this room
-  const { data: matches, error: matchesError } = await supabase
-    .from('matches')
-    .select('id')
-    .eq('room_category_id', roomId)
-    .in('status', ['waiting', 'in_progress']);
+  return count || 0;
+};
 
-  if (matchesError) throw new Error('Failed to fetch matches for occupancy');
+export const updateRoomPresence = async (roomId: string, userId: string) => {
+  const { error } = await supabase.rpc('update_room_presence', {
+    p_room_id: roomId,
+    p_user_id: userId
+  });
 
-  const matchIds = matches.map(m => m.id);
-  let matchesParticipantsCount = 0;
-
-  if (matchIds.length > 0) {
-    const { count, error } = await supabase
-      .from('match_participants')
-      .select('*', { count: 'exact', head: true })
-      .in('match_id', matchIds);
-
-    if (error) throw new Error('Failed to fetch match participants for occupancy');
-    matchesParticipantsCount = count || 0;
+  if (error) {
+    console.error('Update Presence Error:', error);
+    throw new Error('Failed to update presence');
   }
-
-  return requestsParticipantsCount + matchesParticipantsCount;
 };
 
 export const getRoomGames = async (roomId: string) => {

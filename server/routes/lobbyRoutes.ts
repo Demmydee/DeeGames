@@ -9,5 +9,6 @@ router.get('/rooms/:id', authenticateToken, lobbyController.getRoomCategoryById)
 router.get('/rooms/:id/occupancy', authenticateToken, lobbyController.getRoomOccupancy);
 router.get('/rooms/:id/games', authenticateToken, lobbyController.getRoomGames);
 router.get('/game-types', authenticateToken, lobbyController.getGameTypes);
+router.post('/rooms/:id/presence', authenticateToken, lobbyController.updatePresence);
 
 export default router;

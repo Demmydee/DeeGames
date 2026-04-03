@@ -127,15 +127,18 @@ const GameRequestCard: React.FC<Props> = ({ request, onJoin, onCancel, onLeave, 
               <XCircle className="w-4 h-4" />
               <span>Cancel</span>
             </button>
-            {canStart && (
-              <button
-                onClick={onStart}
-                className="flex-[2] py-3 rounded-xl font-black uppercase italic tracking-widest transition-all flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20"
-              >
-                <Play className="w-4 h-4" />
-                <span>Start Game</span>
-              </button>
-            )}
+            <button
+              onClick={onStart}
+              disabled={!canStart}
+              className={`flex-[2] py-3 rounded-xl font-black uppercase italic tracking-widest transition-all flex items-center justify-center gap-2 ${
+                canStart
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20'
+                  : 'bg-white/5 text-gray-600 cursor-not-allowed border border-white/10'
+              }`}
+            >
+              <Play className="w-4 h-4" />
+              <span>Start Game</span>
+            </button>
           </div>
         ) : isParticipant ? (
           <div className="flex gap-2">

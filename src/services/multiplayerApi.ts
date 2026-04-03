@@ -23,6 +23,9 @@ export const lobbyApi = {
   getGameTypes: async (): Promise<GameType[]> => {
     const response = await apiClient.get(`${API_BASE}/lobby/game-types`);
     return response.data;
+  },
+  updatePresence: async (id: string): Promise<void> => {
+    await apiClient.post(`${API_BASE}/lobby/rooms/${id}/presence`);
   }
 };
 

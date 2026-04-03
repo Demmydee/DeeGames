@@ -103,15 +103,15 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="relative w-full max-w-lg bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
+        className="relative w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10">
+        <div className="flex items-center justify-between p-5 border-b border-white/10 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-              <Plus className="w-5 h-5" />
+              <Plus className="w-4 h-4" />
             </div>
-            <h2 className="text-xl font-black text-white uppercase italic tracking-tight">
+            <h2 className="text-lg font-black text-white uppercase italic tracking-tight">
               Create Game Request
             </h2>
           </div>
@@ -124,15 +124,15 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
         </div>
 
         {success ? (
-          <div className="p-12 text-center">
-            <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/20">
-              <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+          <div className="p-10 text-center">
+            <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
+              <CheckCircle2 className="w-8 h-8 text-emerald-500" />
             </div>
-            <h3 className="text-2xl font-bold text-white mb-2">Request Created!</h3>
-            <p className="text-gray-400">Your game request is now live in the lobby.</p>
+            <h3 className="text-xl font-bold text-white mb-2">Request Created!</h3>
+            <p className="text-gray-400 text-sm">Your game request is now live in the lobby.</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="p-5 space-y-5 overflow-y-auto">
             {error && (
               <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-400 text-sm">
                 <AlertCircle className="w-5 h-5 shrink-0" />
@@ -261,11 +261,15 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
                 <div className="relative">
                   <input
                     type="number"
-                    value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: parseInt(e.target.value) || 0 })}
+                    value={formData.amount === 0 ? '' : formData.amount}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                      setFormData({ ...formData, amount: isNaN(val) ? 0 : val });
+                    }}
                     min={room.min_wager}
                     max={room.max_wager || undefined}
-                    className="w-full p-4 pl-10 rounded-xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:border-emerald-500/50 transition-colors"
+                    placeholder="0"
+                    className="w-full p-3 pl-10 rounded-xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:border-emerald-500/50 transition-colors"
                   />
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">₦</span>
                 </div>
