@@ -198,13 +198,13 @@ export const getGameRequestById = async (id: string) => {
       *,
       game_type:game_types(*),
       room:room_categories(*),
-      requester:users(username),
+      requester:users!requester_user_id(username),
       participants:game_request_participants(
         user_id,
         role,
         status,
         joined_at,
-        users(username)
+        users!user_id(username)
       )
     `)
     .eq('id', id)

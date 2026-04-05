@@ -7,12 +7,12 @@ export const getMatchById = async (id: string) => {
       *,
       game_type:game_types(*),
       room:room_categories(*),
-      started_by:users(username),
+      started_by:users!started_by_user_id(username),
       participants:match_participants(
         user_id,
         status,
         joined_at,
-        users(username)
+        users!user_id(username)
       )
     `)
     .eq('id', id)

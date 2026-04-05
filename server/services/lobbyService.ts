@@ -79,12 +79,12 @@ export const getRoomGames = async (roomId: string) => {
     .select(`
       *,
       game_type:game_types(*),
-      requester:users(username),
+      requester:users!requester_user_id(username),
       participants:game_request_participants(
         user_id,
         status,
         joined_at,
-        users(username)
+        users!user_id(username)
       )
     `)
     .eq('room_category_id', roomId)
@@ -97,19 +97,26 @@ export const getRoomGames = async (roomId: string) => {
     .select(`
       *,
       game_type:game_types(*),
-      started_by:users(username),
+      started_by:users!started_by_user_id(username),
       participants:match_participants(
         user_id,
         status,
         joined_at,
-        users(username)
+        users!user_id(username)
       )
     `)
     .eq('room_category_id', roomId)
     .in('status', ['waiting', 'in_progress'])
     .order('started_at', { ascending: false });
 
-  if (requestsError || matchesError) throw new Error('Failed to fetch games');
+  if (requestsError) {
+    console.error('Fetch Requests Error:', requestsError);
+    throw new Error('Failed to fetch game requests');
+  }
+  if (matchesError) {
+    console.error('Fetch Matches Error:', matchesError);
+    throw new Error('Failed to fetch matches');
+  }
 
   return {
     requests,
