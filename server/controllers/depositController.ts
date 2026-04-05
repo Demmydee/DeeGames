@@ -5,7 +5,7 @@ import { config } from '../config';
 export const initiateDeposit = async (req: any, res: Response) => {
   try {
     const { amount } = req.body;
-    const result = await depositService.initiateDeposit(req.user.id, req.user.email, amount);
+    const result = await depositService.initiateDeposit(req.user.id, req.user.email, amount, req.token);
     res.status(200).json(result);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -26,14 +26,14 @@ export const handleCallback = async (req: Request, res: Response) => {
   try {
     const { trxref, reference } = req.query;
     const ref = (reference || trxref) as string;
-    
+
     if (!ref) {
       return res.redirect(`${config.frontendUrl}/deposit/callback?error=No reference provided`);
     }
 
     // Verify the deposit to ensure the wallet is credited before the user sees the result
     await depositService.verifyDeposit(ref);
-    
+
     // Redirect to the frontend callback page
     res.redirect(`${config.frontendUrl}/deposit/callback?reference=${ref}`);
   } catch (error: any) {
@@ -59,7 +59,7 @@ export const handleWebhook = async (req: Request, res: Response) => {
 
 export const getDeposits = async (req: any, res: Response) => {
   try {
-    const deposits = await depositService.getUserDeposits(req.user.id);
+    const deposits = await depositService.getUserDeposits(req.user.id, req.token);
     res.status(200).json({ deposits });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

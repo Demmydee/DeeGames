@@ -13,6 +13,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // Use service role key for backend operations to bypass RLS
 // We use a dedicated admin client to avoid session cross-talk
+// IMPORTANT: Never call auth.signIn... or auth.setSession on this client
 export const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey, {
   auth: {
     autoRefreshToken: false,
@@ -20,5 +21,30 @@ export const supabase = createClient(supabaseUrl, supabaseServiceKey || supabase
   }
 });
 
-// Separate client for auth operations if needed
-export const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
+// Separate client for auth operations to prevent session cross-talk
+// This client will be used for signIn/signUp which sets internal state
+export const createAuthClient = () => createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
+
+export const supabaseAuth = createAuthClient();
+
+// Helper to create a client with a specific user's token
+// This is useful for respecting RLS on the backend without session cross-talk
+export const createClientWithToken = (token: string) => {
+  const client = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  });
+  return client;
+};

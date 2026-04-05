@@ -1,18 +1,21 @@
-import { supabase } from '../config/supabase';
+import { supabase, createClientWithToken } from '../config/supabase';
 import * as paystackService from './paystackService';
 import * as walletService from './walletService';
 import { config } from '../config';
 import crypto from 'crypto';
 
-export const initiateDeposit = async (userId: string, email: string, amount: number) => {
+export const initiateDeposit = async (userId: string, email: string, amount: number, token?: string) => {
   if (amount < config.wallet.minDeposit || amount > config.wallet.maxDeposit) {
     throw new Error(`Deposit amount must be between ${config.wallet.minDeposit} and ${config.wallet.maxDeposit}`);
   }
 
   const internalReference = `DEP_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
+  // Use user client if token provided, otherwise fallback to admin client
+  const client = token ? createClientWithToken(token) : supabase;
+
   // Create pending deposit record
-  const { data: deposit, error } = await supabase
+  const { data: deposit, error } = await client
     .from('deposits')
     .insert([{
       user_id: userId,
@@ -37,7 +40,7 @@ export const initiateDeposit = async (userId: string, email: string, amount: num
   );
 
   // Update deposit record with Paystack details
-  await supabase
+  await client
     .from('deposits')
     .update({
       paystack_reference: paystackResponse.data.reference,
@@ -71,7 +74,7 @@ export const verifyDeposit = async (reference: string) => {
 
   // 3. Verify with Paystack
   const paystackData = await paystackService.verifyTransaction(deposit.paystack_reference || reference);
-  
+
   if (paystackData.data.status === 'success') {
     // 4. Process success atomically via RPC
     const { data: result, error: rpcError } = await supabase.rpc('process_deposit_success', {
@@ -96,7 +99,7 @@ export const verifyDeposit = async (reference: string) => {
       .from('deposits')
       .update({ status: 'failed', metadata: paystackData.data })
       .eq('id', deposit.id);
-      
+
     return { status: 'failed', message: 'Payment failed' };
   }
 };
@@ -121,8 +124,9 @@ export const handleWebhook = async (signature: string, payload: any) => {
   return { success: true };
 };
 
-export const getUserDeposits = async (userId: string) => {
-  const { data, error } = await supabase
+export const getUserDeposits = async (userId: string, token?: string) => {
+  const client = token ? createClientWithToken(token) : supabase;
+  const { data, error } = await client
     .from('deposits')
     .select('*')
     .eq('user_id', userId)

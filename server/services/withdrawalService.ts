@@ -1,15 +1,18 @@
-import { supabase } from '../config/supabase';
+import { supabase, createClientWithToken } from '../config/supabase';
 import * as walletService from './walletService';
 import { config } from '../config';
 
-export const requestWithdrawal = async (userId: string, amount: number, payoutAccountId: string) => {
+export const requestWithdrawal = async (userId: string, amount: number, payoutAccountId: string, token?: string) => {
   if (amount < config.wallet.minWithdrawal || amount > config.wallet.maxWithdrawal) {
     throw new Error(`Withdrawal amount must be between ${config.wallet.minWithdrawal} and ${config.wallet.maxWithdrawal}`);
   }
 
+  // Use user client if token provided, otherwise fallback to admin client
+  const client = token ? createClientWithToken(token) : supabase;
+
   // 1. Check KYC status if required
   if (config.wallet.requireKycForWithdrawal) {
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await client
       .from('users')
       .select('kyc_status')
       .eq('id', userId)
@@ -27,7 +30,7 @@ export const requestWithdrawal = async (userId: string, amount: number, payoutAc
   }
 
   const internalReference = `WITH_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-  
+
   // 3. Process withdrawal atomically via RPC
   const { data: result, error: rpcError } = await supabase.rpc('request_withdrawal_atomic', {
     p_user_id: userId,
@@ -42,7 +45,7 @@ export const requestWithdrawal = async (userId: string, amount: number, payoutAc
   }
 
   // Fetch the created withdrawal to return it
-  const { data: withdrawal } = await supabase
+  const { data: withdrawal } = await client
     .from('withdrawals')
     .select('*')
     .eq('id', result.withdrawal_id)
@@ -51,8 +54,9 @@ export const requestWithdrawal = async (userId: string, amount: number, payoutAc
   return withdrawal;
 };
 
-export const getUserWithdrawals = async (userId: string) => {
-  const { data, error } = await supabase
+export const getUserWithdrawals = async (userId: string, token?: string) => {
+  const client = token ? createClientWithToken(token) : supabase;
+  const { data, error } = await client
     .from('withdrawals')
     .select('*, payout_accounts(*)')
     .eq('user_id', userId)

@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase';
+import { supabase, createClientWithToken } from '../config/supabase';
 
 export const createPayoutAccount = async (userId: string, accountData: {
   account_name: string;
@@ -6,16 +6,18 @@ export const createPayoutAccount = async (userId: string, accountData: {
   bank_code: string;
   account_number: string;
   is_default?: boolean;
-}) => {
+}, token?: string) => {
+  const client = token ? createClientWithToken(token) : supabase;
+
   // If setting as default, unset other defaults first
   if (accountData.is_default) {
-    await supabase
+    await client
       .from('payout_accounts')
       .update({ is_default: false })
       .eq('user_id', userId);
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from('payout_accounts')
     .insert([{ ...accountData, user_id: userId }])
     .select()
@@ -28,8 +30,9 @@ export const createPayoutAccount = async (userId: string, accountData: {
   return data;
 };
 
-export const getPayoutAccounts = async (userId: string) => {
-  const { data, error } = await supabase
+export const getPayoutAccounts = async (userId: string, token?: string) => {
+  const client = token ? createClientWithToken(token) : supabase;
+  const { data, error } = await client
     .from('payout_accounts')
     .select('*')
     .eq('user_id', userId)
@@ -40,15 +43,16 @@ export const getPayoutAccounts = async (userId: string) => {
   return data;
 };
 
-export const updatePayoutAccount = async (userId: string, accountId: string, accountData: any) => {
+export const updatePayoutAccount = async (userId: string, accountId: string, accountData: any, token?: string) => {
+  const client = token ? createClientWithToken(token) : supabase;
   if (accountData.is_default) {
-    await supabase
+    await client
       .from('payout_accounts')
       .update({ is_default: false })
       .eq('user_id', userId);
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from('payout_accounts')
     .update(accountData)
     .eq('id', accountId)
@@ -60,8 +64,9 @@ export const updatePayoutAccount = async (userId: string, accountId: string, acc
   return data;
 };
 
-export const deletePayoutAccount = async (userId: string, accountId: string) => {
-  const { error } = await supabase
+export const deletePayoutAccount = async (userId: string, accountId: string, token?: string) => {
+  const client = token ? createClientWithToken(token) : supabase;
+  const { error } = await client
     .from('payout_accounts')
     .delete()
     .eq('id', accountId)
