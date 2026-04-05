@@ -1,6 +1,9 @@
 import { supabase } from '../config/supabase';
 
 export const getRoomCategories = async () => {
+  // Prune old presence once for all rooms
+  await supabase.rpc('prune_room_presence');
+
   const { data: rooms, error } = await supabase
     .from('room_categories')
     .select('*')
@@ -23,6 +26,9 @@ export const getRoomCategories = async () => {
 };
 
 export const getRoomCategoryById = async (id: string) => {
+  // Prune old presence
+  await supabase.rpc('prune_room_presence');
+
   const { data: room, error } = await supabase
     .from('room_categories')
     .select('*')
@@ -40,9 +46,6 @@ export const getRoomCategoryById = async (id: string) => {
 };
 
 export const getRoomOccupancy = async (roomId: string) => {
-  // Prune old presence first
-  await supabase.rpc('prune_room_presence');
-
   // Count active users in this room from room_presence table
   const { count, error } = await supabase
     .from('room_presence')

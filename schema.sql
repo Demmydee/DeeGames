@@ -92,7 +92,7 @@ BEGIN
     ) INTO v_result;
     RETURN v_result;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- RPC Function to get email by username (needed for login with username using anon key)
 CREATE OR REPLACE FUNCTION public.get_user_email_by_username(p_username text)

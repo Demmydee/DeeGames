@@ -258,7 +258,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'Failed to start game: %', SQLERRM;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 10. Cancel Game Request Function
 CREATE OR REPLACE FUNCTION public.cancel_game_request(
@@ -293,7 +293,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'Failed to cancel game request: %', SQLERRM;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 11. Leave Game Request Function
 CREATE OR REPLACE FUNCTION public.leave_game_request(
@@ -328,7 +328,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'Failed to leave game request: %', SQLERRM;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 12. Check Active Participation Function
 CREATE OR REPLACE FUNCTION public.check_user_active_participation(p_user_id UUID)
@@ -341,15 +341,15 @@ BEGIN
     SELECT grp.game_request_id INTO v_active_request_id
     FROM public.game_request_participants grp
     JOIN public.game_requests gr ON gr.id = grp.game_request_id
-    WHERE grp.user_id = p_user_id 
+    WHERE grp.user_id = p_user_id
     AND grp.status = 'joined'
     AND gr.status IN ('awaiting_opponents', 'ready_to_start')
     LIMIT 1;
-    
+
     IF v_active_request_id IS NOT NULL THEN
         RETURN jsonb_build_object('active', true, 'type', 'request', 'id', v_active_request_id);
     END IF;
-    
+
     -- Check for active match
     SELECT mp.match_id INTO v_active_match_id
     FROM public.match_participants mp
@@ -358,14 +358,14 @@ BEGIN
     AND mp.status = 'active'
     AND m.status IN ('waiting', 'in_progress')
     LIMIT 1;
-    
+
     IF v_active_match_id IS NOT NULL THEN
         RETURN jsonb_build_object('active', true, 'type', 'match', 'id', v_active_match_id);
     END IF;
-    
+
     RETURN jsonb_build_object('active', false);
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 11. Indexes
 CREATE INDEX IF NOT EXISTS idx_game_requests_room_category_id ON public.game_requests(room_category_id);

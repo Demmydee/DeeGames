@@ -135,7 +135,7 @@ BEGIN
     NEW.updated_at := NOW();
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = public;
 
 DROP TRIGGER IF EXISTS on_wallet_balance_change ON public.wallets;
 CREATE TRIGGER on_wallet_balance_change
@@ -149,7 +149,7 @@ BEGIN
     INSERT INTO public.wallets (user_id) VALUES (NEW.id);
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = public;
 
 DROP TRIGGER IF EXISTS on_user_created_wallet ON public.users;
 CREATE TRIGGER on_user_created_wallet
@@ -178,7 +178,7 @@ DECLARE
 BEGIN
     -- Lock the wallet row for update to prevent concurrent modifications
     SELECT * INTO v_wallet FROM public.wallets WHERE user_id = p_user_id FOR UPDATE;
-    
+
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Wallet not found for user %', p_user_id;
     END IF;
@@ -208,7 +208,7 @@ BEGIN
     SELECT jsonb_build_object('success', true) INTO v_result;
     RETURN v_result;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 11. Process Deposit Success (Atomic)
 CREATE OR REPLACE FUNCTION public.process_deposit_success(
@@ -277,7 +277,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'Failed to process deposit: %', SQLERRM;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 12. Request Withdrawal (Atomic)
 CREATE OR REPLACE FUNCTION public.request_withdrawal_atomic(
@@ -294,7 +294,7 @@ DECLARE
     v_result JSONB;
 BEGIN
     -- Lock wallet for update
-    SELECT id, available_balance INTO v_wallet_id, v_available_balance 
+    SELECT id, available_balance INTO v_wallet_id, v_available_balance
     FROM public.wallets WHERE user_id = p_user_id FOR UPDATE;
 
     IF v_available_balance < p_amount THEN
@@ -350,4 +350,4 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'Failed to request withdrawal: %', SQLERRM;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
