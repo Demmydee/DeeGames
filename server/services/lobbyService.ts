@@ -104,11 +104,29 @@ export const getRoomGames = async (roomId: string) => {
     throw new Error('Failed to fetch matches');
   }
 
-  // Enrich requests with requester and participants data manually if needed,
-  // but for now let's try to get the base data working first.
-  // We can add a second pass to fetch usernames if the base query works.
+  // 1. Fetch all participants for these requests
+  const requestIds = requests.map(r => r.id);
+  let requestParticipants: any[] = [];
+  if (requestIds.length > 0) {
+    const { data: pData } = await supabase
+      .from('game_request_participants')
+      .select('*, users(username)')
+      .in('game_request_id', requestIds);
+    requestParticipants = pData || [];
+  }
 
-  // Fetch usernames for requesters
+  // 2. Fetch all participants for these matches
+  const matchIds = matches.map(m => m.id);
+  let matchParticipants: any[] = [];
+  if (matchIds.length > 0) {
+    const { data: pData } = await supabase
+      .from('match_participants')
+      .select('*, users(username)')
+      .in('match_id', matchIds);
+    matchParticipants = pData || [];
+  }
+
+  // 3. Fetch usernames for requesters
   const requesterIds = [...new Set(requests.map(r => r.requester_user_id))];
   const { data: users } = await supabase
     .from('users')
@@ -120,14 +138,22 @@ export const getRoomGames = async (roomId: string) => {
     return acc;
   }, {});
 
+  // 4. Enrich requests
   const enrichedRequests = requests.map(r => ({
     ...r,
-    requester: { username: userMap[r.requester_user_id] || 'Unknown' }
+    requester: { username: userMap[r.requester_user_id] || 'Unknown' },
+    participants: requestParticipants.filter(p => p.game_request_id === r.id)
+  }));
+
+  // 5. Enrich matches
+  const enrichedMatches = (matches || []).map(m => ({
+    ...m,
+    participants: matchParticipants.filter(p => p.match_id === m.id)
   }));
 
   return {
     requests: enrichedRequests,
-    matches
+    matches: enrichedMatches
   };
 };
 
