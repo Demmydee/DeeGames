@@ -78,14 +78,7 @@ export const getRoomGames = async (roomId: string) => {
     .from('game_requests')
     .select(`
       *,
-      game_type:game_types(*),
-      requester:users!requester_user_id(username),
-      participants:game_request_participants(
-        user_id,
-        status,
-        joined_at,
-        users!user_id(username)
-      )
+      game_type:game_types(*)
     `)
     .eq('room_category_id', roomId)
     .in('status', ['awaiting_opponents', 'ready_to_start'])
@@ -96,14 +89,7 @@ export const getRoomGames = async (roomId: string) => {
     .from('matches')
     .select(`
       *,
-      game_type:game_types(*),
-      started_by:users!started_by_user_id(username),
-      participants:match_participants(
-        user_id,
-        status,
-        joined_at,
-        users!user_id(username)
-      )
+      game_type:game_types(*)
     `)
     .eq('room_category_id', roomId)
     .in('status', ['waiting', 'in_progress'])
@@ -117,10 +103,30 @@ export const getRoomGames = async (roomId: string) => {
     console.error('Fetch Matches Error:', JSON.stringify(matchesError, null, 2));
     throw new Error('Failed to fetch matches');
   }
- Riverside:
+
+  // Enrich requests with requester and participants data manually if needed,
+  // but for now let's try to get the base data working first.
+  // We can add a second pass to fetch usernames if the base query works.
+
+  // Fetch usernames for requesters
+  const requesterIds = [...new Set(requests.map(r => r.requester_user_id))];
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, username')
+    .in('id', requesterIds);
+
+  const userMap = (users || []).reduce((acc: any, user: any) => {
+    acc[user.id] = user.username;
+    return acc;
+  }, {});
+
+  const enrichedRequests = requests.map(r => ({
+    ...r,
+    requester: { username: userMap[r.requester_user_id] || 'Unknown' }
+  }));
 
   return {
-    requests,
+    requests: enrichedRequests,
     matches
   };
 };
@@ -134,4 +140,4 @@ export const getGameTypes = async () => {
 
   if (error) throw new Error('Failed to fetch game types');
   return data;
-}
+};

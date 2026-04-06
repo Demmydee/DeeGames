@@ -192,24 +192,33 @@ export const startGameRequest = async (userId: string, requestId: string) => {
 };
 
 export const getGameRequestById = async (id: string) => {
-  const { data, error } = await supabase
+  const { data: request, error } = await supabase
     .from('game_requests')
     .select(`
       *,
       game_type:game_types(*),
-      room:room_categories(*),
-      requester:users!requester_user_id(username),
-      participants:game_request_participants(
-        user_id,
-        role,
-        status,
-        joined_at,
-        users!user_id(username)
-      )
+      room:room_categories(*)
     `)
     .eq('id', id)
     .single();
 
-  if (error) throw new Error('Game request not found');
-  return data;
+  if (error || !request) throw new Error('Game request not found');
+
+  // Fetch requester and participants manually
+  const { data: requester } = await supabase
+    .from('users')
+    .select('username')
+    .eq('id', request.requester_user_id)
+    .single();
+
+  const { data: participants } = await supabase
+    .from('game_request_participants')
+    .select('*, users(username)')
+    .eq('game_request_id', id);
+
+  return {
+    ...request,
+    requester: requester || { username: 'Unknown' },
+    participants: participants || []
+  };
 };

@@ -1,25 +1,35 @@
 import { supabase } from '../config/supabase';
 
 export const getMatchById = async (id: string) => {
-  const { data, error } = await supabase
+  const { data: match, error } = await supabase
     .from('matches')
     .select(`
       *,
       game_type:game_types(*),
-      room:room_categories(*),
-      started_by:users!started_by_user_id(username),
-      participants:match_participants(
-        user_id,
-        status,
-        joined_at,
-        users!user_id(username)
-      )
+      room:room_categories(*)
     `)
     .eq('id', id)
     .single();
 
-  if (error) throw new Error('Match not found');
-  return data;
+  if (error || !match) throw new Error('Match not found');
+
+  // Fetch starter and participants manually
+  const { data: startedBy } = await supabase
+    .from('users')
+    .select('username')
+    .eq('id', match.started_by_user_id)
+    .single();
+
+  const { data: participants } = await supabase
+    .from('match_participants')
+    .select('*, users(username)')
+    .eq('match_id', id);
+
+  return {
+    ...match,
+    started_by: startedBy || { username: 'Unknown' },
+    participants: participants || []
+  };
 };
 
 export const leaveMatch = async (userId: string, matchId: string) => {
