@@ -110,13 +110,14 @@ export const getRoomGames = async (roomId: string) => {
     .order('started_at', { ascending: false });
 
   if (requestsError) {
-    console.error('Fetch Requests Error:', requestsError);
+    console.error('Fetch Requests Error:', JSON.stringify(requestsError, Object.getOwnPropertyNames(requestsError), 2));
     throw new Error('Failed to fetch game requests');
   }
   if (matchesError) {
-    console.error('Fetch Matches Error:', matchesError);
+    console.error('Fetch Matches Error:', JSON.stringify(matchesError, null, 2));
     throw new Error('Failed to fetch matches');
   }
+ Riverside:
 
   return {
     requests,
@@ -133,4 +134,4 @@ export const getGameTypes = async () => {
 
   if (error) throw new Error('Failed to fetch game types');
   return data;
-};
+}
