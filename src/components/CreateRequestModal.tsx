@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  X, 
-  Gamepad2, 
-  Users, 
-  Wallet, 
-  Trophy, 
+import {
+  X,
+  Gamepad2,
+  Users,
+  Wallet,
+  Trophy,
   AlertCircle,
   Loader2,
   CheckCircle2
@@ -20,6 +21,7 @@ interface Props {
 }
 
 const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
+  const navigate = useNavigate();
   const [gameTypes, setGameTypes] = useState<GameType[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -134,9 +136,20 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
         ) : (
           <form onSubmit={handleSubmit} className="p-5 space-y-5 overflow-y-auto">
             {error && (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-400 text-sm">
-                <AlertCircle className="w-5 h-5 shrink-0" />
-                <p>{error}</p>
+              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex flex-col gap-3">
+                <div className="flex items-center gap-3 text-red-400 text-sm">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <p>{error}</p>
+                </div>
+                {(error.toLowerCase().includes('balance') || error.toLowerCase().includes('insufficient')) && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/wallet')}
+                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all shadow-lg shadow-emerald-900/20"
+                  >
+                    Deposit Now
+                  </button>
+                )}
               </div>
             )}
 

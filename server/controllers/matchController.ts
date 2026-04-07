@@ -20,6 +20,16 @@ export const leaveMatch = async (req: Request, res: Response) => {
   }
 };
 
+export const updateMatchPresence = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const result = await matchService.updateMatchPresence(userId, req.params.id);
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 export const getUserActiveMatch = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;

@@ -17,14 +17,17 @@ import {
 } from 'lucide-react';
 import { matchApi } from '../services/multiplayerApi';
 import { Match } from '../types/multiplayer';
+import { useAuth } from '../context/AuthContext';
 
 const GameRoomShell: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const fetchMatch = useCallback(async () => {
     if (!id) return;
@@ -44,18 +47,33 @@ const GameRoomShell: React.FC = () => {
   useEffect(() => {
     fetchMatch();
     const interval = setInterval(fetchMatch, 5000);
-    return () => clearInterval(interval);
-  }, [fetchMatch]);
+
+    // Heartbeat for presence
+    const heartbeatInterval = setInterval(async () => {
+      if (id) {
+        try {
+          await matchApi.updatePresence(id);
+        } catch (err) {
+          console.error('Heartbeat failed');
+        }
+      }
+    }, 10000); // Every 10 seconds
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(heartbeatInterval);
+    };
+  }, [fetchMatch, id]);
 
   const handleLeave = async () => {
-    if (!id || !window.confirm('Are you sure you want to leave? This may count as a defeat.')) return;
     setLeaving(true);
     try {
-      await matchApi.leave(id);
+      await matchApi.leave(id!);
       navigate('/lobby');
     } catch (err: any) {
       alert(err.message);
       setLeaving(false);
+      setShowLeaveConfirm(false);
     }
   };
 
@@ -74,7 +92,7 @@ const GameRoomShell: React.FC = () => {
         <AlertCircle className="w-16 h-16 text-red-500 mb-6" />
         <h2 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tight">Match Not Found</h2>
         <p className="text-gray-400 mb-8 max-w-md">{error || 'This match session is no longer active or you do not have access.'}</p>
-        <button 
+        <button
           onClick={() => navigate('/lobby')}
           className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20"
         >
@@ -123,8 +141,8 @@ const GameRoomShell: React.FC = () => {
           <button className="p-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors">
             <Settings className="w-5 h-5" />
           </button>
-          <button 
-            onClick={handleLeave}
+          <button
+            onClick={() => setShowLeaveConfirm(true)}
             disabled={leaving}
             className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-xs font-bold uppercase tracking-widest transition-all border border-red-500/20"
           >
@@ -133,6 +151,45 @@ const GameRoomShell: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Leave Confirmation Modal */}
+      <AnimatePresence>
+        {showLeaveConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-sm bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 shadow-2xl"
+            >
+              <div className="w-12 h-12 bg-red-500/10 rounded-2xl flex items-center justify-center mb-4 border border-red-500/20">
+                <AlertCircle className="w-6 h-6 text-red-500" />
+              </div>
+              <h3 className="text-xl font-black text-white uppercase italic tracking-tight mb-2">
+                Leave Match?
+              </h3>
+              <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+                Are you sure you want to leave this active match? Leaving now will result in an <span className="text-red-400 font-bold">automatic defeat</span> and loss of your wager.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowLeaveConfirm(false)}
+                  className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold transition-colors border border-white/10"
+                >
+                  Stay
+                </button>
+                <button
+                  onClick={handleLeave}
+                  disabled={leaving}
+                  className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold transition-all shadow-lg shadow-red-900/20 flex items-center justify-center gap-2"
+                >
+                  {leaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Leave Now'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
@@ -157,7 +214,7 @@ const GameRoomShell: React.FC = () => {
                 Game Engine Shell
               </h1>
               <p className="text-gray-400 text-lg leading-relaxed">
-                The multiplayer orchestration is active. Wagers are locked. 
+                The multiplayer orchestration is active. Wagers are locked.
                 The {match.game_type?.name} module will be plugged in here in the next phase.
               </p>
             </motion.div>
@@ -180,19 +237,36 @@ const GameRoomShell: React.FC = () => {
           <div className="absolute bottom-8 left-8 right-8 flex justify-between items-end pointer-events-none">
             <div className="flex flex-col gap-4">
               {match.participants?.map((p, i) => (
-                <motion.div 
+                <motion.div
                   key={p.id}
                   initial={{ x: -50, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   transition={{ delay: i * 0.1 }}
                   className="flex items-center gap-3 p-2 pr-6 rounded-full bg-black/60 backdrop-blur-md border border-white/10 pointer-events-auto"
                 >
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-white ${p.status === 'active' ? 'bg-emerald-600' : 'bg-gray-700'}`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-white relative ${p.status === 'active' ? 'bg-emerald-600' : 'bg-gray-700'}`}>
                     {p.users?.username.substring(0, 2).toUpperCase()}
+                    {p.is_away && (
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-black flex items-center justify-center">
+                        <Clock className="w-2 h-2 text-white" />
+                      </div>
+                    )}
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-white">{p.users?.username}</div>
-                    <div className="text-[8px] text-gray-500 uppercase tracking-widest">{p.status}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs font-bold text-white">{p.users?.username}</div>
+                      {p.user_id === user?.id && <span className="text-[8px] px-1 bg-white/10 rounded text-gray-400 uppercase tracking-widest">You</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`text-[8px] uppercase tracking-widest ${p.is_away ? 'text-orange-400' : 'text-gray-500'}`}>
+                        {p.is_away ? 'Away' : p.status}
+                      </div>
+                      {p.is_away && p.away_since && (
+                        <div className="text-[8px] font-mono text-orange-500 font-bold">
+                          {Math.max(0, 300 - Math.floor((Date.now() - new Date(p.away_since).getTime()) / 1000))}s
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               ))}

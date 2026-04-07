@@ -20,6 +20,9 @@ export const getMatchById = async (id: string) => {
     .eq('id', match.started_by_user_id)
     .single();
 
+  // Run timeout check before fetching participants
+  await supabase.rpc('check_match_timeouts', { p_match_id: id });
+
   const { data: participants } = await supabase
     .from('match_participants')
     .select('*')
@@ -47,6 +50,16 @@ export const getMatchById = async (id: string) => {
     started_by: startedBy || { username: 'Unknown' },
     participants: enrichedParticipants
   };
+};
+
+export const updateMatchPresence = async (userId: string, matchId: string) => {
+  const { error } = await supabase.rpc('update_match_presence', {
+    p_match_id: matchId,
+    p_user_id: userId
+  });
+
+  if (error) throw new Error('Failed to update match presence');
+  return { success: true };
 };
 
 export const leaveMatch = async (userId: string, matchId: string) => {

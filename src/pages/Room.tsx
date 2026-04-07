@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { lobbyApi, gameRequestApi } from '../services/multiplayerApi';
 import { RoomCategory, GameRequest, Match } from '../types/multiplayer';
+import { useAuth } from '../context/AuthContext';
 import CreateRequestModal from '../components/CreateRequestModal';
 import GameRequestCard from '../components/GameRequestCard';
 import MatchCard from '../components/MatchCard';
@@ -25,6 +26,7 @@ import MatchCard from '../components/MatchCard';
 const Room: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [room, setRoom] = useState<RoomCategory | null>(null);
   const [requests, setRequests] = useState<GameRequest[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -80,6 +82,19 @@ const Room: React.FC = () => {
       clearInterval(presenceInterval);
     };
   }, [fetchData, id]);
+
+  // Point 1: Auto-redirect participants when game starts
+  useEffect(() => {
+    if (matches.length > 0) {
+      const myActiveMatch = matches.find(m =>
+        (m.status === 'in_progress' || m.status === 'waiting') &&
+        m.participants?.some(p => p.user_id === user?.id && p.status === 'active')
+      );
+      if (myActiveMatch) {
+        navigate(`/match/${myActiveMatch.id}`);
+      }
+    }
+  }, [matches, user?.id, navigate]);
 
   const handleJoinRequest = async (requestId: string) => {
     try {
@@ -174,10 +189,10 @@ const Room: React.FC = () => {
               <p className="text-sm font-medium">{error}</p>
             </div>
             <div className="flex items-center gap-2">
-              {error.toLowerCase().includes('balance') && (
+              {(error.toLowerCase().includes('balance') || error.toLowerCase().includes('insufficient')) && (
                 <button
                   onClick={() => navigate('/wallet')}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-all shadow-lg shadow-emerald-900/20"
                 >
                   Deposit Now
                 </button>

@@ -73,6 +73,9 @@ export interface MatchParticipant {
   status: 'active' | 'left' | 'defeated' | 'winner' | 'eliminated';
   joined_at: string;
   left_at: string | null;
+  last_seen_at?: string;
+  is_away?: boolean;
+  away_since?: string | null;
   users?: { username: string };
 }
 

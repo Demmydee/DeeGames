@@ -65,6 +65,9 @@ export const matchApi = {
     const response = await apiClient.post(`${API_BASE}/matches/${id}/leave`);
     return response.data;
   },
+  updatePresence: async (id: string): Promise<void> => {
+    await apiClient.post(`${API_BASE}/matches/${id}/presence`);
+  },
   getActive: async (): Promise<Match | null> => {
     const response = await apiClient.get(`${API_BASE}/matches/active`);
     return response.data;
