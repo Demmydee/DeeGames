@@ -110,7 +110,7 @@ export const getRoomGames = async (roomId: string) => {
   if (requestIds.length > 0) {
     const { data: pData } = await supabase
       .from('game_request_participants')
-      .select('*, users(username)')
+      .select('*')
       .in('game_request_id', requestIds);
     requestParticipants = pData || [];
   }
@@ -121,17 +121,22 @@ export const getRoomGames = async (roomId: string) => {
   if (matchIds.length > 0) {
     const { data: pData } = await supabase
       .from('match_participants')
-      .select('*, users(username)')
+      .select('*')
       .in('match_id', matchIds);
     matchParticipants = pData || [];
   }
 
-  // 3. Fetch usernames for requesters
-  const requesterIds = [...new Set(requests.map(r => r.requester_user_id))];
+  // 3. Fetch usernames for everyone involved
+  const requesterIds = requests.map(r => r.requester_user_id);
+  const participantUserIds = requestParticipants.map(p => p.user_id);
+  const matchParticipantUserIds = matchParticipants.map(p => p.user_id);
+
+  const allUserIds = [...new Set([...requesterIds, ...participantUserIds, ...matchParticipantUserIds])];
+
   const { data: users } = await supabase
     .from('users')
     .select('id, username')
-    .in('id', requesterIds);
+    .in('id', allUserIds);
 
   const userMap = (users || []).reduce((acc: any, user: any) => {
     acc[user.id] = user.username;
@@ -142,13 +147,23 @@ export const getRoomGames = async (roomId: string) => {
   const enrichedRequests = requests.map(r => ({
     ...r,
     requester: { username: userMap[r.requester_user_id] || 'Unknown' },
-    participants: requestParticipants.filter(p => p.game_request_id === r.id)
+    participants: requestParticipants
+      .filter(p => p.game_request_id === r.id)
+      .map(p => ({
+        ...p,
+        users: { username: userMap[p.user_id] || 'Unknown' }
+      }))
   }));
 
   // 5. Enrich matches
   const enrichedMatches = (matches || []).map(m => ({
     ...m,
-    participants: matchParticipants.filter(p => p.match_id === m.id)
+    participants: matchParticipants
+      .filter(p => p.match_id === m.id)
+      .map(p => ({
+        ...p,
+        users: { username: userMap[p.user_id] || 'Unknown' }
+      }))
   }));
 
   return {

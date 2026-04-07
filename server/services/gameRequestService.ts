@@ -213,12 +213,29 @@ export const getGameRequestById = async (id: string) => {
 
   const { data: participants } = await supabase
     .from('game_request_participants')
-    .select('*, users(username)')
+    .select('*')
     .eq('game_request_id', id);
+
+  // Fetch usernames for participants
+  const participantIds = (participants || []).map(p => p.user_id);
+  const { data: participantUsers } = await supabase
+    .from('users')
+    .select('id, username')
+    .in('id', participantIds);
+
+  const participantUserMap = (participantUsers || []).reduce((acc: any, user: any) => {
+    acc[user.id] = user.username;
+    return acc;
+  }, {});
+
+  const enrichedParticipants = (participants || []).map(p => ({
+    ...p,
+    users: { username: participantUserMap[p.user_id] || 'Unknown' }
+  }));
 
   return {
     ...request,
     requester: requester || { username: 'Unknown' },
-    participants: participants || []
+    participants: enrichedParticipants
   };
 };

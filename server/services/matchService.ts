@@ -22,13 +22,30 @@ export const getMatchById = async (id: string) => {
 
   const { data: participants } = await supabase
     .from('match_participants')
-    .select('*, users(username)')
+    .select('*')
     .eq('match_id', id);
+
+  // Fetch usernames for participants
+  const participantIds = (participants || []).map(p => p.user_id);
+  const { data: participantUsers } = await supabase
+    .from('users')
+    .select('id, username')
+    .in('id', participantIds);
+
+  const participantUserMap = (participantUsers || []).reduce((acc: any, user: any) => {
+    acc[user.id] = user.username;
+    return acc;
+  }, {});
+
+  const enrichedParticipants = (participants || []).map(p => ({
+    ...p,
+    users: { username: participantUserMap[p.user_id] || 'Unknown' }
+  }));
 
   return {
     ...match,
     started_by: startedBy || { username: 'Unknown' },
-    participants: participants || []
+    participants: enrichedParticipants
   };
 };
 
