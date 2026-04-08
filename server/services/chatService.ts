@@ -8,7 +8,7 @@ export const getOrCreateChatRoom = async (contextType: 'room' | 'match', context
     .eq('context_id', contextId)
     .maybeSingle();
 
-  if (findError) throw new Error('Failed to find chat room');
+  if (findError) throw new Error(`Failed to find chat room: ${findError.message}`);
   if (existing) return existing;
 
   const { data: created, error: createError } = await supabase
@@ -17,7 +17,7 @@ export const getOrCreateChatRoom = async (contextType: 'room' | 'match', context
     .select()
     .single();
 
-  if (createError) throw new Error('Failed to create chat room');
+  if (createError) throw new Error(`Failed to create chat room: ${createError.message}`);
   return created;
 };
 
@@ -29,7 +29,7 @@ export const getChatMessages = async (chatRoomId: string, limit = 50) => {
     .order('created_at', { ascending: false })
     .limit(limit);
 
-  if (error) throw new Error('Failed to fetch chat messages');
+  if (error) throw new Error(`Failed to fetch chat messages: ${error.message}`);
   return messages.reverse();
 };
 
@@ -46,6 +46,6 @@ export const sendMessage = async (chatRoomId: string, userId: string, content: s
     .select('*, users(username)')
     .single();
 
-  if (error) throw new Error('Failed to send message');
+  if (error) throw new Error(`Failed to send message: ${error.message}`);
   return data;
 };

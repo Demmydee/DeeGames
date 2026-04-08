@@ -12,7 +12,7 @@ export const submitSupportTicket = async (userId: string | null, subject: string
     .select()
     .single();
 
-  if (error) throw new Error('Failed to submit support ticket');
+  if (error) throw new Error(`Failed to submit support ticket: ${error.message}`);
   return data;
 };
 
@@ -23,6 +23,6 @@ export const getMyTickets = async (userId: string) => {
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error('Failed to fetch support tickets');
+  if (error) throw new Error(`Failed to fetch support tickets: ${error.message}`);
   return data;
 };

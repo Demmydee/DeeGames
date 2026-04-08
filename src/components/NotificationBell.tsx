@@ -21,8 +21,9 @@ const NotificationBell: React.FC = () => {
       ]);
       setNotifications(notifs);
       setUnreadCount(countData.count);
-    } catch (err) {
-      console.error('Failed to fetch notifications:', err);
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.error || err.message;
+      console.error('Failed to fetch notifications:', errorMessage);
     }
   };
 

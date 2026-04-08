@@ -19,7 +19,7 @@ export const submitReport = async (reporterId: string, reportedId: string, match
     .select()
     .single();
 
-  if (error) throw new Error('Failed to submit report');
+  if (error) throw new Error(`Failed to submit report: ${error.message}`);
 
   // Notify the reporter that their report has been received
   await createNotification(
@@ -40,6 +40,6 @@ export const getMyReports = async (userId: string) => {
     .eq('reporter_user_id', userId)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error('Failed to fetch reports');
+  if (error) throw new Error(`Failed to fetch reports: ${error.message}`);
   return data;
 };

@@ -39,7 +39,7 @@ export const getNotifications = async (userId: string) => {
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error('Failed to fetch notifications');
+  if (error) throw new Error(`Failed to fetch notifications: ${error.message}`);
   return data;
 };
 
@@ -50,7 +50,7 @@ export const getUnreadCount = async (userId: string) => {
     .eq('user_id', userId)
     .eq('is_read', false);
 
-  if (error) throw new Error('Failed to fetch unread count');
+  if (error) throw new Error(`Failed to fetch unread count: ${error.message}`);
   return count || 0;
 };
 

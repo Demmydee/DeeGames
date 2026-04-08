@@ -1,5 +1,5 @@
 {
   "name": "DeeGames",
   "description": "A production-ready P2P gaming platform foundation with secure authentication.",
-  "requestFramePermissions": []
+  "requestFramePermissions": ["camera", "microphone"]
 }

@@ -14,17 +14,38 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ matchId, className = "" }) => {
   const [status, setStatus] = useState<'initializing' | 'joining' | 'joined' | 'error'>('initializing');
   const [error, setError] = useState<string | null>(null);
   const [participants, setParticipants] = useState<number>(0);
+  const callRef = useRef<DailyCall | null>(null);
 
   const initCall = useCallback(async () => {
     try {
+      // Check if a call instance already exists
+      const existingCo = DailyIframe.getCallInstance();
+      if (existingCo) {
+        try {
+          await existingCo.leave();
+          await existingCo.destroy();
+        } catch (e) {
+          console.warn('Error cleaning up existing call:', e);
+        }
+      }
+
+      // Small delay to ensure Daily has cleaned up internal state
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       setStatus('initializing');
       const session = await voiceApi.getMatchSession(matchId);
-      
+
+      // Re-check after async call to prevent race conditions
+      if (DailyIframe.getCallInstance()) {
+        await DailyIframe.getCallInstance()?.destroy();
+      }
+
       const co = DailyIframe.createCallObject({
         audioSource: true,
         videoSource: false,
       });
 
+      callRef.current = co;
       setCallObject(co);
       setStatus('joining');
 
@@ -34,11 +55,11 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ matchId, className = "" }) => {
       });
 
       setStatus('joined');
-      setParticipants(Object.keys(co.participants()).length);
+      setParticipants(Object.keys(co.participants() || {}).length);
 
       // Event listeners
-      co.on('participant-joined', () => setParticipants(Object.keys(co.participants()).length));
-      co.on('participant-left', () => setParticipants(Object.keys(co.participants()).length));
+      co.on('participant-joined', () => setParticipants(Object.keys(co.participants() || {}).length));
+      co.on('participant-left', () => setParticipants(Object.keys(co.participants() || {}).length));
       co.on('error', (e) => {
         console.error('Daily Error:', e);
         setError('Voice connection failed');
@@ -55,9 +76,9 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ matchId, className = "" }) => {
   useEffect(() => {
     initCall();
     return () => {
-      if (callObject) {
-        callObject.leave();
-        callObject.destroy();
+      const co = callRef.current || DailyIframe.getCallInstance();
+      if (co) {
+        co.leave().then(() => co.destroy());
       }
     };
   }, [initCall]);

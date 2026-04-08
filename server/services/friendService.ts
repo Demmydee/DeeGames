@@ -13,7 +13,7 @@ export const sendFriendRequest = async (requesterId: string, addresseeId: string
     .or(`and(requester_user_id.eq.${requesterId},addressee_user_id.eq.${addresseeId}),and(requester_user_id.eq.${addresseeId},addressee_user_id.eq.${requesterId})`)
     .maybeSingle();
 
-  if (findError) throw new Error('Failed to check existing friendship');
+  if (findError) throw new Error(`Failed to check existing friendship: ${findError.message}`);
   if (existing) {
     if (existing.status === 'accepted') throw new Error('You are already friends');
     if (existing.status === 'pending') throw new Error('A friend request is already pending');
@@ -30,7 +30,7 @@ export const sendFriendRequest = async (requesterId: string, addresseeId: string
     .select()
     .single();
 
-  if (createError) throw new Error('Failed to send friend request');
+  if (createError) throw new Error(`Failed to send friend request: ${createError.message}`);
 
   // Notify the addressee
   const { data: requester } = await supabase.from('users').select('username').eq('id', requesterId).single();
@@ -54,18 +54,18 @@ export const acceptFriendRequest = async (userId: string, friendshipId: string) 
     .eq('status', 'pending')
     .single();
 
-  if (findError || !friendship) throw new Error('Friend request not found or already processed');
+  if (findError || !friendship) throw new Error(`Friend request not found or already processed: ${findError?.message || 'Not found'}`);
 
   const { error: updateError } = await supabase
     .from('friendships')
-    .update({ 
-      status: 'accepted', 
+    .update({
+      status: 'accepted',
       responded_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
     .eq('id', friendshipId);
 
-  if (updateError) throw new Error('Failed to accept friend request');
+  if (updateError) throw new Error(`Failed to accept friend request: ${updateError.message}`);
 
   // Notify the requester
   const { data: addressee } = await supabase.from('users').select('username').eq('id', userId).single();
@@ -83,8 +83,8 @@ export const acceptFriendRequest = async (userId: string, friendshipId: string) 
 export const rejectFriendRequest = async (userId: string, friendshipId: string) => {
   const { error } = await supabase
     .from('friendships')
-    .update({ 
-      status: 'rejected', 
+    .update({
+      status: 'rejected',
       responded_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
@@ -92,21 +92,21 @@ export const rejectFriendRequest = async (userId: string, friendshipId: string) 
     .eq('addressee_user_id', userId)
     .eq('status', 'pending');
 
-  if (error) throw new Error('Failed to reject friend request');
+  if (error) throw new Error(`Failed to reject friend request: ${error.message}`);
   return { success: true };
 };
 
 export const removeFriend = async (userId: string, friendshipId: string) => {
   const { error } = await supabase
     .from('friendships')
-    .update({ 
-      status: 'removed', 
+    .update({
+      status: 'removed',
       updated_at: new Date().toISOString()
     })
     .eq('id', friendshipId)
     .or(`requester_user_id.eq.${userId},addressee_user_id.eq.${userId}`);
 
-  if (error) throw new Error('Failed to remove friend');
+  if (error) throw new Error(`Failed to remove friend: ${error.message}`);
   return { success: true };
 };
 
@@ -124,8 +124,8 @@ export const getFriends = async (userId: string) => {
     .or(`requester_user_id.eq.${userId},addressee_user_id.eq.${userId}`)
     .eq('status', 'accepted');
 
-  if (error) throw new Error('Failed to fetch friends');
-  
+  if (error) throw new Error(`Failed to fetch friends: ${error.message}`);
+
   return data.map(f => {
     const friend = f.requester_user_id === userId ? f.addressee : f.requester;
     return {
@@ -142,7 +142,7 @@ export const getIncomingRequests = async (userId: string) => {
     .eq('addressee_user_id', userId)
     .eq('status', 'pending');
 
-  if (error) throw new Error('Failed to fetch incoming requests');
+  if (error) throw new Error(`Failed to fetch incoming requests: ${error.message}`);
   return data;
 };
 
@@ -153,6 +153,6 @@ export const getOutgoingRequests = async (userId: string) => {
     .eq('requester_user_id', userId)
     .eq('status', 'pending');
 
-  if (error) throw new Error('Failed to fetch outgoing requests');
+  if (error) throw new Error(`Failed to fetch outgoing requests: ${error.message}`);
   return data;
 };
