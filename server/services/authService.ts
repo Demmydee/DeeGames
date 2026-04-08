@@ -49,9 +49,9 @@ export const registerUser = async (userData: any) => {
     if (message === 'User already registered') {
       message = 'Email is already registered';
     }
-    throw {
-      status: 400,
-      message
+    throw { 
+      status: 400, 
+      message 
     };
   }
 
@@ -76,7 +76,7 @@ export const loginUser = async (identifier: string, password: string) => {
   if (!lowerIdentifier.includes('@')) {
     const { data: userEmail, error: userError } = await supabase
       .rpc('get_user_email_by_username', { p_username: lowerIdentifier });
-
+    
     if (userError) {
       console.error('Username lookup error:', userError);
       throw { status: 500, message: 'Internal server error' };

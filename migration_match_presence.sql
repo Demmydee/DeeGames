@@ -1,5 +1,5 @@
 -- Migration: Add presence tracking to match participants
-ALTER TABLE public.match_participants
+ALTER TABLE public.match_participants 
 ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ DEFAULT NOW(),
 ADD COLUMN IF NOT EXISTS is_away BOOLEAN DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS away_since TIMESTAMPTZ;
@@ -11,8 +11,8 @@ CREATE OR REPLACE FUNCTION public.update_match_presence(
 )
 RETURNS VOID AS $$
 BEGIN
-    UPDATE public.match_participants
-    SET
+    UPDATE public.match_participants 
+    SET 
         last_seen_at = NOW(),
         is_away = FALSE,
         away_since = NULL
@@ -27,27 +27,27 @@ RETURNS VOID AS $$
 BEGIN
     -- Mark participants as away if not seen for 15 seconds
     UPDATE public.match_participants
-    SET
+    SET 
         is_away = TRUE,
         away_since = COALESCE(away_since, NOW())
-    WHERE match_id = p_match_id
+    WHERE match_id = p_match_id 
     AND status = 'active'
     AND last_seen_at < NOW() - INTERVAL '15 seconds'
     AND is_away = FALSE;
 
     -- Reset away status if seen recently
     UPDATE public.match_participants
-    SET
+    SET 
         is_away = FALSE,
         away_since = NULL
-    WHERE match_id = p_match_id
+    WHERE match_id = p_match_id 
     AND status = 'active'
     AND last_seen_at >= NOW() - INTERVAL '15 seconds'
     AND is_away = TRUE;
 
     -- Mark as defeated if away for more than 300 seconds
     UPDATE public.match_participants
-    SET
+    SET 
         status = 'left',
         left_at = NOW()
     WHERE match_id = p_match_id

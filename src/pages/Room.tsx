@@ -22,6 +22,7 @@ import { useAuth } from '../context/AuthContext';
 import CreateRequestModal from '../components/CreateRequestModal';
 import GameRequestCard from '../components/GameRequestCard';
 import MatchCard from '../components/MatchCard';
+import Chat from '../components/Chat';
 
 const Room: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -62,7 +63,7 @@ const Room: React.FC = () => {
     fetchData();
     // Set up polling for real-time updates (every 5 seconds)
     const interval = setInterval(() => fetchData(true), 5000);
-
+    
     // Presence tracking
     const updatePresence = async () => {
       if (id) {
@@ -73,10 +74,10 @@ const Room: React.FC = () => {
         }
       }
     };
-
+    
     updatePresence();
     const presenceInterval = setInterval(updatePresence, 20000); // Every 20 seconds
-
+    
     return () => {
       clearInterval(interval);
       clearInterval(presenceInterval);
@@ -86,8 +87,8 @@ const Room: React.FC = () => {
   // Point 1: Auto-redirect participants when game starts
   useEffect(() => {
     if (matches.length > 0) {
-      const myActiveMatch = matches.find(m =>
-        (m.status === 'in_progress' || m.status === 'waiting') &&
+      const myActiveMatch = matches.find(m => 
+        (m.status === 'in_progress' || m.status === 'waiting') && 
         m.participants?.some(p => p.user_id === user?.id && p.status === 'active')
       );
       if (myActiveMatch) {
@@ -154,14 +155,14 @@ const Room: React.FC = () => {
         </h2>
         <p className="text-gray-400 mb-6">{error || 'The room you are looking for does not exist.'}</p>
         <div className="flex gap-4">
-          <button
+          <button 
             onClick={() => navigate('/lobby')}
             className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors border border-white/10"
           >
             Back to Lobby
           </button>
           {!isNotFound && (
-            <button
+            <button 
               onClick={() => fetchData()}
               className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
             >
@@ -174,8 +175,9 @@ const Room: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      {/* Error Message */}
+    <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8">
+      <div className="flex-1">
+        {/* Error Message */}
       <AnimatePresence>
         {error && (
           <motion.div
@@ -211,7 +213,7 @@ const Room: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div className="flex items-center gap-4">
-          <button
+          <button 
             onClick={() => navigate('/lobby')}
             className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
           >
@@ -233,14 +235,14 @@ const Room: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
+          <button 
             onClick={() => fetchData(true)}
             disabled={refreshing}
             className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/10 text-gray-400"
           >
             <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
-          <button
+          <button 
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20"
           >
@@ -285,13 +287,13 @@ const Room: React.FC = () => {
 
       {/* Tabs */}
       <div className="flex items-center gap-2 mb-6 p-1 bg-white/5 rounded-xl border border-white/10 w-fit">
-        <button
+        <button 
           onClick={() => setActiveTab('requests')}
           className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'requests' ? 'bg-emerald-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
         >
           Requests ({requests.length})
         </button>
-        <button
+        <button 
           onClick={() => setActiveTab('matches')}
           className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'matches' ? 'bg-emerald-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
         >
@@ -311,9 +313,9 @@ const Room: React.FC = () => {
           >
             {requests.length > 0 ? (
               requests.map((request, i) => (
-                <GameRequestCard
-                  key={request.id || `req-${i}`}
-                  request={request}
+                <GameRequestCard 
+                  key={request.id || `req-${i}`} 
+                  request={request} 
                   onJoin={() => handleJoinRequest(request.id)}
                   onCancel={() => handleCancelRequest(request.id)}
                   onLeave={() => handleLeaveRequest(request.id)}
@@ -377,7 +379,18 @@ const Room: React.FC = () => {
         />
       )}
     </div>
-  );
+
+    {/* Sidebar Chat */}
+    <div className="w-full lg:w-80 shrink-0">
+      <Chat 
+        contextType="room" 
+        contextId={id!} 
+        title={`${room.name} Chat`}
+        className="sticky top-24"
+      />
+    </div>
+  </div>
+);
 };
 
 export default Room;

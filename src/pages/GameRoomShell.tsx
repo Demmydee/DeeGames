@@ -13,11 +13,18 @@ import {
   LogOut,
   Shield,
   Clock,
-  Zap
+  Zap,
+  ShieldAlert,
+  Mic,
+  MicOff,
+  Volume2
 } from 'lucide-react';
 import { matchApi } from '../services/multiplayerApi';
 import { Match } from '../types/multiplayer';
 import { useAuth } from '../context/AuthContext';
+import VoiceChat from '../components/VoiceChat';
+import Chat from '../components/Chat';
+import ReportModal from '../components/ReportModal';
 
 const GameRoomShell: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -28,6 +35,7 @@ const GameRoomShell: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [reportingPlayer, setReportingPlayer] = useState<{ id: string, username: string } | null>(null);
 
   const fetchMatch = useCallback(async () => {
     if (!id) return;
@@ -47,7 +55,7 @@ const GameRoomShell: React.FC = () => {
   useEffect(() => {
     fetchMatch();
     const interval = setInterval(fetchMatch, 5000);
-
+    
     // Heartbeat for presence
     const heartbeatInterval = setInterval(async () => {
       if (id) {
@@ -92,7 +100,7 @@ const GameRoomShell: React.FC = () => {
         <AlertCircle className="w-16 h-16 text-red-500 mb-6" />
         <h2 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tight">Match Not Found</h2>
         <p className="text-gray-400 mb-8 max-w-md">{error || 'This match session is no longer active or you do not have access.'}</p>
-        <button
+        <button 
           onClick={() => navigate('/lobby')}
           className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20"
         >
@@ -141,7 +149,7 @@ const GameRoomShell: React.FC = () => {
           <button className="p-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors">
             <Settings className="w-5 h-5" />
           </button>
-          <button
+          <button 
             onClick={() => setShowLeaveConfirm(true)}
             disabled={leaving}
             className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-xs font-bold uppercase tracking-widest transition-all border border-red-500/20"
@@ -195,6 +203,10 @@ const GameRoomShell: React.FC = () => {
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Game Viewport */}
         <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+          {/* Voice Chat Overlay */}
+          <div className="absolute top-8 left-8 z-20 w-72">
+            <VoiceChat matchId={id!} />
+          </div>
           {/* Placeholder for Game Engine */}
           <div className="absolute inset-0 opacity-20 pointer-events-none">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-500/20 via-transparent to-transparent" />
@@ -214,7 +226,7 @@ const GameRoomShell: React.FC = () => {
                 Game Engine Shell
               </h1>
               <p className="text-gray-400 text-lg leading-relaxed">
-                The multiplayer orchestration is active. Wagers are locked.
+                The multiplayer orchestration is active. Wagers are locked. 
                 The {match.game_type?.name} module will be plugged in here in the next phase.
               </p>
             </motion.div>
@@ -237,7 +249,7 @@ const GameRoomShell: React.FC = () => {
           <div className="absolute bottom-8 left-8 right-8 flex justify-between items-end pointer-events-none">
             <div className="flex flex-col gap-4">
               {match.participants?.map((p, i) => (
-                <motion.div
+                <motion.div 
                   key={p.id}
                   initial={{ x: -50, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
@@ -256,6 +268,15 @@ const GameRoomShell: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <div className="text-xs font-bold text-white">{p.users?.username}</div>
                       {p.user_id === user?.id && <span className="text-[8px] px-1 bg-white/10 rounded text-gray-400 uppercase tracking-widest">You</span>}
+                      {p.user_id !== user?.id && (
+                        <button 
+                          onClick={() => setReportingPlayer({ id: p.user_id, username: p.users?.username || 'Unknown' })}
+                          className="p-1 rounded hover:bg-red-500/20 text-red-500/40 hover:text-red-500 transition-all"
+                          title="Report Player"
+                        >
+                          <ShieldAlert className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <div className={`text-[8px] uppercase tracking-widest ${p.is_away ? 'text-orange-400' : 'text-gray-500'}`}>
@@ -275,38 +296,51 @@ const GameRoomShell: React.FC = () => {
         </div>
 
         {/* Sidebar (Chat/Log) */}
-        <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-white/10 bg-black/20 flex flex-col">
-          <div className="p-4 border-b border-white/10 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-gray-500" />
-              <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Match Log</span>
-            </div>
-          </div>
-          <div className="flex-1 p-4 overflow-y-auto space-y-4">
-            <div className="text-[10px] text-emerald-500 font-mono">
-              [{new Date(match.started_at).toLocaleTimeString()}] Match started by {match.started_by?.username}
-            </div>
-            {match.participants?.map((p) => (
-              <div key={p.id} className="text-[10px] text-gray-400 font-mono">
-                [{new Date(p.joined_at).toLocaleTimeString()}] {p.users?.username} joined the arena
+        <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-white/10 bg-black/20 flex flex-col">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-emerald-500" />
+                <span className="text-xs font-black uppercase tracking-widest text-white/60">Match Chat</span>
               </div>
-            ))}
-            <div className="text-[10px] text-blue-400 font-mono animate-pulse">
-              [SYSTEM] Waiting for game module initialization...
             </div>
+            <Chat 
+              contextType="match" 
+              contextId={id!} 
+              className="flex-1 border-0 rounded-none bg-transparent" 
+            />
           </div>
-          <div className="p-4 border-t border-white/10">
-            <div className="relative">
-              <input 
-                type="text" 
-                placeholder="Chat disabled in shell..." 
-                disabled
-                className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-500 italic cursor-not-allowed"
-              />
+
+          <div className="h-48 border-t border-white/10 flex flex-col overflow-hidden bg-black/40">
+            <div className="p-3 border-b border-white/10 flex items-center gap-2">
+              <Shield className="w-3 h-3 text-gray-500" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Match Log</span>
+            </div>
+            <div className="flex-1 p-4 overflow-y-auto space-y-2">
+              <div className="text-[9px] text-emerald-500/60 font-mono">
+                [{new Date(match.started_at).toLocaleTimeString()}] Match started
+              </div>
+              {match.participants?.map((p) => (
+                <div key={p.id} className="text-[9px] text-gray-600 font-mono">
+                  [{new Date(p.joined_at).toLocaleTimeString()}] {p.users?.username} joined
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Report Modal */}
+      <AnimatePresence>
+        {reportingPlayer && (
+          <ReportModal
+            reportedId={reportingPlayer.id}
+            reportedUsername={reportingPlayer.username}
+            matchId={id}
+            onClose={() => setReportingPlayer(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

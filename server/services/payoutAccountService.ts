@@ -8,7 +8,7 @@ export const createPayoutAccount = async (userId: string, accountData: {
   is_default?: boolean;
 }, token?: string) => {
   const client = token ? createClientWithToken(token) : supabase;
-
+  
   // If setting as default, unset other defaults first
   if (accountData.is_default) {
     await client

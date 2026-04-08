@@ -43,14 +43,14 @@ export const createGameRequest = async (userId: string, requestData: any) => {
     if (amount < room.min_wager || (room.max_wager && amount > room.max_wager)) {
       throw new Error(`Wager amount must be between ${room.min_wager} and ${room.max_wager || 'above'}`);
     }
-
+    
     // Precheck balance for paid rooms
     const { data: wallet, error: walletError } = await supabase
       .from('wallets')
       .select('available_balance')
       .eq('user_id', userId)
       .single();
-
+    
     if (walletError || !wallet) throw new Error('Wallet not found');
     if (wallet.available_balance < amount) {
       throw new Error(`Insufficient balance. You need ₦${amount.toLocaleString()} to create this game.`);
@@ -122,7 +122,7 @@ export const joinGameRequest = async (userId: string, requestId: string) => {
       .select('available_balance')
       .eq('user_id', userId)
       .single();
-
+    
     if (walletError || !wallet) throw new Error('Wallet not found');
     if (wallet.available_balance < request.amount) {
       throw new Error(`Insufficient balance. You need ₦${request.amount.toLocaleString()} to join this game.`);
@@ -222,7 +222,7 @@ export const getGameRequestById = async (id: string) => {
     .from('users')
     .select('id, username')
     .in('id', participantIds);
-
+  
   const participantUserMap = (participantUsers || []).reduce((acc: any, user: any) => {
     acc[user.id] = user.username;
     return acc;

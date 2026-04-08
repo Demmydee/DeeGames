@@ -80,3 +80,115 @@ export const dashboardApi = {
     return response.data;
   }
 };
+
+export const chatApi = {
+  getRoomMessages: async (roomId: string) => {
+    const response = await apiClient.get(`${API_BASE}/chat/rooms/${roomId}/messages`);
+    return response.data;
+  },
+  sendRoomMessage: async (roomId: string, content: string) => {
+    const response = await apiClient.post(`${API_BASE}/chat/rooms/${roomId}/messages`, { content });
+    return response.data;
+  },
+  getMatchMessages: async (matchId: string) => {
+    const response = await apiClient.get(`${API_BASE}/chat/matches/${matchId}/messages`);
+    return response.data;
+  },
+  sendMatchMessage: async (matchId: string, content: string) => {
+    const response = await apiClient.post(`${API_BASE}/chat/matches/${matchId}/messages`, { content });
+    return response.data;
+  }
+};
+
+export const voiceApi = {
+  getMatchSession: async (matchId: string) => {
+    const response = await apiClient.get(`${API_BASE}/voice/matches/${matchId}/session`);
+    return response.data;
+  }
+};
+
+export const friendApi = {
+  sendRequest: async (addresseeId: string) => {
+    const response = await apiClient.post(`${API_BASE}/friends/request`, { addresseeId });
+    return response.data;
+  },
+  acceptRequest: async (id: string) => {
+    const response = await apiClient.post(`${API_BASE}/friends/${id}/accept`);
+    return response.data;
+  },
+  rejectRequest: async (id: string) => {
+    const response = await apiClient.post(`${API_BASE}/friends/${id}/reject`);
+    return response.data;
+  },
+  removeFriend: async (id: string) => {
+    const response = await apiClient.post(`${API_BASE}/friends/${id}/remove`);
+    return response.data;
+  },
+  getFriends: async () => {
+    const response = await apiClient.get(`${API_BASE}/friends`);
+    return response.data;
+  },
+  getIncomingRequests: async () => {
+    const response = await apiClient.get(`${API_BASE}/friends/requests/incoming`);
+    return response.data;
+  },
+  getOutgoingRequests: async () => {
+    const response = await apiClient.get(`${API_BASE}/friends/requests/outgoing`);
+    return response.data;
+  }
+};
+
+export const socialApi = {
+  getRecentOpponents: async () => {
+    const response = await apiClient.get(`${API_BASE}/social/recent-opponents`);
+    return response.data;
+  }
+};
+
+export const notificationApi = {
+  getNotifications: async () => {
+    const response = await apiClient.get(`${API_BASE}/notifications`);
+    return response.data;
+  },
+  getUnreadCount: async () => {
+    const response = await apiClient.get(`${API_BASE}/notifications/unread-count`);
+    return response.data;
+  },
+  markAsRead: async (id: string) => {
+    const response = await apiClient.post(`${API_BASE}/notifications/${id}/read`);
+    return response.data;
+  },
+  markAllAsRead: async () => {
+    const response = await apiClient.post(`${API_BASE}/notifications/read-all`);
+    return response.data;
+  }
+};
+
+export const reportApi = {
+  submitReport: async (data: { reportedId: string, matchId?: string, reason: string, description?: string }) => {
+    const response = await apiClient.post(`${API_BASE}/reports/player`, data);
+    return response.data;
+  },
+  getMyReports: async () => {
+    const response = await apiClient.get(`${API_BASE}/reports/my`);
+    return response.data;
+  }
+};
+
+export const supportApi = {
+  submitTicket: async (data: { subject: string, message: string }) => {
+    const response = await apiClient.post(`${API_BASE}/support`, data);
+    return response.data;
+  },
+  getMyTickets: async () => {
+    const response = await apiClient.get(`${API_BASE}/support/my`);
+    return response.data;
+  }
+};
+
+export const presenceApi = {
+  ping: async () => {
+    const response = await apiClient.post(`${API_BASE}/presence/ping`);
+    return response.data;
+  }
+};

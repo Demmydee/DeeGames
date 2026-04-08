@@ -74,7 +74,7 @@ export const verifyDeposit = async (reference: string) => {
 
   // 3. Verify with Paystack
   const paystackData = await paystackService.verifyTransaction(deposit.paystack_reference || reference);
-
+  
   if (paystackData.data.status === 'success') {
     // 4. Process success atomically via RPC
     const { data: result, error: rpcError } = await supabase.rpc('process_deposit_success', {
@@ -99,7 +99,7 @@ export const verifyDeposit = async (reference: string) => {
       .from('deposits')
       .update({ status: 'failed', metadata: paystackData.data })
       .eq('id', deposit.id);
-
+      
     return { status: 'failed', message: 'Payment failed' };
   }
 };

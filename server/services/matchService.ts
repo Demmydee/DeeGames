@@ -34,7 +34,7 @@ export const getMatchById = async (id: string) => {
     .from('users')
     .select('id, username')
     .in('id', participantIds);
-
+  
   const participantUserMap = (participantUsers || []).reduce((acc: any, user: any) => {
     acc[user.id] = user.username;
     return acc;

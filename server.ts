@@ -13,6 +13,14 @@ import lobbyRoutes from "./server/routes/lobbyRoutes";
 import gameRequestRoutes from "./server/routes/gameRequestRoutes";
 import matchRoutes from "./server/routes/matchRoutes";
 import dashboardRoutes from "./server/routes/dashboardRoutes";
+import chatRoutes from "./server/routes/chatRoutes";
+import voiceRoutes from "./server/routes/voiceRoutes";
+import friendRoutes from "./server/routes/friendRoutes";
+import notificationRoutes from "./server/routes/notificationRoutes";
+import reportRoutes from "./server/routes/reportRoutes";
+import supportRoutes from "./server/routes/supportRoutes";
+import presenceRoutes from "./server/routes/presenceRoutes";
+import socialRoutes from "./server/routes/socialRoutes";
 
 async function startServer() {
   const app = express();
@@ -36,6 +44,14 @@ async function startServer() {
   app.use("/api/game-requests", gameRequestRoutes);
   app.use("/api/matches", matchRoutes);
   app.use("/api/dashboard", dashboardRoutes);
+  app.use("/api/chat", chatRoutes);
+  app.use("/api/voice", voiceRoutes);
+  app.use("/api/friends", friendRoutes);
+  app.use("/api/notifications", notificationRoutes);
+  app.use("/api/reports", reportRoutes);
+  app.use("/api/support", supportRoutes);
+  app.use("/api/presence", presenceRoutes);
+  app.use("/api/social", socialRoutes);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

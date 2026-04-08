@@ -178,7 +178,7 @@ DECLARE
 BEGIN
     -- Lock the wallet row for update to prevent concurrent modifications
     SELECT * INTO v_wallet FROM public.wallets WHERE user_id = p_user_id FOR UPDATE;
-
+    
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Wallet not found for user %', p_user_id;
     END IF;
@@ -294,7 +294,7 @@ DECLARE
     v_result JSONB;
 BEGIN
     -- Lock wallet for update
-    SELECT id, available_balance INTO v_wallet_id, v_available_balance
+    SELECT id, available_balance INTO v_wallet_id, v_available_balance 
     FROM public.wallets WHERE user_id = p_user_id FOR UPDATE;
 
     IF v_available_balance < p_amount THEN

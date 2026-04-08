@@ -30,7 +30,7 @@ export const requestWithdrawal = async (userId: string, amount: number, payoutAc
   }
 
   const internalReference = `WITH_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-
+  
   // 3. Process withdrawal atomically via RPC
   const { data: result, error: rpcError } = await supabase.rpc('request_withdrawal_atomic', {
     p_user_id: userId,

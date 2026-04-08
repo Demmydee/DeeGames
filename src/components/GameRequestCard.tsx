@@ -44,15 +44,15 @@ const GameRequestCard: React.FC<Props> = ({ request, onJoin, onCancel, onLeave, 
         </div>
         <div className="flex items-center gap-2">
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-            request.category === 'arena'
-              ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+            request.category === 'arena' 
+              ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' 
               : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
           }`}>
             {request.category}
           </span>
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-            request.status === 'ready_to_start'
-              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+            request.status === 'ready_to_start' 
+              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
               : 'bg-orange-500/20 text-orange-400 border-orange-500/30'
           }`}>
             {request.status.replace('_', ' ')}
@@ -96,8 +96,8 @@ const GameRequestCard: React.FC<Props> = ({ request, onJoin, onCancel, onLeave, 
       {/* Participants List */}
       <div className="flex -space-x-2 mb-6">
         {request.participants?.map((p) => (
-          <div
-            key={p.id || `p-${p.user_id}`}
+          <div 
+            key={p.id || `p-${p.user_id}`} 
             title={p.users?.username}
             className={`w-8 h-8 rounded-full border-2 border-[#0a0a0a] flex items-center justify-center text-[10px] font-bold text-white uppercase ${
               p.user_id === request.requester_user_id ? 'bg-orange-600' : 'bg-emerald-600'
@@ -107,8 +107,8 @@ const GameRequestCard: React.FC<Props> = ({ request, onJoin, onCancel, onLeave, 
           </div>
         ))}
         {Array.from({ length: Math.max(0, request.required_players - (request.participants?.length || 0)) }).map((_, i) => (
-          <div
-            key={`empty-${i}`}
+          <div 
+            key={`empty-${i}`} 
             className="w-8 h-8 rounded-full border-2 border-[#0a0a0a] bg-white/5 flex items-center justify-center text-[10px] font-bold text-gray-600 uppercase"
           >
             ?
@@ -131,8 +131,8 @@ const GameRequestCard: React.FC<Props> = ({ request, onJoin, onCancel, onLeave, 
               onClick={onStart}
               disabled={!canStart}
               className={`flex-[2] py-3 rounded-xl font-black uppercase italic tracking-widest transition-all flex items-center justify-center gap-2 ${
-                canStart
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20'
+                canStart 
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20' 
                   : 'bg-white/5 text-gray-600 cursor-not-allowed border border-white/10'
               }`}
             >
@@ -159,8 +159,8 @@ const GameRequestCard: React.FC<Props> = ({ request, onJoin, onCancel, onLeave, 
             onClick={onJoin}
             disabled={isFull}
             className={`w-full py-3 rounded-xl font-black uppercase italic tracking-widest transition-all flex items-center justify-center gap-2 ${
-              isFull
-                ? 'bg-white/5 text-gray-600 cursor-not-allowed'
+              isFull 
+                ? 'bg-white/5 text-gray-600 cursor-not-allowed' 
                 : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20'
             }`}
           >

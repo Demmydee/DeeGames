@@ -36,7 +36,7 @@ export const getRoomCategoryById = async (id: string) => {
     .single();
 
   if (error || !room) throw new Error('Room category not found');
-
+  
   try {
     const occupancy = await getRoomOccupancy(room.id);
     return { ...room, occupancy };
@@ -56,7 +56,7 @@ export const getRoomOccupancy = async (roomId: string) => {
     console.error('Fetch Occupancy Error:', error);
     return 0;
   }
-
+  
   return count || 0;
 };
 
@@ -130,14 +130,14 @@ export const getRoomGames = async (roomId: string) => {
   const requesterIds = requests.map(r => r.requester_user_id);
   const participantUserIds = requestParticipants.map(p => p.user_id);
   const matchParticipantUserIds = matchParticipants.map(p => p.user_id);
-
+  
   const allUserIds = [...new Set([...requesterIds, ...participantUserIds, ...matchParticipantUserIds])];
-
+  
   const { data: users } = await supabase
     .from('users')
     .select('id, username')
     .in('id', allUserIds);
-
+  
   const userMap = (users || []).reduce((acc: any, user: any) => {
     acc[user.id] = user.username;
     return acc;

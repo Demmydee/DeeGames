@@ -14,6 +14,9 @@ import Transactions from './pages/Transactions';
 import Lobby from './pages/Lobby';
 import Room from './pages/Room';
 import GameRoomShell from './pages/GameRoomShell';
+import Cliques from './pages/Cliques';
+import FAQ from './pages/FAQ';
+import Support from './pages/Support';
 import Navbar from './components/layout/Navbar';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -48,6 +51,9 @@ export default function App() {
         <Route path="/lobby" element={<ProtectedRoute><Lobby /></ProtectedRoute>} />
         <Route path="/lobby/room/:id" element={<ProtectedRoute><Room /></ProtectedRoute>} />
         <Route path="/match/:id" element={<ProtectedRoute><GameRoomShell /></ProtectedRoute>} />
+        <Route path="/cliques" element={<ProtectedRoute><Cliques /></ProtectedRoute>} />
+        <Route path="/faq" element={<FAQ />} />
+        <Route path="/support" element={<Support />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </div>
