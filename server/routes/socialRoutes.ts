@@ -5,5 +5,6 @@ import { authenticateToken } from '../middleware/auth';
 const router = Router();
 
 router.get('/recent-opponents', authenticateToken, socialController.getRecentOpponents);
+router.get('/search', authenticateToken, socialController.searchUsers);
 
 export default router;

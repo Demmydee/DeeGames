@@ -15,6 +15,8 @@ import {
 import { supportApi } from '../services/multiplayerApi';
 import { useAuth } from '../context/AuthContext';
 
+import ErrorMessage from '../components/ui/ErrorMessage';
+
 const Support: React.FC = () => {
   const { user } = useAuth();
   const [subject, setSubject] = useState("");
@@ -82,9 +84,9 @@ const Support: React.FC = () => {
               <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
                 <Send className="w-24 h-24" />
               </div>
-              
+
               <h2 className="text-xl font-black text-white uppercase italic tracking-tight mb-6">Submit a Ticket</h2>
-              
+
               <form onSubmit={handleSubmit} className="space-y-6">
                 {success && (
                   <motion.div
@@ -97,12 +99,7 @@ const Support: React.FC = () => {
                   </motion.div>
                 )}
 
-                {error && (
-                  <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-400 text-xs">
-                    <AlertCircle className="w-5 h-5 shrink-0" />
-                    <p>{error}</p>
-                  </div>
-                )}
+                <ErrorMessage message={error} />
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Subject</label>

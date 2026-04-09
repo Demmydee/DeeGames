@@ -1,36 +1,70 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
-import { Wallet, Trophy, History, Settings, Gamepad2, ArrowUpRight, ArrowDownLeft, User, ChevronRight, Building2, Loader2, AlertCircle, Play } from 'lucide-react';
+import {
+  Wallet,
+  Trophy,
+  History,
+  Settings,
+  Gamepad2,
+  ArrowUpRight,
+  ArrowDownLeft,
+  User,
+  ChevronRight,
+  Building2,
+  Loader2,
+  AlertCircle,
+  Play,
+  Users,
+  HelpCircle,
+  MessageSquare,
+  UserPlus
+} from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '../api/client';
-import { dashboardApi } from '../services/multiplayerApi';
+import { dashboardApi, socialApi, friendApi } from '../services/multiplayerApi';
 import { DashboardStatus } from '../types/multiplayer';
+
+import ErrorMessage from '../components/ui/ErrorMessage';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [wallet, setWallet] = useState<any>(null);
   const [status, setStatus] = useState<DashboardStatus | null>(null);
+  const [recentOpponents, setRecentOpponents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [walletRes, statusRes] = await Promise.all([
+        const [walletRes, statusRes, opponentsRes] = await Promise.all([
           apiClient.get('/api/wallet'),
-          dashboardApi.getStatus()
+          dashboardApi.getStatus(),
+          socialApi.getRecentOpponents()
         ]);
         setWallet(walletRes.data.wallet);
         setStatus(statusRes);
-      } catch (error) {
+        setRecentOpponents(opponentsRes.slice(0, 3)); // Only show top 3
+      } catch (error: any) {
         console.error('Failed to fetch dashboard data', error);
+        setError('Failed to load dashboard data. Please refresh.');
       } finally {
         setLoading(false);
       }
     };
     fetchData();
   }, []);
+
+  const handleAddFriend = async (userId: string) => {
+    try {
+      await friendApi.sendRequest(userId);
+      alert('Friend request sent!');
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -57,6 +91,8 @@ const Dashboard = () => {
         </h1>
         <p className="text-neutral-400">Ready for your next challenge?</p>
       </motion.div>
+
+      <ErrorMessage message={error} className="mb-8" />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
@@ -90,7 +126,7 @@ const Dashboard = () => {
               <Gamepad2 className="w-6 h-6 text-orange-500" />
               Multiplayer Arena
             </h2>
-            
+
             {status?.active ? (
               <div className="bg-neutral-900 border border-orange-500/30 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-6">
@@ -106,7 +142,7 @@ const Dashboard = () => {
                     </p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => navigate(status.type === 'match' ? `/match/${status.id}` : `/lobby/room/${status.details?.room_category_id}`)}
                   className="px-8 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-orange-900/20"
                 >
@@ -116,7 +152,7 @@ const Dashboard = () => {
             ) : (
               <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-12 text-center">
                 <p className="text-neutral-500 mb-6">You are not currently in any active game or request.</p>
-                <Link 
+                <Link
                   to="/lobby"
                   className="inline-block bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 rounded-full font-bold transition-all shadow-lg shadow-orange-900/20"
                 >
@@ -127,14 +163,42 @@ const Dashboard = () => {
           </section>
 
           <section>
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-              <History className="w-6 h-6 text-orange-500" />
-              Recent Activity
+            <h2 className="text-2xl font-bold mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="w-6 h-6 text-orange-500" />
+                Recent Opponents
+              </div>
+              <Link to="/cliques" className="text-sm text-orange-500 hover:underline font-bold uppercase tracking-widest">View All</Link>
             </h2>
             <div className="bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden">
-              <div className="p-8 text-center text-neutral-500">
-                Your recent game and transaction history will appear in the <Link to="/wallet" className="text-orange-500 hover:underline">Wallet</Link> section.
-              </div>
+              {recentOpponents.length === 0 ? (
+                <div className="p-8 text-center text-neutral-500">
+                  Your recent opponents will appear here after you play some matches.
+                </div>
+              ) : (
+                <div className="divide-y divide-neutral-800">
+                  {recentOpponents.map((opp) => (
+                    <div key={opp.id} className="p-4 flex items-center justify-between hover:bg-neutral-800/50 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center font-black text-orange-500">
+                          {opp.username.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-white">{opp.username}</h4>
+                          <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Matched recently</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleAddFriend(opp.id)}
+                        className="p-2 rounded-lg bg-neutral-800 hover:bg-orange-600 text-neutral-400 hover:text-white transition-all"
+                        title="Add Friend"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         </div>
@@ -144,7 +208,7 @@ const Dashboard = () => {
           <div className="bg-orange-600 rounded-3xl p-6 text-white">
             <h3 className="text-xl font-black uppercase mb-4">Quick Deposit</h3>
             <p className="text-orange-100 text-sm mb-6">Fund your wallet to start wagering against other players.</p>
-            <Link 
+            <Link
               to="/deposit"
               className="w-full bg-white text-orange-600 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-orange-50 transition-colors"
             >
@@ -154,14 +218,32 @@ const Dashboard = () => {
           </div>
 
           <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6">
-            <h3 className="text-xl font-bold mb-4">Account Settings</h3>
+            <h3 className="text-xl font-bold mb-4">Quick Navigation</h3>
             <div className="space-y-2">
-              <button className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
+              <Link to="/cliques" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
                 <span className="flex items-center gap-3">
-                  <User className="w-5 h-5" /> Profile
+                  <Users className="w-5 h-5" /> Cliques
                 </span>
                 <ChevronRight className="w-4 h-4" />
-              </button>
+              </Link>
+              <Link to="/faq" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
+                <span className="flex items-center gap-3">
+                  <HelpCircle className="w-5 h-5" /> FAQ
+                </span>
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+              <Link to="/support" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
+                <span className="flex items-center gap-3">
+                  <MessageSquare className="w-5 h-5" /> Support
+                </span>
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6">
+            <h3 className="text-xl font-bold mb-4">Account Settings</h3>
+            <div className="space-y-2">
               <Link to="/wallet" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
                 <span className="flex items-center gap-3">
                   <Wallet className="w-5 h-5" /> Wallet

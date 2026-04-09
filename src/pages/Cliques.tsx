@@ -13,11 +13,14 @@ import {
   MessageSquare,
   ShieldAlert,
   ChevronRight,
-  MoreVertical
+  MoreVertical,
+  User
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { friendApi, socialApi } from '../services/multiplayerApi';
 import { useAuth } from '../context/AuthContext';
+import ErrorMessage from '../components/ui/ErrorMessage';
+import apiClient from '../api/client';
 
 const Cliques: React.FC = () => {
   const { user } = useAuth();
@@ -27,7 +30,12 @@ const Cliques: React.FC = () => {
   const [recentOpponents, setRecentOpponents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'opponents'>('friends');
+  const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'opponents' | 'search'>('friends');
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -53,12 +61,31 @@ const Cliques: React.FC = () => {
     fetchData();
   }, []);
 
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    setSearching(true);
+    setError(null);
+    try {
+      const response = await apiClient.get(`/api/social/search?q=${encodeURIComponent(searchQuery)}`);
+      setSearchResults(response.data);
+      if (response.data.length === 0) {
+        setError('No users found matching that username');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to search users');
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const handleAccept = async (id: string) => {
     try {
       await friendApi.acceptRequest(id);
       fetchData();
     } catch (err: any) {
-      alert(err.message);
+      setError(err.message);
     }
   };
 
@@ -67,7 +94,7 @@ const Cliques: React.FC = () => {
       await friendApi.rejectRequest(id);
       fetchData();
     } catch (err: any) {
-      alert(err.message);
+      setError(err.message);
     }
   };
 
@@ -77,7 +104,7 @@ const Cliques: React.FC = () => {
       await friendApi.removeFriend(id);
       fetchData();
     } catch (err: any) {
-      alert(err.message);
+      setError(err.message);
     }
   };
 
@@ -87,7 +114,7 @@ const Cliques: React.FC = () => {
       alert('Friend request sent!');
       fetchData();
     } catch (err: any) {
-      alert(err.message);
+      setError(err.message);
     }
   };
 
@@ -114,19 +141,22 @@ const Cliques: React.FC = () => {
           </div>
         </header>
 
+        <ErrorMessage message={error} className="mb-6" />
+
         {/* Tabs */}
-        <div className="flex gap-2 mb-8 p-1 bg-white/5 rounded-2xl border border-white/10 w-fit">
+        <div className="flex flex-wrap gap-2 mb-8 p-1 bg-white/5 rounded-2xl border border-white/10 w-fit">
           {[
             { id: 'friends', label: 'Friends', count: friends.length },
             { id: 'requests', label: 'Requests', count: incoming.length + outgoing.length },
-            { id: 'opponents', label: 'Recent Opponents', count: recentOpponents.length }
+            { id: 'opponents', label: 'Recent Opponents', count: recentOpponents.length },
+            { id: 'search', label: 'Find Users', count: 0 }
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-3 ${
-                activeTab === tab.id 
-                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20' 
+              className={`px-4 sm:px-6 py-3 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all flex items-center gap-3 ${
+                activeTab === tab.id
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20'
                   : 'text-gray-500 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -142,6 +172,28 @@ const Cliques: React.FC = () => {
           ))}
         </div>
 
+        {activeTab === 'search' && (
+          <div className="mb-8">
+            <form onSubmit={handleSearch} className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search by username..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all text-sm"
+              />
+              <button
+                type="submit"
+                disabled={searching}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+              >
+                {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+              </button>
+            </form>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-10 h-10 animate-spin text-emerald-500 mb-4" />
@@ -149,6 +201,56 @@ const Cliques: React.FC = () => {
           </div>
         ) : (
           <div className="grid gap-4">
+            {activeTab === 'search' && (
+              searchResults.length === 0 ? (
+                !searching && searchQuery && (
+                  <div className="p-12 text-center bg-white/5 border border-white/10 rounded-3xl opacity-40">
+                    <Search className="w-12 h-12 mx-auto mb-4" />
+                    <p className="text-sm font-bold uppercase tracking-widest">No users found</p>
+                  </div>
+                )
+              ) : (
+                searchResults.map((res) => (
+                  <div
+                    key={res.id}
+                    className="p-4 bg-white/5 border border-white/10 rounded-3xl flex items-center justify-between hover:bg-white/10 transition-all group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center font-black text-emerald-500 border border-emerald-500/20">
+                        {res.username.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black text-white uppercase italic tracking-tight">{res.username}</h3>
+                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                          Member since {new Date(res.created_at).getFullYear()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {res.id === user?.id ? (
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-4">You</span>
+                      ) : friends.some(f => f.id === res.id) ? (
+                        <span className="flex items-center gap-2 text-emerald-500 text-[10px] font-black uppercase tracking-widest px-4">
+                          <Check className="w-4 h-4" /> Friend
+                        </span>
+                      ) : outgoing.some(o => o.addressee_user_id === res.id) ? (
+                        <span className="flex items-center gap-2 text-amber-500 text-[10px] font-black uppercase tracking-widest px-4">
+                          <Clock className="w-4 h-4" /> Pending
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleAddFriend(res.id)}
+                          className="px-6 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-900/20"
+                        >
+                          Add Friend
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )
+            )}
+
             {activeTab === 'friends' && (
               friends.length === 0 ? (
                 <div className="p-12 text-center bg-white/5 border border-white/10 rounded-3xl opacity-40">
@@ -176,12 +278,12 @@ const Cliques: React.FC = () => {
                       <div>
                         <h3 className="text-lg font-black text-white uppercase italic tracking-tight">{friend.username}</h3>
                         <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-                          {isOnline(friend.last_seen_at) ? 'Online Now' : `Last seen ${formatDistanceToNow(new Date(friend.last_seen_at), { addSuffix: true })}`}
+                          {isOnline(friend.last_seen_at) ? 'Online Now' : friend.last_seen_at ? `Last seen ${formatDistanceToNow(new Date(friend.last_seen_at), { addSuffix: true })}` : 'Offline'}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button 
+                      <button
                         onClick={() => handleRemove(friend.friendship_id)}
                         className="p-3 rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20"
                       >
@@ -211,13 +313,13 @@ const Cliques: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <button 
+                            <button
                               onClick={() => handleAccept(req.id)}
                               className="p-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
                             >
                               <Check className="w-5 h-5" />
                             </button>
-                            <button 
+                            <button
                               onClick={() => handleReject(req.id)}
                               className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-red-500/20 hover:text-red-500 transition-all"
                             >
@@ -288,7 +390,7 @@ const Cliques: React.FC = () => {
                       <div>
                         <h3 className="text-lg font-black text-white uppercase italic tracking-tight">{opp.username}</h3>
                         <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-                          Last matched {formatDistanceToNow(new Date(opp.last_match_at), { addSuffix: true })}
+                          Last matched {opp.last_match_at ? formatDistanceToNow(new Date(opp.last_match_at), { addSuffix: true }) : 'recently'}
                         </p>
                       </div>
                     </div>

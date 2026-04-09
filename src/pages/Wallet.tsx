@@ -6,16 +6,20 @@ import WalletSummary from '../components/wallet/WalletSummary';
 import TransactionList from '../components/wallet/TransactionList';
 import { Link, useNavigate } from 'react-router-dom';
 
+import ErrorMessage from '../components/ui/ErrorMessage';
+
 const Wallet = () => {
   const navigate = useNavigate();
   const [wallet, setWallet] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [kycStatus, setKycStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
       setLoading(true);
+      setError(null);
       const [walletRes, txRes, kycRes] = await Promise.all([
         apiClient.get('/api/wallet'),
         apiClient.get('/api/wallet/transactions/recent'),
@@ -24,8 +28,9 @@ const Wallet = () => {
       setWallet(walletRes.data.wallet);
       setTransactions(txRes.data.transactions);
       setKycStatus(kycRes.data);
-    } catch (error) {
-      console.error('Failed to fetch wallet data', error);
+    } catch (err: any) {
+      console.error('Failed to fetch wallet data', err);
+      setError('Failed to load wallet data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -77,6 +82,8 @@ const Wallet = () => {
           </Link>
         </div>
       </div>
+
+      <ErrorMessage message={error} className="mb-8" />
 
       <WalletSummary
         available={wallet?.available_balance || 0}

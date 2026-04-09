@@ -20,21 +20,24 @@ interface ChatProps {
   className?: string;
 }
 
+import ErrorMessage from './ui/ErrorMessage';
+
 const Chat: React.FC<ChatProps> = ({ contextType, contextId, title, className = "" }) => {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchMessages = async () => {
     try {
-      const data = contextType === 'room' 
+      const data = contextType === 'room'
         ? await chatApi.getRoomMessages(contextId)
         : await chatApi.getMatchMessages(contextId);
       setMessages(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch messages:', err);
     } finally {
       setLoading(false);
@@ -58,15 +61,17 @@ const Chat: React.FC<ChatProps> = ({ contextType, contextId, title, className = 
     if (!newMessage.trim() || sending) return;
 
     setSending(true);
+    setError(null);
     try {
       const sent = contextType === 'room'
         ? await chatApi.sendRoomMessage(contextId, newMessage)
         : await chatApi.sendMatchMessage(contextId, newMessage);
-      
+
       setMessages(prev => [...prev, sent]);
       setNewMessage("");
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to send message:', err);
+      setError('Failed to send message. Please try again.');
     } finally {
       setSending(false);
     }
@@ -83,6 +88,8 @@ const Chat: React.FC<ChatProps> = ({ contextType, contextId, title, className = 
           </div>
         </div>
       )}
+
+      <ErrorMessage message={error} className="m-2" />
 
       <div 
         ref={scrollRef}

@@ -44,3 +44,22 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+export const searchUsers = async (req: Request, res: Response) => {
+  try {
+    const query = req.query.q as string;
+    if (!query) return res.json([]);
+
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('id, username, created_at')
+      .ilike('username', `%${query}%`)
+      .limit(10);
+
+    if (error) throw new Error('Failed to search users');
+
+    res.json(users);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
