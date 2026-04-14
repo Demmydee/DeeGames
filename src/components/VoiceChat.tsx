@@ -17,6 +17,12 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ matchId, className = "" }) => {
   const [participants, setParticipants] = useState<number>(0);
   const callRef = useRef<DailyCall | null>(null);
   const audioContainerRef = useRef<HTMLDivElement>(null);
+  const speakerMutedRef = useRef(isSpeakerMuted);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    speakerMutedRef.current = isSpeakerMuted;
+  }, [isSpeakerMuted]);
 
   const handleTrackStarted = useCallback((event?: DailyEventObjectTrack) => {
     if (!event || event.track.kind !== 'audio' || event.participant.local) return;
@@ -26,12 +32,12 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ matchId, className = "" }) => {
     audioEl.srcObject = new MediaStream([event.track]);
     audioEl.autoplay = true;
     audioEl.dataset.participantId = event.participant.session_id;
-    audioEl.muted = isSpeakerMuted;
+    audioEl.muted = speakerMutedRef.current;
 
     if (audioContainerRef.current) {
       audioContainerRef.current.appendChild(audioEl);
     }
-  }, [isSpeakerMuted]);
+  }, []);
 
   const handleTrackStopped = useCallback((event?: DailyEventObjectTrack) => {
     if (!event || event.track.kind !== 'audio') return;

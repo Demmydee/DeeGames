@@ -19,28 +19,35 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
     // 2. Get all other participants in those matches
     const { data: opponents, error: opponentError } = await supabase
       .from('match_participants')
-      .select('user_id, joined_at, users(username, last_seen_at)')
+      .select('user_id, joined_at, users(username, last_login_at)')
       .in('match_id', matchIds)
       .neq('user_id', userId)
       .order('joined_at', { ascending: false });
 
-    if (opponentError) throw new Error('Failed to fetch opponents');
+    if (opponentError) {
+      console.error('Fetch Opponents Error:', opponentError);
+      throw new Error('Failed to fetch opponents');
+    }
 
     // 3. Deduplicate by user_id and keep the latest encounter
     const uniqueOpponents = new Map();
     opponents.forEach(o => {
       if (!uniqueOpponents.has(o.user_id)) {
-        uniqueOpponents.set(o.user_id, {
-          id: o.user_id,
-          username: (o.users as any).username,
-          last_seen_at: (o.users as any).last_seen_at,
-          last_match_at: o.joined_at
-        });
+        const userData = Array.isArray(o.users) ? o.users[0] : o.users;
+        if (userData) {
+          uniqueOpponents.set(o.user_id, {
+            id: o.user_id,
+            username: (userData as any).username,
+            last_seen_at: (userData as any).last_login_at,
+            last_match_at: o.joined_at
+          });
+        }
       }
     });
 
     res.json(Array.from(uniqueOpponents.values()));
   } catch (error: any) {
+    console.error('Recent Opponents Error:', error);
     res.status(500).json({ error: error.message });
   }
 };
