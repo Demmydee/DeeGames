@@ -3,7 +3,7 @@ import * as walletService from '../services/walletService';
 
 export const getWallet = async (req: any, res: Response) => {
   try {
-    const wallet = await walletService.getWalletByUserId(req.user.id);
+    const wallet = await walletService.getWalletByUserId(req.user.id, req.token);
     res.status(200).json({ wallet });
   } catch (error: any) {
     console.error('Get Wallet Controller Error:', error);

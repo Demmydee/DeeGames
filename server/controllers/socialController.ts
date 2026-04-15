@@ -1,23 +1,27 @@
 import { Request, Response } from 'express';
-import { supabase } from '../config/supabase';
+import { supabase, createClientWithToken } from '../config/supabase';
 
 export const getRecentOpponents = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
+    const token = (req as any).token;
+
+    // Use a client with the user's token if we're not sure about the service role
+    // This ensures RLS is respected if the service role key is missing
+    const client = token ? createClientWithToken(token) : supabase;
 
     // 1. Get all matches the user participated in
-    const { data: myMatches, error: matchError } = await supabase
+    const { data: myMatches, error: matchError } = await client
       .from('match_participants')
       .select('match_id')
       .eq('user_id', userId);
 
     if (matchError) {
       console.error('Fetch Match History Error:', matchError);
-      throw new Error('Failed to fetch match history');
+      return res.status(500).json({ error: 'Failed to fetch match history' });
     }
 
     if (!myMatches || myMatches.length === 0) {
-      console.log('No match history found for user', userId);
       return res.json([]);
     }
 
@@ -28,7 +32,7 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
     }
 
     // 2. Get all other participants in those matches
-    const { data: opponents, error: opponentError } = await supabase
+    const { data: opponents, error: opponentError } = await client
       .from('match_participants')
       .select('user_id, joined_at, users(username, last_login_at)')
       .in('match_id', matchIds)
@@ -37,11 +41,10 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
 
     if (opponentError) {
       console.error('Fetch Opponents Error:', opponentError);
-      throw new Error('Failed to fetch opponents');
+      return res.status(500).json({ error: 'Failed to fetch opponents' });
     }
 
     if (!opponents) {
-      console.log('No opponents found for user', userId);
       return res.json([]);
     }
 
@@ -49,12 +52,16 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
     const uniqueOpponents = new Map();
     opponents.forEach(o => {
       if (!uniqueOpponents.has(o.user_id)) {
-        const userData = Array.isArray(o.users) ? o.users[0] : o.users;
-        if (userData) {
+        let userData = o.users as any;
+        if (Array.isArray(userData)) {
+          userData = userData[0];
+        }
+
+        if (userData && userData.username) {
           uniqueOpponents.set(o.user_id, {
             id: o.user_id,
-            username: (userData as any).username,
-            last_seen_at: (userData as any).last_login_at,
+            username: userData.username,
+            last_seen_at: userData.last_login_at,
             last_match_at: o.joined_at
           });
         }
@@ -63,8 +70,8 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
 
     res.json(Array.from(uniqueOpponents.values()));
   } catch (error: any) {
-    console.error('Recent Opponents Error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Recent Opponents Fatal Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 

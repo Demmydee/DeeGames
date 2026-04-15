@@ -39,17 +39,35 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [walletRes, statusRes, opponentsRes] = await Promise.all([
+        const results = await Promise.allSettled([
           apiClient.get('/api/wallet'),
           dashboardApi.getStatus(),
           socialApi.getRecentOpponents()
         ]);
-        setWallet(walletRes.data.wallet);
-        setStatus(statusRes);
-        setRecentOpponents(opponentsRes.slice(0, 3)); // Only show top 3
+
+        // Handle Wallet
+        if (results[0].status === 'fulfilled') {
+          setWallet(results[0].value.data.wallet);
+        } else {
+          console.error('Wallet fetch error:', results[0].reason);
+        }
+
+        // Handle Status
+        if (results[1].status === 'fulfilled') {
+          setStatus(results[1].value);
+        } else {
+          console.error('Status fetch error:', results[1].reason);
+        }
+
+        // Handle Opponents
+        if (results[2].status === 'fulfilled') {
+          setRecentOpponents(results[2].value.slice(0, 3));
+        } else {
+          console.error('Opponents fetch error:', results[2].reason);
+        }
       } catch (error: any) {
-        console.error('Failed to fetch dashboard data', error);
-        setError('Failed to load dashboard data. Please refresh.');
+        console.error('Unexpected dashboard error:', error);
+        setError('An unexpected error occurred. Please refresh.');
       } finally {
         setLoading(false);
       }

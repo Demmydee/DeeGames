@@ -1,16 +1,20 @@
 import { Request, Response } from 'express';
-import { supabase } from '../config/supabase';
+import { supabase, createClientWithToken } from '../config/supabase';
 
 export const getDashboardStatus = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
+    const token = (req as any).token;
+
+    // Use a client with the user's token if we're not sure about the service role
+    const client = token ? createClientWithToken(token) : supabase;
 
     // Check active participation
-    const { data: participation, error: participationError } = await supabase.rpc('check_user_active_participation', { p_user_id: userId });
-    
+    const { data: participation, error: participationError } = await client.rpc('check_user_active_participation', { p_user_id: userId });
+
     if (participationError) {
       console.error('Participation RPC Error:', participationError);
-      throw new Error('Failed to check active participation');
+      return res.status(500).json({ error: 'Failed to check active participation' });
     }
 
     if (!participation) {
@@ -21,7 +25,7 @@ export const getDashboardStatus = async (req: Request, res: Response) => {
     if (participation.active && participation.id) {
       try {
         if (participation.type === 'request') {
-          const { data, error } = await supabase
+          const { data, error } = await client
             .from('game_requests')
             .select('*, game_type:game_types(name), room:room_categories(name)')
             .eq('id', participation.id)
@@ -32,7 +36,7 @@ export const getDashboardStatus = async (req: Request, res: Response) => {
             details = data;
           }
         } else if (participation.type === 'match') {
-          const { data, error } = await supabase
+          const { data, error } = await client
             .from('matches')
             .select('*, game_type:game_types(name), room:room_categories(name)')
             .eq('id', participation.id)
@@ -49,13 +53,13 @@ export const getDashboardStatus = async (req: Request, res: Response) => {
     }
 
     res.json({
-      active: participation.active,
-      type: participation.type,
-      id: participation.id,
+      active: !!participation.active,
+      type: participation.type || null,
+      id: participation.id || null,
       details
     });
   } catch (error: any) {
-    console.error('Dashboard Status Error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Dashboard Status Fatal Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

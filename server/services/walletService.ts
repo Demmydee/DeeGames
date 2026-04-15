@@ -1,7 +1,9 @@
-import { supabase } from '../config/supabase';
+import { supabase, createClientWithToken } from '../config/supabase';
 
-export const getWalletByUserId = async (userId: string) => {
-  const { data, error } = await supabase
+export const getWalletByUserId = async (userId: string, token?: string) => {
+  const client = token ? createClientWithToken(token) : supabase;
+
+  const { data, error } = await client
     .from('wallets')
     .select('*')
     .eq('user_id', userId)
@@ -10,7 +12,7 @@ export const getWalletByUserId = async (userId: string) => {
   if (error) {
     if (error.code === 'PGRST116') { // JSON object requested, but no rows were returned
       console.log(`Wallet not found for user ${userId}, creating one...`);
-      const { data: newWallet, error: createError } = await supabase
+      const { data: newWallet, error: createError } = await client
         .from('wallets')
         .insert([{ user_id: userId }])
         .select()
