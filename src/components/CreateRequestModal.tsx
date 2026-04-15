@@ -9,7 +9,8 @@ import {
   Trophy, 
   AlertCircle,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  Plus
 } from 'lucide-react';
 import { lobbyApi, gameRequestApi } from '../services/multiplayerApi';
 import { RoomCategory, GameType } from '../types/multiplayer';
@@ -42,8 +43,8 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
         const data = await lobbyApi.getGameTypes();
         setGameTypes(data);
         if (data.length > 0) {
-          setFormData(prev => ({ 
-            ...prev, 
+          setFormData(prev => ({
+            ...prev,
             game_type_id: data[0].id,
             required_players: data[0].min_players
           }));
@@ -57,6 +58,14 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
 
     fetchGameTypes();
   }, []);
+
+  const errorRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (error && errorRef.current) {
+      errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [error]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,10 +92,10 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
   // Enforce rules when category or game type changes
   useEffect(() => {
     if (formData.category === 'duel') {
-      setFormData(prev => ({ 
-        ...prev, 
-        pay_mode: 'knockout', 
-        required_players: 2 
+      setFormData(prev => ({
+        ...prev,
+        pay_mode: 'knockout',
+        required_players: 2
       }));
     }
   }, [formData.category]);
@@ -117,7 +126,7 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
               Create Game Request
             </h2>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-white/5 transition-colors text-gray-500 hover:text-white"
           >
@@ -136,7 +145,7 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
         ) : (
           <form onSubmit={handleSubmit} className="p-5 space-y-5 overflow-y-auto">
             {error && (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex flex-col gap-3">
+              <div ref={errorRef} className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex flex-col gap-3">
                 <div className="flex items-center gap-3 text-red-400 text-sm">
                   <AlertCircle className="w-5 h-5 shrink-0" />
                   <p>{error}</p>
@@ -171,8 +180,8 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
                       type="button"
                       onClick={() => setFormData({ ...formData, game_type_id: game.id })}
                       className={`p-4 rounded-xl border-2 text-left transition-all ${
-                        formData.game_type_id === game.id 
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white' 
+                        formData.game_type_id === game.id
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white'
                           : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
                       }`}
                     >
@@ -237,8 +246,8 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
                   type="button"
                   onClick={() => setFormData({ ...formData, pay_mode: 'knockout' })}
                   className={`p-3 rounded-xl border-2 text-center transition-all ${
-                    formData.pay_mode === 'knockout' 
-                      ? 'border-emerald-500 bg-emerald-500/10 text-white' 
+                    formData.pay_mode === 'knockout'
+                      ? 'border-emerald-500 bg-emerald-500/10 text-white'
                       : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
                   }`}
                 >
@@ -250,8 +259,8 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
                   disabled={formData.category === 'duel' || formData.required_players <= 2}
                   onClick={() => setFormData({ ...formData, pay_mode: 'split' })}
                   className={`p-3 rounded-xl border-2 text-center transition-all ${
-                    formData.pay_mode === 'split' 
-                      ? 'border-emerald-500 bg-emerald-500/10 text-white' 
+                    formData.pay_mode === 'split'
+                      ? 'border-emerald-500 bg-emerald-500/10 text-white'
                       : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10 disabled:opacity-30'
                   }`}
                 >
@@ -315,10 +324,3 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
 };
 
 export default CreateRequestModal;
-
-// Helper component for Plus icon
-const Plus = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-  </svg>
-);

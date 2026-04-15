@@ -96,10 +96,10 @@ const NotificationBell: React.FC = () => {
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
-              className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-80 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
+              className="fixed sm:absolute top-16 sm:top-full left-4 right-4 sm:left-auto sm:right-0 sm:mt-2 sm:w-80 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
             >
               <div className="p-4 border-b border-white/10 bg-white/5 flex items-center justify-between">
-                <h3 className="text-xs font-black uppercase tracking-widest text-white/60 whitespace-nowrap">Notifications</h3>
+                <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-wider sm:tracking-widest text-white/60">Notifications</h3>
                 {unreadCount > 0 && (
                   <button
                     onClick={handleMarkAllAsRead}

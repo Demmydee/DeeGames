@@ -12,7 +12,19 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({ message, className = "" }) 
 
   useEffect(() => {
     if (message && errorRef.current) {
-      errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const element = errorRef.current;
+      // Small delay to ensure layout is stable
+      const timer = setTimeout(() => {
+        const navHeight = 80; // Approximate height of sticky navbar
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - navHeight - 20;
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [message]);
 
