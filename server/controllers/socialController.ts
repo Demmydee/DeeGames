@@ -6,8 +6,6 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
     const userId = (req as any).user.id;
     const token = (req as any).token;
 
-    // Use a client with the user's token if we're not sure about the service role
-    // This ensures RLS is respected if the service role key is missing
     const client = token ? createClientWithToken(token) : supabase;
 
     // 1. Get all matches the user participated in
@@ -18,7 +16,7 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
 
     if (matchError) {
       console.error('Fetch Match History Error:', matchError);
-      return res.status(500).json({ error: 'Failed to fetch match history' });
+      return res.status(500).json({ error: `Match history error: ${matchError.message}` });
     }
 
     if (!myMatches || myMatches.length === 0) {
@@ -32,37 +30,49 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
     }
 
     // 2. Get all other participants in those matches
-    const { data: opponents, error: opponentError } = await client
+    const { data: participants, error: participantError } = await client
       .from('match_participants')
-      .select('user_id, joined_at, users(username, last_login_at)')
+      .select('user_id, joined_at')
       .in('match_id', matchIds)
       .neq('user_id', userId)
       .order('joined_at', { ascending: false });
 
-    if (opponentError) {
-      console.error('Fetch Opponents Error:', opponentError);
-      return res.status(500).json({ error: 'Failed to fetch opponents' });
+    if (participantError) {
+      console.error('Fetch Participants Error:', participantError);
+      return res.status(500).json({ error: `Participants error: ${participantError.message}` });
     }
 
-    if (!opponents) {
+    if (!participants || participants.length === 0) {
       return res.json([]);
     }
 
-    // 3. Deduplicate by user_id and keep the latest encounter
-    const uniqueOpponents = new Map();
-    opponents.forEach(o => {
-      if (!uniqueOpponents.has(o.user_id)) {
-        let userData = o.users as any;
-        if (Array.isArray(userData)) {
-          userData = userData[0];
-        }
+    // Deduplicate and get unique user IDs
+    const uniqueUserIds = Array.from(new Set(participants.map(p => p.user_id)));
 
-        if (userData && userData.username) {
-          uniqueOpponents.set(o.user_id, {
-            id: o.user_id,
-            username: userData.username,
-            last_seen_at: userData.last_login_at,
-            last_match_at: o.joined_at
+    // 3. Get user profiles for these IDs
+    const { data: userProfiles, error: userError } = await client
+      .from('users')
+      .select('id, username, last_login_at')
+      .in('id', uniqueUserIds);
+
+    if (userError) {
+      console.error('Fetch User Profiles Error:', userError);
+      return res.status(500).json({ error: `User profiles error: ${userError.message}` });
+    }
+
+    // 4. Map profiles back to participants
+    const profileMap = new Map(userProfiles?.map(p => [p.id, p]) || []);
+    const uniqueOpponents = new Map();
+
+    participants.forEach(p => {
+      if (!uniqueOpponents.has(p.user_id)) {
+        const profile = profileMap.get(p.user_id);
+        if (profile) {
+          uniqueOpponents.set(p.user_id, {
+            id: p.user_id,
+            username: profile.username,
+            last_seen_at: profile.last_login_at,
+            last_match_at: p.joined_at
           });
         }
       }
@@ -71,7 +81,7 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
     res.json(Array.from(uniqueOpponents.values()));
   } catch (error: any) {
     console.error('Recent Opponents Fatal Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: `Server error: ${error.message}` });
   }
 };
 
