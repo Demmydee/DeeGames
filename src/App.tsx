@@ -34,6 +34,11 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 export default function App() {
+  React.useEffect(() => {
+    const apiUrl = import.meta.env.VITE_API_URL || 'Local Server (Relative)';
+    console.log(`%c🚀 DeeGames API: ${apiUrl}`, 'color: #f97316; font-weight: bold; font-size: 12px;');
+  }, []);
+
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans">
       <Navbar />

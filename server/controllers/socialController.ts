@@ -8,6 +8,14 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
 
     const client = token ? createClientWithToken(token) : supabase;
 
+    // Debug log for environment status
+    console.log('Recent Opponents Request:', {
+      userId,
+      hasToken: !!token,
+      hasSupabaseUrl: !!process.env.SUPABASE_URL,
+      hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    });
+
     // 1. Get all matches the user participated in
     const { data: myMatches, error: matchError } = await client
       .from('match_participants')
@@ -88,18 +96,25 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
 export const searchUsers = async (req: Request, res: Response) => {
   try {
     const query = req.query.q as string;
+    const token = (req as any).token;
     if (!query) return res.json([]);
 
-    const { data: users, error } = await supabase
+    const client = token ? createClientWithToken(token) : supabase;
+
+    const { data: users, error } = await client
       .from('users')
       .select('id, username, created_at')
       .ilike('username', `%${query}%`)
       .limit(10);
 
-    if (error) throw new Error('Failed to search users');
+    if (error) {
+      console.error('Search Users Error:', error);
+      return res.status(500).json({ error: `Search error: ${error.message}` });
+    }
 
     res.json(users);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Search Users Fatal Error:', error);
+    res.status(500).json({ error: `Server error: ${error.message}` });
   }
 };
