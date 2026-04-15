@@ -8,6 +8,20 @@ export const getWalletByUserId = async (userId: string) => {
     .single();
 
   if (error) {
+    if (error.code === 'PGRST116') { // JSON object requested, but no rows were returned
+      console.log(`Wallet not found for user ${userId}, creating one...`);
+      const { data: newWallet, error: createError } = await supabase
+        .from('wallets')
+        .insert([{ user_id: userId }])
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Failed to create missing wallet:', createError);
+        throw new Error('Failed to initialize wallet');
+      }
+      return newWallet;
+    }
     console.error('Fetch Wallet Error:', error);
     throw new Error('Failed to fetch wallet information');
   }

@@ -11,10 +11,21 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
       .select('match_id')
       .eq('user_id', userId);
 
-    if (matchError) throw new Error('Failed to fetch match history');
-    if (!myMatches || myMatches.length === 0) return res.json([]);
+    if (matchError) {
+      console.error('Fetch Match History Error:', matchError);
+      throw new Error('Failed to fetch match history');
+    }
 
-    const matchIds = myMatches.map(m => m.match_id);
+    if (!myMatches || myMatches.length === 0) {
+      console.log('No match history found for user', userId);
+      return res.json([]);
+    }
+
+    const matchIds = myMatches.map(m => m.match_id).filter(id => !!id);
+
+    if (matchIds.length === 0) {
+      return res.json([]);
+    }
 
     // 2. Get all other participants in those matches
     const { data: opponents, error: opponentError } = await supabase
@@ -27,6 +38,11 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
     if (opponentError) {
       console.error('Fetch Opponents Error:', opponentError);
       throw new Error('Failed to fetch opponents');
+    }
+
+    if (!opponents) {
+      console.log('No opponents found for user', userId);
+      return res.json([]);
     }
 
     // 3. Deduplicate by user_id and keep the latest encounter

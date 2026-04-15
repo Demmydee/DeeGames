@@ -6,6 +6,7 @@ export const getWallet = async (req: any, res: Response) => {
     const wallet = await walletService.getWalletByUserId(req.user.id);
     res.status(200).json({ wallet });
   } catch (error: any) {
+    console.error('Get Wallet Controller Error:', error);
     res.status(500).json({ error: error.message });
   }
 };
