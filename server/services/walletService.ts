@@ -1,7 +1,8 @@
 import { supabase, createClientWithToken } from '../config/supabase';
 
 export const getWalletByUserId = async (userId: string, token?: string) => {
-  const client = token ? createClientWithToken(token) : supabase;
+  const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const client = hasServiceKey ? supabase : (token ? createClientWithToken(token) : supabase);
 
   const { data, error } = await client
     .from('wallets')

@@ -6,14 +6,16 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
     const userId = (req as any).user.id;
     const token = (req as any).token;
 
-    const client = token ? createClientWithToken(token) : supabase;
+    // Use the service role client if available to bypass RLS and avoid recursion issues
+    // Fallback to token-based client if service role is missing
+    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const client = hasServiceKey ? supabase : (token ? createClientWithToken(token) : supabase);
 
     // Debug log for environment status
     console.log('Recent Opponents Request:', {
       userId,
-      hasToken: !!token,
-      hasSupabaseUrl: !!process.env.SUPABASE_URL,
-      hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+      usingServiceRole: hasServiceKey,
+      hasToken: !!token
     });
 
     // 1. Get all matches the user participated in

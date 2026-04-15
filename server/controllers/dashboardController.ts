@@ -6,8 +6,9 @@ export const getDashboardStatus = async (req: Request, res: Response) => {
     const userId = (req as any).user.id;
     const token = (req as any).token;
 
-    // Use a client with the user's token if we're not sure about the service role
-    const client = token ? createClientWithToken(token) : supabase;
+    // Use the service role client if available to bypass RLS
+    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const client = hasServiceKey ? supabase : (token ? createClientWithToken(token) : supabase);
 
     // Check active participation
     const { data: participation, error: participationError } = await client.rpc('check_user_active_participation', { p_user_id: userId });
