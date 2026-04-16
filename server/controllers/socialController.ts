@@ -25,7 +25,7 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
       .eq('user_id', userId);
 
     if (matchError) {
-      console.error('Fetch Match History Error:', matchError);
+      console.error('Fetch Match History Error:', JSON.stringify(matchError, null, 2));
       return res.status(500).json({ error: `Match history error: ${matchError.message}` });
     }
     

@@ -10,11 +10,10 @@ export const getDashboardStatus = async (req: Request, res: Response) => {
     const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
     const client = hasServiceKey ? supabase : (token ? createClientWithToken(token) : supabase);
 
-    // Check active participation
     const { data: participation, error: participationError } = await client.rpc('check_user_active_participation', { p_user_id: userId });
-    
+
     if (participationError) {
-      console.error('Participation RPC Error:', participationError);
+      console.error('Participation RPC Error (Dashboard Status):', JSON.stringify(participationError, null, 2));
       return res.status(500).json({ error: 'Failed to check active participation' });
     }
 

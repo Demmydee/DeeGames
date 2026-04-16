@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { supabase } from '../config/supabase';
 import { GameStateService } from '../services/gameStateService';
 import { HeartbeatService } from '../services/heartbeatService';
 
@@ -49,7 +50,7 @@ export const leaveMatch = async (req: Request, res: Response) => {
 export const getMatchResult = async (req: Request, res: Response) => {
   try {
     const { matchId } = req.params;
-    const { data, error } = await (req as any).supabase
+    const { data, error } = await supabase
       .from('match_results')
       .select('*')
       .eq('match_id', matchId)

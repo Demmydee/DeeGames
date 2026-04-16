@@ -5,14 +5,17 @@ export const getMatchById = async (id: string) => {
     .from('matches')
     .select(`
       *,
-      game_type:game_types(*),
-      room:room_categories(*),
+      game_type:game_types(id, name, code),
+      room:room_categories(id, name, code, is_free),
       game_request:game_requests(*)
     `)
     .eq('id', id)
     .single();
 
-  if (error || !match) throw new Error('Match not found');
+  if (error || !match) {
+    console.error('getMatchById error:', error);
+    throw new Error('Match not found');
+  }
 
   // Fetch starter and participants manually
   const { data: startedBy } = await supabase
