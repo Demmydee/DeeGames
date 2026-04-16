@@ -21,7 +21,7 @@ CREATE POLICY "Users can view own match participations" ON public.match_particip
     FOR SELECT
     TO authenticated
     USING (
-        auth.uid() = user_id OR
+        auth.uid() = user_id OR 
         match_id IN (
             SELECT match_id FROM public.match_participants WHERE user_id = auth.uid()
         )

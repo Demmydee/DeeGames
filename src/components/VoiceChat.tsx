@@ -26,14 +26,14 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ matchId, className = "" }) => {
 
   const handleTrackStarted = useCallback((event?: DailyEventObjectTrack) => {
     if (!event || event.track.kind !== 'audio' || event.participant.local) return;
-
+    
     // Create audio element for the participant
     const audioEl = document.createElement('audio');
     audioEl.srcObject = new MediaStream([event.track]);
     audioEl.autoplay = true;
     audioEl.dataset.participantId = event.participant.session_id;
     audioEl.muted = speakerMutedRef.current;
-
+    
     if (audioContainerRef.current) {
       audioContainerRef.current.appendChild(audioEl);
     }
@@ -65,7 +65,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ matchId, className = "" }) => {
 
       setStatus('initializing');
       const session = await voiceApi.getMatchSession(matchId);
-
+      
       // Re-check after async call to prevent race conditions
       if (DailyIframe.getCallInstance()) {
         await DailyIframe.getCallInstance()?.destroy();
@@ -150,7 +150,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ matchId, className = "" }) => {
     <div className={`p-4 bg-black/20 border border-white/10 rounded-2xl flex items-center justify-between ${className}`}>
       {/* Hidden container for audio elements */}
       <div ref={audioContainerRef} className="hidden" />
-
+      
       <div className="flex items-center gap-4">
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
           status === 'joined' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-white/5 text-gray-500'
@@ -175,8 +175,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ matchId, className = "" }) => {
           onClick={toggleSpeakerMute}
           disabled={status !== 'joined'}
           className={`p-3 rounded-xl border transition-all flex items-center gap-2 ${
-            isSpeakerMuted
-              ? 'bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20'
+            isSpeakerMuted 
+              ? 'bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20' 
               : 'bg-blue-500/10 border-blue-500/20 text-blue-500 hover:bg-blue-500/20'
           } disabled:opacity-30 disabled:grayscale`}
           title={isSpeakerMuted ? 'Unmute Speaker' : 'Mute Speaker'}
@@ -188,8 +188,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ matchId, className = "" }) => {
           onClick={toggleMute}
           disabled={status !== 'joined'}
           className={`p-3 rounded-xl border transition-all flex items-center gap-2 ${
-            isMuted
-              ? 'bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20'
+            isMuted 
+              ? 'bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20' 
               : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20'
           } disabled:opacity-30 disabled:grayscale`}
           title={isMuted ? 'Unmute Mic' : 'Mute Mic'}

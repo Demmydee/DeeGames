@@ -12,8 +12,8 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
     const client = hasServiceKey ? supabase : (token ? createClientWithToken(token) : supabase);
 
     // Debug log for environment status
-    console.log('Recent Opponents Request:', {
-      userId,
+    console.log('Recent Opponents Request:', { 
+      userId, 
       usingServiceRole: hasServiceKey,
       hasToken: !!token
     });
@@ -28,13 +28,13 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
       console.error('Fetch Match History Error:', matchError);
       return res.status(500).json({ error: `Match history error: ${matchError.message}` });
     }
-
+    
     if (!myMatches || myMatches.length === 0) {
       return res.json([]);
     }
 
     const matchIds = myMatches.map(m => m.match_id).filter(id => !!id);
-
+    
     if (matchIds.length === 0) {
       return res.json([]);
     }

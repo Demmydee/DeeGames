@@ -6,7 +6,8 @@ export const getMatchById = async (id: string) => {
     .select(`
       *,
       game_type:game_types(*),
-      room:room_categories(*)
+      room:room_categories(*),
+      game_request:game_requests(*)
     `)
     .eq('id', id)
     .single();

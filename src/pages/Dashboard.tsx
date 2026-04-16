@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
-import {
-  Wallet,
-  Trophy,
-  History,
-  Settings,
-  Gamepad2,
-  ArrowUpRight,
-  ArrowDownLeft,
-  User,
-  ChevronRight,
-  Building2,
-  Loader2,
-  AlertCircle,
+import { 
+  Wallet, 
+  Trophy, 
+  History, 
+  Settings, 
+  Gamepad2, 
+  ArrowUpRight, 
+  ArrowDownLeft, 
+  User, 
+  ChevronRight, 
+  Building2, 
+  Loader2, 
+  AlertCircle, 
   Play,
   Users,
   HelpCircle,
@@ -144,7 +144,7 @@ const Dashboard = () => {
               <Gamepad2 className="w-6 h-6 text-orange-500" />
               Multiplayer Arena
             </h2>
-
+            
             {status?.active ? (
               <div className="bg-neutral-900 border border-orange-500/30 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-6">
@@ -160,7 +160,7 @@ const Dashboard = () => {
                     </p>
                   </div>
                 </div>
-                <button
+                <button 
                   onClick={() => navigate(status.type === 'match' ? `/match/${status.id}` : `/lobby/room/${status.details?.room_category_id}`)}
                   className="px-8 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-orange-900/20"
                 >
@@ -170,7 +170,7 @@ const Dashboard = () => {
             ) : (
               <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-12 text-center">
                 <p className="text-neutral-500 mb-6">You are not currently in any active game or request.</p>
-                <Link
+                <Link 
                   to="/lobby"
                   className="inline-block bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 rounded-full font-bold transition-all shadow-lg shadow-orange-900/20"
                 >
@@ -206,7 +206,7 @@ const Dashboard = () => {
                           <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Matched recently</p>
                         </div>
                       </div>
-                      <button
+                      <button 
                         onClick={() => handleAddFriend(opp.id)}
                         className="p-2 rounded-lg bg-neutral-800 hover:bg-orange-600 text-neutral-400 hover:text-white transition-all"
                         title="Add Friend"
@@ -226,7 +226,7 @@ const Dashboard = () => {
           <div className="bg-orange-600 rounded-3xl p-6 text-white">
             <h3 className="text-xl font-black uppercase mb-4">Quick Deposit</h3>
             <p className="text-orange-100 text-sm mb-6">Fund your wallet to start wagering against other players.</p>
-            <Link
+            <Link 
               to="/deposit"
               className="w-full bg-white text-orange-600 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-orange-50 transition-colors"
             >

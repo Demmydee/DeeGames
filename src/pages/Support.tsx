@@ -84,9 +84,9 @@ const Support: React.FC = () => {
               <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
                 <Send className="w-24 h-24" />
               </div>
-
+              
               <h2 className="text-xl font-black text-white uppercase italic tracking-tight mb-6">Submit a Ticket</h2>
-
+              
               <form onSubmit={handleSubmit} className="space-y-6">
                 {success && (
                   <motion.div

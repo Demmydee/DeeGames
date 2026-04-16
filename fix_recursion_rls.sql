@@ -14,11 +14,11 @@ CREATE POLICY "Users can view own match participations" ON public.match_particip
     FOR SELECT
     TO authenticated
     USING (
-        auth.uid() = user_id OR
+        auth.uid() = user_id OR 
         EXISTS (
-            SELECT 1
-            FROM public.match_participants AS mp
-            WHERE mp.match_id = public.match_participants.match_id
+            SELECT 1 
+            FROM public.match_participants AS mp 
+            WHERE mp.match_id = public.match_participants.match_id 
             AND mp.user_id = auth.uid()
         )
     );
@@ -31,9 +31,9 @@ CREATE POLICY "Users can view relevant game requests" ON public.game_requests
     USING (
         requester_user_id = auth.uid() OR
         EXISTS (
-            SELECT 1
-            FROM public.game_request_participants AS grp
-            WHERE grp.game_request_id = public.game_requests.id
+            SELECT 1 
+            FROM public.game_request_participants AS grp 
+            WHERE grp.game_request_id = public.game_requests.id 
             AND grp.user_id = auth.uid()
         )
     );
@@ -46,9 +46,9 @@ CREATE POLICY "Users can view relevant matches" ON public.matches
     USING (
         started_by_user_id = auth.uid() OR
         EXISTS (
-            SELECT 1
-            FROM public.match_participants AS mp
-            WHERE mp.match_id = public.matches.id
+            SELECT 1 
+            FROM public.match_participants AS mp 
+            WHERE mp.match_id = public.matches.id 
             AND mp.user_id = auth.uid()
         )
     );

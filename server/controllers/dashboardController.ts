@@ -12,7 +12,7 @@ export const getDashboardStatus = async (req: Request, res: Response) => {
 
     // Check active participation
     const { data: participation, error: participationError } = await client.rpc('check_user_active_participation', { p_user_id: userId });
-
+    
     if (participationError) {
       console.error('Participation RPC Error:', participationError);
       return res.status(500).json({ error: 'Failed to check active participation' });

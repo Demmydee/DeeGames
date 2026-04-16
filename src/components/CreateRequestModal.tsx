@@ -34,7 +34,8 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
     category: 'duel' as 'duel' | 'arena',
     pay_mode: 'knockout' as 'knockout' | 'split',
     amount: room.min_wager,
-    required_players: 2
+    required_players: 2,
+    game_variant: 'sudden_drop' as 'sudden_drop' | 'marathon'
   });
 
   useEffect(() => {
@@ -43,8 +44,8 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
         const data = await lobbyApi.getGameTypes();
         setGameTypes(data);
         if (data.length > 0) {
-          setFormData(prev => ({
-            ...prev,
+          setFormData(prev => ({ 
+            ...prev, 
             game_type_id: data[0].id,
             required_players: data[0].min_players
           }));
@@ -92,10 +93,10 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
   // Enforce rules when category or game type changes
   useEffect(() => {
     if (formData.category === 'duel') {
-      setFormData(prev => ({
-        ...prev,
-        pay_mode: 'knockout',
-        required_players: 2
+      setFormData(prev => ({ 
+        ...prev, 
+        pay_mode: 'knockout', 
+        required_players: 2 
       }));
     }
   }, [formData.category]);
@@ -126,7 +127,7 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
               Create Game Request
             </h2>
           </div>
-          <button
+          <button 
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-white/5 transition-colors text-gray-500 hover:text-white"
           >
@@ -180,8 +181,8 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
                       type="button"
                       onClick={() => setFormData({ ...formData, game_type_id: game.id })}
                       className={`p-4 rounded-xl border-2 text-left transition-all ${
-                        formData.game_type_id === game.id
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                        formData.game_type_id === game.id 
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white' 
                           : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
                       }`}
                     >
@@ -194,6 +195,42 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
                 )}
               </div>
             </div>
+
+            {/* Variant Selection (Only for Dice) */}
+            {selectedGame?.name.toLowerCase().includes('dice') && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                  <Trophy className="w-3 h-3" />
+                  Dice Variant
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, game_variant: 'sudden_drop' })}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      formData.game_variant === 'sudden_drop' 
+                        ? 'border-emerald-500 bg-emerald-500/10 text-white' 
+                        : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
+                    }`}
+                  >
+                    <div className="font-bold text-xs">Sudden Drop</div>
+                    <div className="text-[8px] opacity-60 uppercase tracking-wider">Elimination mode</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, game_variant: 'marathon' })}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      formData.game_variant === 'marathon' 
+                        ? 'border-emerald-500 bg-emerald-500/10 text-white' 
+                        : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
+                    }`}
+                  >
+                    <div className="font-bold text-xs">Marathon</div>
+                    <div className="text-[8px] opacity-60 uppercase tracking-wider">Cumulative scoring</div>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Players & Category */}
             <div className="grid grid-cols-2 gap-4">
@@ -246,8 +283,8 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
                   type="button"
                   onClick={() => setFormData({ ...formData, pay_mode: 'knockout' })}
                   className={`p-3 rounded-xl border-2 text-center transition-all ${
-                    formData.pay_mode === 'knockout'
-                      ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                    formData.pay_mode === 'knockout' 
+                      ? 'border-emerald-500 bg-emerald-500/10 text-white' 
                       : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
                   }`}
                 >
@@ -259,8 +296,8 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
                   disabled={formData.category === 'duel' || formData.required_players <= 2}
                   onClick={() => setFormData({ ...formData, pay_mode: 'split' })}
                   className={`p-3 rounded-xl border-2 text-center transition-all ${
-                    formData.pay_mode === 'split'
-                      ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                    formData.pay_mode === 'split' 
+                      ? 'border-emerald-500 bg-emerald-500/10 text-white' 
                       : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10 disabled:opacity-30'
                   }`}
                 >

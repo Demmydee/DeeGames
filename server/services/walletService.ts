@@ -3,7 +3,7 @@ import { supabase, createClientWithToken } from '../config/supabase';
 export const getWalletByUserId = async (userId: string, token?: string) => {
   const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
   const client = hasServiceKey ? supabase : (token ? createClientWithToken(token) : supabase);
-
+  
   const { data, error } = await client
     .from('wallets')
     .select('*')
@@ -18,7 +18,7 @@ export const getWalletByUserId = async (userId: string, token?: string) => {
         .insert([{ user_id: userId }])
         .select()
         .single();
-
+      
       if (createError) {
         console.error('Failed to create missing wallet:', createError);
         throw new Error('Failed to initialize wallet');

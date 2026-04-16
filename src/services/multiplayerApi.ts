@@ -192,3 +192,26 @@ export const presenceApi = {
     return response.data;
   }
 };
+
+export const gameApi = {
+  getState: async (matchId: string) => {
+    const response = await apiClient.get(`${API_BASE}/game/${matchId}/state`);
+    return response.data;
+  },
+  move: async (matchId: string, moveData: any) => {
+    const response = await apiClient.post(`${API_BASE}/game/${matchId}/move`, moveData);
+    return response.data;
+  },
+  getResult: async (matchId: string) => {
+    const response = await apiClient.get(`${API_BASE}/game/${matchId}/result`);
+    return response.data;
+  },
+  heartbeat: async (matchId: string) => {
+    const response = await apiClient.post(`${API_BASE}/game/${matchId}/heartbeat`);
+    return response.data;
+  },
+  leave: async (matchId: string) => {
+    const response = await apiClient.post(`${API_BASE}/game/${matchId}/leave`);
+    return response.data;
+  }
+};

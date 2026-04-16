@@ -33,7 +33,7 @@ const Chat: React.FC<ChatProps> = ({ contextType, contextId, title, className = 
 
   const fetchMessages = async () => {
     try {
-      const data = contextType === 'room'
+      const data = contextType === 'room' 
         ? await chatApi.getRoomMessages(contextId)
         : await chatApi.getMatchMessages(contextId);
       setMessages(data);
@@ -66,7 +66,7 @@ const Chat: React.FC<ChatProps> = ({ contextType, contextId, title, className = 
       const sent = contextType === 'room'
         ? await chatApi.sendRoomMessage(contextId, newMessage)
         : await chatApi.sendMatchMessage(contextId, newMessage);
-
+      
       setMessages(prev => [...prev, sent]);
       setNewMessage("");
     } catch (err: any) {

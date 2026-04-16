@@ -1,0 +1,144 @@
+import { supabase } from '../config/supabase';
+import { DiceGameEngine } from '../engines/DiceGameEngine';
+import { GameEngine, GameState, MoveData, GameConfig } from '../engines/types';
+import { SettlementService } from './settlementService';
+import { Match } from '../../src/types/multiplayer';
+import { getMatchById } from './matchService';
+
+export class GameStateService {
+  private static engines: Record<string, GameEngine> = {
+    'dice': new DiceGameEngine()
+  };
+
+  static async initializeGame(matchId: string) {
+    const match = await getMatchById(matchId);
+    const engine = this.engines[match.game_type!.name.toLowerCase()] || this.engines['dice'];
+    
+    const config: GameConfig = {
+      variant: (match.game_request?.game_variant as any) || 'sudden_drop',
+      diceCount: 1, // Default, could be configurable
+      rounds: 5 // Default for marathon
+    };
+
+    const initialState = engine.initializeState(match, match.participants!, config);
+
+    const { data, error } = await supabase
+      .from('game_states')
+      .insert([{
+        match_id: matchId,
+        game_type: match.game_type!.name.toLowerCase(),
+        game_variant: config.variant,
+        state: initialState,
+        current_round: initialState.currentRound,
+        total_rounds: initialState.totalRounds,
+        status: 'active'
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async getGameState(matchId: string) {
+    const { data, error } = await supabase
+      .from('game_states')
+      .select('*')
+      .eq('match_id', matchId)
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async processMove(matchId: string, userId: string, moveData: MoveData) {
+    const gameStateRecord = await this.getGameState(matchId);
+    const engine = this.engines[gameStateRecord.game_type] || this.engines['dice'];
+    
+    const { newState, events } = engine.processMove(gameStateRecord.state, userId, moveData);
+
+    // Save move
+    await supabase.from('game_moves').insert([{
+      match_id: matchId,
+      game_state_id: gameStateRecord.id,
+      user_id: userId,
+      move_type: moveData.type,
+      move_data: moveData,
+      result_data: { roll: newState.rolls[userId] },
+      round_number: newState.currentRound,
+      move_number: (gameStateRecord.state.history?.length || 0) + 1
+    }]);
+
+    // Update state
+    const { data: updatedRecord, error: updateError } = await supabase
+      .from('game_states')
+      .update({
+        state: newState,
+        current_round: newState.currentRound,
+        status: newState.status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', gameStateRecord.id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    // Check end condition
+    if (newState.status === 'completed') {
+      await this.handleGameEnd(matchId, newState);
+    }
+
+    return { state: updatedRecord, events };
+  }
+
+  static async handlePlayerDefeat(matchId: string, userId: string, reason: 'left' | 'disconnected') {
+    const gameStateRecord = await this.getGameState(matchId);
+    if (gameStateRecord.status !== 'active') return;
+
+    const engine = this.engines[gameStateRecord.game_type] || this.engines['dice'];
+    const { newState, events } = engine.handlePlayerDefeat(gameStateRecord.state, userId, reason);
+
+    // Update state
+    const { data: updatedRecord, error: updateError } = await supabase
+      .from('game_states')
+      .update({
+        state: newState,
+        status: newState.status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', gameStateRecord.id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    // Update participant status in DB
+    await supabase
+      .from('match_participants')
+      .update({ 
+        status: 'defeated', 
+        defeat_reason: reason,
+        left_at: reason === 'left' ? new Date().toISOString() : null
+      })
+      .eq('match_id', matchId)
+      .eq('user_id', userId);
+
+    // Check end condition
+    if (newState.status === 'completed') {
+      await this.handleGameEnd(matchId, newState);
+    }
+
+    return { state: updatedRecord, events };
+  }
+
+  private static async handleGameEnd(matchId: string, state: GameState) {
+    const match = await getMatchById(matchId);
+    const engine = this.engines['dice']; // Default to dice for now
+    const endResult = engine.detectEndCondition(state);
+
+    if (endResult) {
+      await SettlementService.settleMatch(match, endResult.rankings);
+    }
+  }
+}

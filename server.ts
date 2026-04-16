@@ -21,6 +21,8 @@ import reportRoutes from "./server/routes/reportRoutes";
 import supportRoutes from "./server/routes/supportRoutes";
 import presenceRoutes from "./server/routes/presenceRoutes";
 import socialRoutes from "./server/routes/socialRoutes";
+import gameRoutes from "./server/routes/gameRoutes";
+import { HeartbeatService } from "./server/services/heartbeatService";
 
 async function startServer() {
   const app = express();
@@ -52,6 +54,13 @@ async function startServer() {
   app.use("/api/support", supportRoutes);
   app.use("/api/presence", presenceRoutes);
   app.use("/api/social", socialRoutes);
+  app.use("/api/game", gameRoutes);
+
+  // Periodic Heartbeat & Countdown Checks
+  setInterval(() => {
+    HeartbeatService.checkStaleHeartbeats().catch(console.error);
+    HeartbeatService.checkExpiredCountdowns().catch(console.error);
+  }, 15000); // Check every 15 seconds
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

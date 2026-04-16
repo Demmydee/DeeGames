@@ -1,7 +1,8 @@
 import { supabase } from '../config/supabase';
+import { GameStateService } from './gameStateService';
 
 export const createGameRequest = async (userId: string, requestData: any) => {
-  let { room_category_id, game_type_id, category, pay_mode, amount, required_players } = requestData;
+  let { room_category_id, game_type_id, category, pay_mode, amount, required_players, game_variant } = requestData;
 
   // 1. Validate category and pay_mode rules
   if (category === 'duel') {
@@ -70,6 +71,7 @@ export const createGameRequest = async (userId: string, requestData: any) => {
       pay_mode,
       amount,
       required_players,
+      game_variant,
       status: 'awaiting_opponents'
     }])
     .select()
@@ -186,6 +188,16 @@ export const startGameRequest = async (userId: string, requestId: string) => {
   if (error) {
     console.error('Start Game RPC Error:', error);
     throw new Error(error.message || 'Failed to start game');
+  }
+
+  // Initialize Game State
+  try {
+    await GameStateService.initializeGame(data.match_id);
+  } catch (initError) {
+    console.error('Failed to initialize game state:', initError);
+    // We don't throw here to avoid breaking the match start, 
+    // but the game won't work without state. 
+    // In a real app, we might want to retry or handle this better.
   }
 
   return data;

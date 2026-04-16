@@ -19,12 +19,14 @@ import {
   MicOff,
   Volume2
 } from 'lucide-react';
-import { matchApi } from '../services/multiplayerApi';
+import { matchApi, gameApi } from '../services/multiplayerApi';
 import { Match } from '../types/multiplayer';
 import { useAuth } from '../context/AuthContext';
 import VoiceChat from '../components/VoiceChat';
 import Chat from '../components/Chat';
 import ReportModal from '../components/ReportModal';
+import DiceGameUI from '../components/DiceGameUI';
+import MatchResultScreen from '../components/MatchResultScreen';
 
 const GameRoomShell: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -36,6 +38,7 @@ const GameRoomShell: React.FC = () => {
   const [leaving, setLeaving] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [reportingPlayer, setReportingPlayer] = useState<{ id: string, username: string } | null>(null);
+  const [matchResult, setMatchResult] = useState<any>(null);
 
   const fetchMatch = useCallback(async () => {
     if (!id) return;
@@ -43,7 +46,13 @@ const GameRoomShell: React.FC = () => {
       const data = await matchApi.getById(id);
       setMatch(data);
       if (data.status === 'finished' || data.status === 'cancelled') {
-        // Handle end of match
+        // If finished, try to fetch result
+        try {
+          const result = await gameApi.getResult(id);
+          setMatchResult(result);
+        } catch (resErr) {
+          console.error('Failed to fetch match result:', resErr);
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load match');
@@ -76,7 +85,7 @@ const GameRoomShell: React.FC = () => {
   const handleLeave = async () => {
     setLeaving(true);
     try {
-      await matchApi.leave(id!);
+      await gameApi.leave(id!);
       navigate('/lobby');
     } catch (err: any) {
       alert(err.message);
@@ -207,42 +216,44 @@ const GameRoomShell: React.FC = () => {
           <div className="absolute top-8 left-8 z-20 w-72">
             <VoiceChat matchId={id!} />
           </div>
-          {/* Placeholder for Game Engine */}
-          <div className="absolute inset-0 opacity-20 pointer-events-none">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-500/20 via-transparent to-transparent" />
-            <div className="w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
-          </div>
+          
+          {/* Game Engine UI */}
+          <div className="w-full h-full overflow-y-auto flex items-center justify-center">
+            {match.game_type?.name.toLowerCase().includes('dice') ? (
+              <DiceGameUI matchId={id!} onGameEnd={(result) => setMatchResult(result)} />
+            ) : (
+              <div className="relative z-10 text-center p-8 max-w-lg">
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="mb-8"
+                >
+                  <div className="w-32 h-32 bg-emerald-500/10 rounded-3xl border-2 border-emerald-500/20 flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-emerald-500/10">
+                    <Zap className="w-16 h-16 text-emerald-500" />
+                  </div>
+                  <h1 className="text-4xl font-black text-white uppercase italic tracking-tighter mb-4">
+                    Game Engine Shell
+                  </h1>
+                  <p className="text-gray-400 text-lg leading-relaxed">
+                    The multiplayer orchestration is active. Wagers are locked. 
+                    The {match.game_type?.name} module will be plugged in here in the next phase.
+                  </p>
+                </motion.div>
 
-          <div className="relative z-10 text-center p-8 max-w-lg">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="mb-8"
-            >
-              <div className="w-32 h-32 bg-emerald-500/10 rounded-3xl border-2 border-emerald-500/20 flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-emerald-500/10">
-                <Zap className="w-16 h-16 text-emerald-500" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-left">
+                    <Shield className="w-5 h-5 text-blue-400 mb-2" />
+                    <div className="text-xs font-bold text-white uppercase tracking-tight">Fair Play</div>
+                    <div className="text-[10px] text-gray-500 mt-1">Anti-cheat active</div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-left">
+                    <Clock className="w-5 h-5 text-purple-400 mb-2" />
+                    <div className="text-xs font-bold text-white uppercase tracking-tight">Real-time</div>
+                    <div className="text-[10px] text-gray-500 mt-1">Low latency sync</div>
+                  </div>
+                </div>
               </div>
-              <h1 className="text-4xl font-black text-white uppercase italic tracking-tighter mb-4">
-                Game Engine Shell
-              </h1>
-              <p className="text-gray-400 text-lg leading-relaxed">
-                The multiplayer orchestration is active. Wagers are locked. 
-                The {match.game_type?.name} module will be plugged in here in the next phase.
-              </p>
-            </motion.div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-left">
-                <Shield className="w-5 h-5 text-blue-400 mb-2" />
-                <div className="text-xs font-bold text-white uppercase tracking-tight">Fair Play</div>
-                <div className="text-[10px] text-gray-500 mt-1">Anti-cheat active</div>
-              </div>
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-left">
-                <Clock className="w-5 h-5 text-purple-400 mb-2" />
-                <div className="text-xs font-bold text-white uppercase tracking-tight">Real-time</div>
-                <div className="text-[10px] text-gray-500 mt-1">Low latency sync</div>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* HUD Elements */}
@@ -338,6 +349,16 @@ const GameRoomShell: React.FC = () => {
             reportedUsername={reportingPlayer.username}
             matchId={id}
             onClose={() => setReportingPlayer(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Match Result Overlay */}
+      <AnimatePresence>
+        {matchResult && (
+          <MatchResultScreen 
+            result={matchResult} 
+            onClose={() => setMatchResult(null)} 
           />
         )}
       </AnimatePresence>

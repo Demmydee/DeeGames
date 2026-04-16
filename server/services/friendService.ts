@@ -58,8 +58,8 @@ export const acceptFriendRequest = async (userId: string, friendshipId: string) 
 
   const { error: updateError } = await supabase
     .from('friendships')
-    .update({
-      status: 'accepted',
+    .update({ 
+      status: 'accepted', 
       responded_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
@@ -83,8 +83,8 @@ export const acceptFriendRequest = async (userId: string, friendshipId: string) 
 export const rejectFriendRequest = async (userId: string, friendshipId: string) => {
   const { error } = await supabase
     .from('friendships')
-    .update({
-      status: 'rejected',
+    .update({ 
+      status: 'rejected', 
       responded_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
@@ -99,8 +99,8 @@ export const rejectFriendRequest = async (userId: string, friendshipId: string) 
 export const removeFriend = async (userId: string, friendshipId: string) => {
   const { error } = await supabase
     .from('friendships')
-    .update({
-      status: 'removed',
+    .update({ 
+      status: 'removed', 
       updated_at: new Date().toISOString()
     })
     .eq('id', friendshipId)
@@ -125,7 +125,7 @@ export const getFriends = async (userId: string) => {
     .eq('status', 'accepted');
 
   if (error) throw new Error(`Failed to fetch friends: ${error.message}`);
-
+  
   return data.map(f => {
     const friend = f.requester_user_id === userId ? f.addressee : f.requester;
     return {

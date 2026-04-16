@@ -27,9 +27,10 @@ export interface GameRequest {
   game_type_id: string;
   requester_user_id: string;
   category: 'duel' | 'arena';
-  pay_mode: 'knockout' | 'split';
+  pay_mode: 'knockout' | 'split' | 'free';
   amount: number;
   required_players: number;
+  game_variant?: string;
   status: GameRequestStatus;
   created_at: string;
   game_type?: GameType;
@@ -64,6 +65,7 @@ export interface Match {
   room?: RoomCategory;
   started_by?: { username: string };
   participants?: MatchParticipant[];
+  game_request?: GameRequest;
 }
 
 export interface MatchParticipant {

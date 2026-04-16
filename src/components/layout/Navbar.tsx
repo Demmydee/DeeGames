@@ -29,9 +29,9 @@ const Navbar = () => {
               <>
                 <div className="hidden md:flex items-center gap-6 mr-4">
                   {navLinks.map((link) => (
-                    <Link
+                    <Link 
                       key={link.to}
-                      to={link.to}
+                      to={link.to} 
                       className="text-xs font-black uppercase tracking-widest text-neutral-400 hover:text-emerald-500 transition-colors flex items-center gap-2"
                     >
                       <link.icon className="w-4 h-4" />
@@ -39,7 +39,7 @@ const Navbar = () => {
                     </Link>
                   ))}
                 </div>
-
+                
                 <NotificationBell />
 
                 <div className="h-6 w-px bg-neutral-800 mx-2 hidden sm:block" />
