@@ -28,17 +28,50 @@ export const getOrCreateChatRoom = async (contextType: 'room' | 'match', context
 };
 
 export const getChatMessages = async (chatRoomId: string, limit = 50) => {
-  const { data: messages, error } = await supabase
+  // Try to join first as it is more efficient
+  let { data: messages, error } = await supabase
     .from('chat_messages')
     .select('*, users(username)')
     .eq('chat_room_id', chatRoomId)
     .order('created_at', { ascending: false })
     .limit(limit);
 
-  if (error) {
+  // If join fails due to schema/relationship issues, fallback to manual fetch
+  if (error && error.message.includes('relationship')) {
+    console.warn('Chat join failed, falling back to manual mapping:', error.message);
+    const { data: rawMessages, error: rawError } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('chat_room_id', chatRoomId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (rawError) throw new Error(`Failed to fetch raw chat messages: ${rawError.message}`);
+
+    if (rawMessages && rawMessages.length > 0) {
+      const userIds = [...new Set(rawMessages.map(m => m.sender_user_id))];
+      const { data: users, error: userError } = await supabase
+        .from('users')
+        .select('id, username')
+        .in('id', userIds);
+
+      if (!userError && users) {
+        const userMap = Object.fromEntries(users.map(u => [u.id, u]));
+        messages = rawMessages.map(m => ({
+          ...m,
+          users: userMap[m.sender_user_id] || null
+        }));
+      } else {
+        messages = rawMessages;
+      }
+    } else {
+      messages = [];
+    }
+  } else if (error) {
     console.error('getChatMessages Error:', JSON.stringify(error));
     throw new Error(`Failed to fetch chat messages: ${error.message}`);
   }
+
   return (messages || []).reverse();
 };
 
