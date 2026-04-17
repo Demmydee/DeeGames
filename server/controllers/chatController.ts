@@ -8,6 +8,7 @@ export const getRoomMessages = async (req: Request, res: Response) => {
     const messages = await chatService.getChatMessages(room.id);
     res.json(messages);
   } catch (error: any) {
+    console.error('getRoomMessages Error:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -32,6 +33,7 @@ export const getMatchMessages = async (req: Request, res: Response) => {
     const messages = await chatService.getChatMessages(room.id);
     res.json(messages);
   } catch (error: any) {
+    console.error('getMatchMessages Error:', error);
     res.status(500).json({ error: error.message });
   }
 };

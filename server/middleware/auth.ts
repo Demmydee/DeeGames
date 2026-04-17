@@ -13,13 +13,15 @@ export const authenticateToken = async (req: any, res: Response, next: NextFunct
     const { data: { user }, error } = await supabase.auth.getUser(token);
     
     if (error || !user) {
+      console.error('Auth Middleware Error (getUser):', JSON.stringify(error, Object.getOwnPropertyNames(error)));
       return res.status(403).json({ error: 'Invalid or expired token.' });
     }
-    
+
     req.user = user;
     req.token = token;
     next();
   } catch (error) {
+    console.error('Auth Middleware Vital Error:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     res.status(403).json({ error: 'Invalid or expired token.' });
   }
 };
