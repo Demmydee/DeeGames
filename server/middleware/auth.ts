@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabase } from '../config/supabase';
+import { supabase, supabaseAuth } from '../config/supabase';
 
 export const authenticateToken = async (req: any, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
@@ -10,18 +10,20 @@ export const authenticateToken = async (req: any, res: Response, next: NextFunct
   }
 
   try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    
-    if (error || !user) {
-      console.error('Auth Middleware Error (getUser):', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    // Check server time to help debug "expired" tokens
+    const now = Math.floor(Date.now() / 1000);
+    const { data, error } = await supabaseAuth.auth.getUser(token);
+
+    if (error || !data?.user) {
+      console.error(`Auth Middleware Error (Time: ${now}):`, JSON.stringify(error, Object.getOwnPropertyNames(error)));
       return res.status(403).json({ error: 'Invalid or expired token.' });
     }
 
-    req.user = user;
+    req.user = data.user;
     req.token = token;
     next();
   } catch (error) {
-    console.error('Auth Middleware Vital Error:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    console.error('Auth Middleware Vital Error:', error);
     res.status(403).json({ error: 'Invalid or expired token.' });
   }
 };
