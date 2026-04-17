@@ -31,16 +31,14 @@ export class SettlementService {
     const totalPlayers = rankings.length;
     const totalPoolKobo = wagerKobo * totalPlayers;
 
-    if (pay_mode === 'free' || wagerKobo === 0) {
-      return this.handleFreeSettlement(match, rankings);
-    }
-
-    const houseCutKobo = Math.floor(totalPoolKobo * this.HOUSE_CUT_PERCENTAGE);
+    const houseCutKobo = (pay_mode === 'free' || wagerKobo === 0) ? 0 : Math.floor(totalPoolKobo * this.HOUSE_CUT_PERCENTAGE);
     const netPoolKobo = totalPoolKobo - houseCutKobo;
 
     let payouts: ParticipantPayout[] = [];
 
-    if (pay_mode === 'knockout') {
+    if (pay_mode === 'free' || wagerKobo === 0) {
+      payouts = this.calculateFreePayouts(rankings);
+    } else if (pay_mode === 'knockout') {
       payouts = this.calculateKnockoutPayouts(rankings, wagerKobo, netPoolKobo);
     } else if (pay_mode === 'split') {
       payouts = this.calculateSplitPayouts(rankings, wagerKobo, netPoolKobo);
@@ -80,7 +78,7 @@ export class SettlementService {
 
   static async refundMatch(match: Match, rankings: RankedParticipant[]): Promise<SettlementResult> {
     const wagerKobo = Math.round(match.game_request!.amount * 100);
-    
+
     try {
       const { data, error } = await supabase.rpc('refund_match_wagers_atomic', {
         p_match_id: match.id,
@@ -126,6 +124,17 @@ export class SettlementService {
       })),
       status: 'settled'
     };
+  }
+
+  private static calculateFreePayouts(rankings: RankedParticipant[]): ParticipantPayout[] {
+    return rankings.map(r => ({
+      userId: r.userId,
+      rank: r.rank || 0,
+      wagerKobo: 0,
+      payoutKobo: 0,
+      isWinner: r.rank === 1,
+      defeatReason: r.defeatReason
+    }));
   }
 
   private static calculateKnockoutPayouts(rankings: RankedParticipant[], wagerKobo: number, netPoolKobo: number): ParticipantPayout[] {

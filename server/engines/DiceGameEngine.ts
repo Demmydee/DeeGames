@@ -188,6 +188,14 @@ export class DiceGameEngine implements GameEngine {
   }
 
   private resolveSuddenDropRound(state: GameState, events: any[]) {
+    // Show current rolls as scores for visibility
+    state.activePlayerIds.forEach(id => {
+      const participant = state.participants.find(p => p.userId === id);
+      if (participant) {
+        participant.score = state.rolls[id]!;
+      }
+    });
+
     const rolls = state.activePlayerIds.map(id => ({ id, roll: state.rolls[id]! }));
     const minRoll = Math.min(...rolls.map(r => r.roll));
     const lowestRollers = rolls.filter(r => r.roll === minRoll);
