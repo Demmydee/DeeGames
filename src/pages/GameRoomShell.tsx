@@ -220,7 +220,11 @@ const GameRoomShell: React.FC = () => {
           {/* Game Engine UI */}
           <div className="w-full h-full overflow-y-auto flex items-center justify-center">
             {match.game_type?.name.toLowerCase().includes('dice') ? (
-              <DiceGameUI matchId={id!} onGameEnd={(result) => setMatchResult(result)} />
+              <DiceGameUI
+                matchId={id!}
+                matchParticipants={match.participants}
+                onGameEnd={(result) => setMatchResult(result)}
+              />
             ) : (
               <div className="relative z-10 text-center p-8 max-w-lg">
                 <motion.div
@@ -235,7 +239,7 @@ const GameRoomShell: React.FC = () => {
                     Game Engine Shell
                   </h1>
                   <p className="text-gray-400 text-lg leading-relaxed">
-                    The multiplayer orchestration is active. Wagers are locked. 
+                    The multiplayer orchestration is active. Wagers are locked.
                     The {match.game_type?.name} module will be plugged in here in the next phase.
                   </p>
                 </motion.div>
@@ -258,51 +262,7 @@ const GameRoomShell: React.FC = () => {
 
           {/* HUD Elements */}
           <div className="absolute bottom-8 left-8 right-8 flex justify-between items-end pointer-events-none">
-            <div className="flex flex-col gap-4">
-              {match.participants?.map((p, i) => (
-                <motion.div 
-                  key={p.id}
-                  initial={{ x: -50, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: i * 0.1 }}
-                  className="flex items-center gap-3 p-2 pr-6 rounded-full bg-black/60 backdrop-blur-md border border-white/10 pointer-events-auto"
-                >
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-white relative ${p.status === 'active' ? 'bg-emerald-600' : 'bg-gray-700'}`}>
-                    {p.users?.username.substring(0, 2).toUpperCase()}
-                    {p.is_away && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-black flex items-center justify-center">
-                        <Clock className="w-2 h-2 text-white" />
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-xs font-bold text-white">{p.users?.username}</div>
-                      {p.user_id === user?.id && <span className="text-[8px] px-1 bg-white/10 rounded text-gray-400 uppercase tracking-widest">You</span>}
-                      {p.user_id !== user?.id && (
-                        <button 
-                          onClick={() => setReportingPlayer({ id: p.user_id, username: p.users?.username || 'Unknown' })}
-                          className="p-1 rounded hover:bg-red-500/20 text-red-500/40 hover:text-red-500 transition-all"
-                          title="Report Player"
-                        >
-                          <ShieldAlert className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className={`text-[8px] uppercase tracking-widest ${p.is_away ? 'text-orange-400' : 'text-gray-500'}`}>
-                        {p.is_away ? 'Away' : p.status}
-                      </div>
-                      {p.is_away && p.away_since && (
-                        <div className="text-[8px] font-mono text-orange-500 font-bold">
-                          {Math.max(0, 300 - Math.floor((Date.now() - new Date(p.away_since).getTime()) / 1000))}s
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+            {/* Presence info will be moved to DiceGameUI */}
           </div>
         </div>
 

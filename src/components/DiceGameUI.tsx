@@ -9,17 +9,20 @@ import {
   UserMinus,
   CheckCircle2,
   Clock,
-  Zap
+  Zap,
+  ArrowRight
 } from 'lucide-react';
 import { gameApi } from '../services/multiplayerApi';
 import { useAuth } from '../context/AuthContext';
+import { MatchParticipant } from '../types/multiplayer';
 
 interface Props {
   matchId: string;
+  matchParticipants?: MatchParticipant[];
   onGameEnd: (result: any) => void;
 }
 
-const DiceGameUI: React.FC<Props> = ({ matchId, onGameEnd }) => {
+const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) => {
   const { user } = useAuth();
   const [gameState, setGameState] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +47,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, onGameEnd }) => {
   useEffect(() => {
     fetchState();
     const interval = setInterval(fetchState, 3000);
-    
+
     // Heartbeat
     const hbInterval = setInterval(async () => {
       try {
@@ -65,10 +68,10 @@ const DiceGameUI: React.FC<Props> = ({ matchId, onGameEnd }) => {
     setRolling(true);
     setError(null);
     try {
-      const moveType = gameState.tieBreaker?.playerIds.includes(user?.id) 
+      const moveType = gameState.tieBreaker?.playerIds.includes(user?.id)
         ? (gameState.variant === 'sudden_drop' ? 'tie_reroll' : 'sudden_death_roll')
         : 'roll';
-        
+
       await gameApi.move(matchId, { type: moveType });
       await fetchState();
     } catch (err: any) {
@@ -90,15 +93,19 @@ const DiceGameUI: React.FC<Props> = ({ matchId, onGameEnd }) => {
   const hasRolled = gameState.rolls[user?.id!] !== undefined && gameState.rolls[user?.id!] !== null;
   const isTieBreaker = gameState.tieBreaker?.playerIds.includes(user?.id);
   const hasTieRolled = isTieBreaker && gameState.tieBreaker.rolls[user?.id!] !== undefined && gameState.tieBreaker.rolls[user?.id!] !== null;
-  
-  const canRoll = gameState.status === 'active' && 
-                 gameState.activePlayerIds.includes(user?.id) && 
+
+  const isMyTurn = gameState.currentTurnPlayerId === user?.id;
+  const currentTurnPlayer = gameState.participants.find((p: any) => p.userId === gameState.currentTurnPlayerId);
+
+  const canRoll = gameState.status === 'active' &&
+                 isMyTurn &&
+                 gameState.activePlayerIds.includes(user?.id) &&
                  (!hasRolled || (isTieBreaker && !hasTieRolled));
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 flex flex-col gap-8">
       {/* Game Header */}
-      <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md">
+      <div className="flex flex-col md:flex-row md:items-center justify-between bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-md gap-4">
         <div className="flex items-center gap-4">
           <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400">
             <Dices className="w-6 h-6" />
@@ -113,14 +120,14 @@ const DiceGameUI: React.FC<Props> = ({ matchId, onGameEnd }) => {
           </div>
         </div>
 
-        <div className="flex gap-4">
-          {gameState.variant === 'marathon' && (
-            <div className="text-right">
-              <div className="text-xs font-black text-white">Leaderboard</div>
-              <div className="text-[10px] text-gray-500 uppercase tracking-widest">Cumulative Scores</div>
-            </div>
-          )}
-        </div>
+        {gameState.status === 'active' && gameState.currentTurnPlayerId && (
+          <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 animate-pulse">
+            <Zap className="w-4 h-4 text-emerald-500" />
+            <span className="text-xs font-black uppercase italic text-emerald-400 tracking-tight">
+              {isMyTurn ? "IT'S YOUR TURN TO ROLL!" : `WAITING FOR ${currentTurnPlayer?.username?.toUpperCase()}`}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Main Game Area */}
@@ -128,34 +135,52 @@ const DiceGameUI: React.FC<Props> = ({ matchId, onGameEnd }) => {
         {/* Players List */}
         <div className="lg:col-span-1 space-y-3">
           <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-2">Participants</h3>
-          {gameState.participants.map((p: any) => (
-            <div 
-              key={p.userId}
-              className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${
-                p.status === 'active' 
-                  ? 'bg-white/5 border-white/10' 
-                  : 'bg-red-500/5 border-red-500/20 opacity-60'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-[10px] ${
-                  p.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-800 text-gray-500'
-                }`}>
-                  {p.username.substring(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-white">{p.username}</div>
-                  <div className="text-[8px] uppercase tracking-widest text-gray-500">
-                    {p.status} {p.rank ? `• Rank ${p.rank}` : ''}
+          {gameState.participants.map((p: any) => {
+            const presence = matchParticipants?.find(mp => mp.user_id === p.userId);
+            const isCurrentTurn = gameState.currentTurnPlayerId === p.userId;
+
+            return (
+              <div
+                key={p.userId}
+                className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${
+                  isCurrentTurn
+                    ? 'bg-emerald-500/10 border-emerald-500/40 ring-1 ring-emerald-500/20'
+                    : p.status === 'active'
+                      ? 'bg-white/5 border-white/10'
+                      : 'bg-red-500/5 border-red-500/20 opacity-60'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-[10px] relative ${
+                    p.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-800 text-gray-500'
+                  }`}>
+                    {p.username.substring(0, 2).toUpperCase()}
+                    {presence?.is_away && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border-2 border-black" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-xs font-bold text-white leading-tight">{p.username}</div>
+                      {isCurrentTurn && <ArrowRight className="w-3 h-3 text-emerald-500" />}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <div className={`text-[8px] uppercase tracking-widest ${presence?.is_away ? 'text-orange-400' : 'text-gray-500'}`}>
+                        {presence?.is_away ? 'Away' : p.status}
+                      </div>
+                      {p.rank && (
+                        <div className="text-[8px] px-1 bg-white/10 text-gray-400 rounded">Rank {p.rank}</div>
+                      )}
+                    </div>
                   </div>
                 </div>
+                <div className="text-right">
+                  <div className="text-xs font-black text-white">{p.score.toFixed(0)}</div>
+                  <div className="text-[8px] text-gray-500 uppercase tracking-widest leading-none mt-0.5">Score</div>
+                </div>
               </div>
-              <div className="text-right">
-                <div className="text-xs font-black text-white">{p.score.toFixed(gameState.variant === 'marathon' ? 0 : 0)}</div>
-                <div className="text-[8px] text-gray-500 uppercase tracking-widest">Score</div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Action Area */}
@@ -163,7 +188,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, onGameEnd }) => {
           {/* Dice Display */}
           <div className="aspect-video bg-black/40 border border-white/5 rounded-3xl flex items-center justify-center relative overflow-hidden">
             <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
-            
+
             <AnimatePresence mode="wait">
               {hasRolled || hasTieRolled ? (
                 <motion.div
@@ -188,7 +213,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, onGameEnd }) => {
                 >
                   <Dices className={`w-20 h-20 mx-auto mb-4 text-white/20 ${canRoll ? 'animate-bounce' : ''}`} />
                   <p className="text-gray-500 text-sm font-bold uppercase tracking-widest">
-                    {canRoll ? 'Your Turn to Roll' : 'Waiting for others...'}
+                    {canRoll ? 'Your Turn to Roll' : isMyTurn ? 'Rolling...' : `Waiting for ${currentTurnPlayer?.username}`}
                   </p>
                 </motion.div>
               )}

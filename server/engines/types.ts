@@ -14,6 +14,7 @@ export interface GameState {
   activePlayerIds: string[];
   participants: RankedParticipant[];
   rolls: Record<string, number | null>; // current round rolls
+  currentTurnPlayerId: string | null;
   history: RoundResult[];
   config: GameConfig;
   tieBreaker?: {

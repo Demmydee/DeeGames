@@ -35,6 +35,7 @@ export class DiceGameEngine implements GameEngine {
         status: 'active'
       })),
       rolls: {},
+      currentTurnPlayerId: activePlayerIds[0],
       history: [],
       config
     };
@@ -53,6 +54,10 @@ export class DiceGameEngine implements GameEngine {
       throw new Error('Player is not active in this game');
     }
 
+    if (currentState.currentTurnPlayerId && currentState.currentTurnPlayerId !== userId) {
+      throw new Error("It is not your turn");
+    }
+
     const newState = JSON.parse(JSON.stringify(currentState)) as GameState;
     const events: any[] = [];
 
@@ -64,11 +69,25 @@ export class DiceGameEngine implements GameEngine {
       // Generate roll server-side
       const roll = this.generateRoll(newState.config.diceCount);
       newState.rolls[userId] = roll;
+
+      // Update score immediately
+      const participant = newState.participants.find(p => p.userId === userId);
+      if (participant) {
+        if (newState.variant === 'marathon') {
+          participant.score += roll;
+        } else {
+          participant.score = roll; // Sudden drop shows current round roll as score
+        }
+      }
+
       events.push({ type: 'player_rolled', payload: { userId, roll } });
+
+      // Rotate turn
+      this.rotateTurn(newState);
 
       // Check if all active players have rolled
       const allRolled = newState.activePlayerIds.every(id => newState.rolls[id] !== undefined && newState.rolls[id] !== null);
-      
+
       if (allRolled) {
         this.resolveRound(newState, events);
       }
@@ -86,7 +105,7 @@ export class DiceGameEngine implements GameEngine {
       events.push({ type: 'player_tie_rolled', payload: { userId, roll } });
 
       const allReRolled = newState.tieBreaker.playerIds.every(id => newState.tieBreaker!.rolls[id] !== undefined && newState.tieBreaker!.rolls[id] !== null);
-      
+
       if (allReRolled) {
         this.resolveTieBreaker(newState, events);
       }
@@ -101,7 +120,7 @@ export class DiceGameEngine implements GameEngine {
       events.push({ type: 'player_sudden_death_rolled', payload: { userId, roll } });
 
       const allRolled = newState.tieBreaker.playerIds.every(id => newState.tieBreaker!.rolls[id] !== undefined && newState.tieBreaker!.rolls[id] !== null);
-      
+
       if (allRolled) {
         this.resolveSuddenDeath(newState, events);
       }
@@ -125,7 +144,7 @@ export class DiceGameEngine implements GameEngine {
 
     participant.status = reason === 'left' ? 'left' : 'disconnected';
     participant.defeatReason = reason;
-    
+
     // Remove from active players
     newState.activePlayerIds = newState.activePlayerIds.filter(id => id !== userId);
 
@@ -135,8 +154,16 @@ export class DiceGameEngine implements GameEngine {
 
     events.push({ type: 'player_defeated', payload: { userId, reason, rank: currentRank } });
 
+    // If it was this player's turn, rotate it
+    if (newState.currentTurnPlayerId === userId) {
+      this.rotateTurn(newState);
+    }
+
     // If only one player remains, they win
     if (newState.activePlayerIds.length <= 1) {
+      if (newState.activePlayerIds.length === 1) {
+        events.push({ type: 'winner_by_default', payload: { userId: newState.activePlayerIds[0] } });
+      }
       this.finalizeGame(newState, events);
     } else {
       // Check if we were waiting for this player to roll
@@ -144,7 +171,7 @@ export class DiceGameEngine implements GameEngine {
       if (allOthersRolled && Object.keys(newState.rolls).length > 0) {
         this.resolveRound(newState, events);
       }
-      
+
       // Check tie-breaker
       if (newState.tieBreaker && newState.tieBreaker.playerIds.includes(userId)) {
         newState.tieBreaker.playerIds = newState.tieBreaker.playerIds.filter(id => id !== userId);
@@ -211,11 +238,12 @@ export class DiceGameEngine implements GameEngine {
       // Single lowest roller eliminated
       const eliminatedId = lowestRollers[0].id;
       this.eliminatePlayer(state, eliminatedId, events);
-      
+
       // Advance round if not finished
       if (state.activePlayerIds.length > 1) {
         state.currentRound++;
         state.rolls = {};
+        state.currentTurnPlayerId = state.activePlayerIds[0];
         events.push({ type: 'round_started', payload: { round: state.currentRound } });
       } else {
         this.finalizeGame(state, events);
@@ -227,9 +255,11 @@ export class DiceGameEngine implements GameEngine {
     if (!state.tieBreaker) return;
 
     const rolls = state.tieBreaker.playerIds.map(id => ({ id, roll: state.tieBreaker!.rolls[id]! }));
-    
+
     if (rolls.length === 0) {
         state.tieBreaker = undefined;
+        // Reset turn if tie breaker was emptied
+        state.currentTurnPlayerId = state.activePlayerIds[0];
         return;
     }
 
@@ -239,6 +269,7 @@ export class DiceGameEngine implements GameEngine {
     if (lowestRollers.length > 1 && state.tieBreaker.playerIds.length > 1) {
       // Still tied
       state.tieBreaker.rolls = {};
+      state.currentTurnPlayerId = state.tieBreaker.playerIds[0];
       events.push({ type: 'tie_still_active', payload: { playerIds: lowestRollers.map(r => r.id) } });
     } else {
       // Tie broken
@@ -249,6 +280,7 @@ export class DiceGameEngine implements GameEngine {
       if (state.activePlayerIds.length > 1) {
         state.currentRound++;
         state.rolls = {};
+        state.currentTurnPlayerId = state.activePlayerIds[0];
         events.push({ type: 'round_started', payload: { round: state.currentRound } });
       } else {
         this.finalizeGame(state, events);
@@ -262,23 +294,17 @@ export class DiceGameEngine implements GameEngine {
       participant.status = 'eliminated';
       participant.defeatReason = 'eliminated';
       participant.eliminatedRound = state.currentRound;
-      
+
       const rank = this.getNextAvailableLowestRank(state);
       participant.rank = rank;
-      
+
       state.activePlayerIds = state.activePlayerIds.filter(id => id !== userId);
       events.push({ type: 'player_eliminated', payload: { userId, rank } });
     }
   }
 
   private resolveMarathonRound(state: GameState, events: any[]) {
-    // Add rolls to cumulative scores
-    state.activePlayerIds.forEach(id => {
-      const participant = state.participants.find(p => p.userId === id);
-      if (participant) {
-        participant.score += state.rolls[id]!;
-      }
-    });
+    // Scores are already updated in processMove for Marathon
 
     state.history.push({
       round: state.currentRound,
@@ -288,6 +314,7 @@ export class DiceGameEngine implements GameEngine {
     if (state.currentRound < state.totalRounds) {
       state.currentRound++;
       state.rolls = {};
+      state.currentTurnPlayerId = state.activePlayerIds[0];
       events.push({ type: 'round_started', payload: { round: state.currentRound } });
     } else {
       // Check for ties at the end of Marathon
@@ -309,6 +336,7 @@ export class DiceGameEngine implements GameEngine {
         playerIds: topScorers.map(p => p.userId),
         rolls: {}
       };
+      state.currentTurnPlayerId = state.tieBreaker.playerIds[0];
       events.push({ type: 'sudden_death_started', payload: { playerIds: state.tieBreaker.playerIds } });
     } else {
       this.finalizeGame(state, events);
@@ -325,22 +353,25 @@ export class DiceGameEngine implements GameEngine {
     if (winners.length > 1) {
       // Still tied in sudden death
       state.tieBreaker.rolls = {};
+      state.currentTurnPlayerId = state.tieBreaker.playerIds[0];
       events.push({ type: 'sudden_death_still_active', payload: { playerIds: winners.map(r => r.id) } });
     } else {
       // Sudden death winner found
       const winnerId = winners[0].id;
       // Adjust score slightly to break tie for ranking logic
       const winner = state.participants.find(p => p.userId === winnerId);
-      if (winner) winner.score += 0.1; 
-      
+      if (winner) winner.score += 0.1;
+
       state.tieBreaker = undefined;
+      state.currentTurnPlayerId = null;
       this.finalizeGame(state, events);
     }
   }
 
   private finalizeGame(state: GameState, events: any[]) {
     state.status = 'completed';
-    
+    state.currentTurnPlayerId = null;
+
     // Rank remaining active players
     const activeParticipants = state.participants
       .filter(p => p.status === 'active')
@@ -353,7 +384,7 @@ export class DiceGameEngine implements GameEngine {
     // Ensure all participants have a rank
     const unranked = state.participants.filter(p => !p.rank);
     // Sort unranked by status/score/time if needed, but they should already have ranks from defeat
-    
+
     events.push({ type: 'game_completed', payload: { rankings: this.getRankings(state) } });
   }
 
@@ -361,5 +392,19 @@ export class DiceGameEngine implements GameEngine {
     const totalPlayers = state.participants.length;
     const rankedCount = state.participants.filter(p => !!p.rank).length;
     return totalPlayers - rankedCount;
+  }
+
+  private rotateTurn(state: GameState) {
+    const playerPool = state.tieBreaker ? state.tieBreaker.playerIds : state.activePlayerIds;
+    const rolls = state.tieBreaker ? state.tieBreaker.rolls : state.rolls;
+
+    if (playerPool.length === 0) {
+      state.currentTurnPlayerId = null;
+      return;
+    }
+
+    // Find next player in the pool who hasn't rolled
+    const nextPlayer = playerPool.find(id => rolls[id] === undefined || rolls[id] === null);
+    state.currentTurnPlayerId = nextPlayer || null;
   }
 }

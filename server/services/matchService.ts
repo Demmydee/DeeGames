@@ -123,9 +123,10 @@ export const leaveMatch = async (userId: string, matchId: string) => {
 export const getUserActiveMatch = async (userId: string) => {
   const { data, error } = await supabase
     .from('match_participants')
-    .select('match_id, matches(*)')
+    .select('match_id, matches!inner(*)')
     .eq('user_id', userId)
     .in('status', ['active'])
+    .in('matches.status', ['waiting', 'in_progress']) // Only actively ongoing matches
     .order('joined_at', { ascending: false })
     .limit(1)
     .maybeSingle();
