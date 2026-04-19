@@ -229,6 +229,7 @@ export class DiceGameEngine implements GameEngine {
 
     if (lowestRollers.length > 1) {
       // Tie for lowest
+      state.lastRoundResults = { ...state.rolls };
       state.tieBreaker = {
         playerIds: lowestRollers.map(r => r.id),
         rolls: {}
@@ -237,6 +238,7 @@ export class DiceGameEngine implements GameEngine {
     } else {
       // Single lowest roller eliminated
       const eliminatedId = lowestRollers[0].id;
+      state.lastRoundResults = { ...state.rolls };
       this.eliminatePlayer(state, eliminatedId, events);
 
       // Advance round if not finished
@@ -268,12 +270,14 @@ export class DiceGameEngine implements GameEngine {
 
     if (lowestRollers.length > 1 && state.tieBreaker.playerIds.length > 1) {
       // Still tied
+      state.lastRoundResults = { ...state.tieBreaker.rolls };
       state.tieBreaker.rolls = {};
       state.currentTurnPlayerId = state.tieBreaker.playerIds[0];
       events.push({ type: 'tie_still_active', payload: { playerIds: lowestRollers.map(r => r.id) } });
     } else {
       // Tie broken
       const eliminatedId = lowestRollers[0].id;
+      state.lastRoundResults = { ...state.tieBreaker.rolls };
       state.tieBreaker = undefined;
       this.eliminatePlayer(state, eliminatedId, events);
 
@@ -312,12 +316,14 @@ export class DiceGameEngine implements GameEngine {
     });
 
     if (state.currentRound < state.totalRounds) {
+      state.lastRoundResults = { ...state.rolls };
       state.currentRound++;
       state.rolls = {};
       state.currentTurnPlayerId = state.activePlayerIds[0];
       events.push({ type: 'round_started', payload: { round: state.currentRound } });
     } else {
       // Check for ties at the end of Marathon
+      state.lastRoundResults = { ...state.rolls };
       this.checkMarathonEndTies(state, events);
     }
   }
@@ -352,11 +358,13 @@ export class DiceGameEngine implements GameEngine {
 
     if (winners.length > 1) {
       // Still tied in sudden death
+      state.lastRoundResults = { ...state.tieBreaker.rolls };
       state.tieBreaker.rolls = {};
       state.currentTurnPlayerId = state.tieBreaker.playerIds[0];
       events.push({ type: 'sudden_death_still_active', payload: { playerIds: winners.map(r => r.id) } });
     } else {
       // Sudden death winner found
+      state.lastRoundResults = { ...state.tieBreaker.rolls };
       const winnerId = winners[0].id;
       // Adjust score slightly to break tie for ranking logic
       const winner = state.participants.find(p => p.userId === winnerId);

@@ -14,6 +14,7 @@ export interface GameState {
   activePlayerIds: string[];
   participants: RankedParticipant[];
   rolls: Record<string, number | null>; // current round rolls
+  lastRoundResults?: Record<string, number | null>; // rolls from recently resolved round
   currentTurnPlayerId: string | null;
   history: RoundResult[];
   config: GameConfig;

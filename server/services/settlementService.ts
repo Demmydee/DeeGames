@@ -151,7 +151,7 @@ export class SettlementService {
   private static calculateSplitPayouts(rankings: RankedParticipant[], wagerKobo: number, netPoolKobo: number): ParticipantPayout[] {
     const totalPlayers = rankings.length;
     const winnersCount = Math.ceil(totalPlayers / 2);
-    
+
     // Descending triangular weights
     // Rank 1: winnersCount, Rank 2: winnersCount - 1, ... Rank winnersCount: 1
     const weights: Record<number, number> = {};
@@ -164,12 +164,12 @@ export class SettlementService {
 
     const payouts = rankings.map(r => {
       const rank = r.rank || 0;
-      const isWinner = rank <= winnersCount && r.status === 'active'; // Only active players can win? 
+      const isWinner = rank <= winnersCount && r.status === 'active'; // Only active players can win?
       // Actually, if someone is eliminated but still in top half, do they win?
       // Usually "Split" implies top half of those who finished.
       // But Sudden Drop eliminates. Marathon ranks all.
       // Let's stick to rank.
-      
+
       const weight = weights[rank] || 0;
       let payoutKobo = 0;
       if (weight > 0) {
@@ -199,14 +199,29 @@ export class SettlementService {
   }
 
   private static async executeAtomicSettlement(
-    match: Match, 
-    rankings: RankedParticipant[], 
+    match: Match,
+    rankings: RankedParticipant[],
     payouts: ParticipantPayout[],
     totalPoolKobo: number,
     houseCutKobo: number,
     netPoolKobo: number
   ) {
-    // We'll use a complex RPC to ensure atomicity
+    // 1. Update all participants to their final statuses so redirection logic clears
+    const statusUpdates = rankings.map(r => {
+      let finalStatus: 'winner' | 'defeated' | 'left' = 'defeated';
+      if (r.rank === 1) finalStatus = 'winner';
+      if (r.status === 'left') finalStatus = 'left';
+
+      return supabase
+        .from('match_participants')
+        .update({ status: finalStatus })
+        .eq('match_id', match.id)
+        .eq('user_id', r.userId);
+    });
+
+    await Promise.all(statusUpdates);
+
+    // 2. We'll use a complex RPC to ensure atomicity for payouts and match status
     const { error } = await supabase.rpc('settle_match_atomic', {
       p_match_id: match.id,
       p_pay_mode: match.game_request!.pay_mode,

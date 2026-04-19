@@ -97,6 +97,12 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
   const isMyTurn = gameState.currentTurnPlayerId === user?.id;
   const currentTurnPlayer = gameState.participants.find((p: any) => p.userId === gameState.currentTurnPlayerId);
 
+  // Determine what roll to show
+  const currentRoll = isTieBreaker ? gameState.tieBreaker.rolls[user?.id!] : gameState.rolls[user?.id!];
+  const lastRoll = gameState.lastRoundResults?.[user?.id!];
+  const displayRoll = currentRoll !== undefined && currentRoll !== null ? currentRoll : (Object.keys(gameState.rolls).length === 0 ? lastRoll : null);
+  const hasDisplayRoll = displayRoll !== undefined && displayRoll !== null;
+
   const canRoll = gameState.status === 'active' &&
                  isMyTurn &&
                  gameState.activePlayerIds.includes(user?.id) &&
@@ -168,6 +174,11 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                       <div className={`text-[8px] uppercase tracking-widest ${presence?.is_away ? 'text-orange-400' : 'text-gray-500'}`}>
                         {presence?.is_away ? 'Away' : p.status}
                       </div>
+                      {presence?.is_away && presence.away_since && (
+                        <div className="text-[8px] font-mono text-orange-500 font-bold">
+                          {Math.max(0, 300 - Math.floor((Date.now() - new Date(presence.away_since).getTime()) / 1000))}s
+                        </div>
+                      )}
                       {p.rank && (
                         <div className="text-[8px] px-1 bg-white/10 text-gray-400 rounded">Rank {p.rank}</div>
                       )}
@@ -190,7 +201,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
             <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
 
             <AnimatePresence mode="wait">
-              {hasRolled || hasTieRolled ? (
+              {hasDisplayRoll ? (
                 <motion.div
                   key="roll-result"
                   initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
@@ -199,10 +210,12 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                 >
                   <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center shadow-2xl shadow-white/10 mb-4">
                     <span className="text-5xl font-black text-black">
-                      {isTieBreaker ? gameState.tieBreaker.rolls[user?.id!] : gameState.rolls[user?.id!]}
+                      {displayRoll}
                     </span>
                   </div>
-                  <p className="text-xs font-bold text-emerald-500 uppercase tracking-widest">You Rolled!</p>
+                  <p className="text-xs font-bold text-emerald-400 uppercase tracking-widest">
+                    {Object.keys(gameState.rolls).length === 0 && lastRoll ? "Last Round Roll" : "You Rolled!"}
+                  </p>
                 </motion.div>
               ) : (
                 <motion.div

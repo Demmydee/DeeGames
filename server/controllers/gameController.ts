@@ -50,14 +50,31 @@ export const leaveMatch = async (req: Request, res: Response) => {
 export const getMatchResult = async (req: Request, res: Response) => {
   try {
     const { matchId } = req.params;
-    const { data, error } = await supabase
+    const { data: result, error } = await supabase
       .from('match_results')
-      .select('*')
+      .select(`
+        *,
+        payouts:match_payouts(*)
+      `)
       .eq('match_id', matchId)
       .single();
-    
+
     if (error) throw error;
-    res.json(data);
+
+    // Merge payout data into rankings for easier frontend consumption
+    if (result && result.rankings) {
+      result.rankings = result.rankings.map((r: any) => {
+        const payout = result.payouts?.find((p: any) => p.user_id === r.userId);
+        return {
+          ...r,
+          payoutKobo: payout?.payout_kobo || 0,
+          wagerKobo: payout?.wager_kobo || 0,
+          isWinner: payout?.is_winner || false
+        };
+      });
+    }
+
+    res.json(result);
   } catch (error: any) {
     res.status(404).json({ error: error.message });
   }
