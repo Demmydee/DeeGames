@@ -38,7 +38,9 @@ export interface RoundResult {
   round: number;
   rolls: Record<string, number>;
   eliminatedPlayerId?: string;
-  isTieBreaker?: boolean;
+  isTieBreakerInitial?: boolean;
+  isTieBreakerContinued?: boolean;
+  isTieBreakerResolved?: boolean;
 }
 
 export interface MoveData {

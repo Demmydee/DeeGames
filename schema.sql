@@ -1,129 +1,339 @@
--- SQL Schema for DeeGames Phase 1
--- To be run in Supabase SQL Editor
+-- Unified Schema for DeeGames
+-- This script contains all tables, functions, and policies needed for the application.
 
--- Enable pgcrypto for gen_random_uuid() if needed
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- 1. Explicit cleanup of accidental tables from previous failed runs
+-- These names were sometimes misinterpreted as relations by the parser in failed states
+DROP TABLE IF EXISTS public.v_wallet_id, public.v_user_wallet_id, public.v_result_id, public.v_trans_id CASCADE;
+DROP TABLE IF EXISTS public._l_target_wallet_id, public._l_result_id, public._l_trans_id, public._l_payout CASCADE;
 
--- Drop existing trigger and function if they exist
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-DROP FUNCTION IF EXISTS public.handle_new_user();
-
--- Drop existing table to ensure clean slate (WARNING: This deletes existing user data in public.users)
-DROP TABLE IF EXISTS public.users CASCADE;
-
--- Create users table linked to Supabase Auth
-CREATE TABLE public.users (
-    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+-- 2. Base Users Table
+CREATE TABLE IF NOT EXISTS public.users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     phone TEXT UNIQUE,
-    is_adult_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
-    terms_accepted BOOLEAN NOT NULL DEFAULT FALSE,
-    terms_accepted_at TIMESTAMPTZ,
-    status TEXT NOT NULL DEFAULT 'active',
+    full_name TEXT,
+    avatar_url TEXT,
+    kyc_status TEXT DEFAULT 'pending', -- pending, verified, rejected
+    kyc_verified_at TIMESTAMPTZ,
+    transaction_pin_hash TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 3. Wallets & Transactions
+CREATE TABLE IF NOT EXISTS public.wallets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID UNIQUE NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    available_balance DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+    locked_balance DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+    total_balance DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+    currency TEXT NOT NULL DEFAULT 'NGN',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.payout_accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    account_name TEXT NOT NULL,
+    bank_name TEXT NOT NULL,
+    bank_code TEXT NOT NULL,
+    account_number TEXT NOT NULL,
+    is_default BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.deposits (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    amount DECIMAL(15, 2) NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'NGN',
+    provider TEXT NOT NULL DEFAULT 'paystack',
+    internal_reference TEXT UNIQUE NOT NULL,
+    paystack_reference TEXT UNIQUE,
+    paystack_access_code TEXT,
+    authorization_url TEXT,
+    status TEXT NOT NULL DEFAULT 'pending', -- pending, successful, failed, abandoned, cancelled
+    initiated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    verified_at TIMESTAMPTZ,
+    channel TEXT,
+    paid_at TIMESTAMPTZ,
+    metadata JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.withdrawals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    payout_account_id UUID NOT NULL REFERENCES public.payout_accounts(id),
+    amount DECIMAL(15, 2) NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'NGN',
+    internal_reference TEXT UNIQUE NOT NULL,
+    provider TEXT NOT NULL DEFAULT 'manual',
+    provider_reference TEXT,
+    status TEXT NOT NULL DEFAULT 'pending', -- pending, approved, processing, successful, failed, rejected, cancelled
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    processed_at TIMESTAMPTZ,
+    failure_reason TEXT,
+    metadata JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.wallet_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    wallet_id UUID NOT NULL REFERENCES public.wallets(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    transaction_type TEXT NOT NULL, -- deposit, withdrawal, wager_lock, wager_release, wager_payout, wager_loss, refund, bonus, fee, adjustment
+    direction TEXT NOT NULL, -- credit, debit
+    amount DECIMAL(15, 2) NOT NULL,
+    status TEXT NOT NULL DEFAULT 'successful', -- pending, successful, failed, cancelled, reversed
+    reference TEXT NOT NULL,
+    description TEXT,
+    metadata JSONB,
+    related_deposit_id UUID REFERENCES public.deposits(id),
+    related_withdrawal_id UUID REFERENCES public.withdrawals(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 4. Lobby & Matches
+CREATE TABLE IF NOT EXISTS public.room_categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    code TEXT UNIQUE NOT NULL,
+    min_wager DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+    max_wager DECIMAL(15, 2),
+    is_free BOOLEAN NOT NULL DEFAULT FALSE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.game_types (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    code TEXT UNIQUE NOT NULL,
+    min_players INTEGER NOT NULL DEFAULT 2,
+    max_players INTEGER NOT NULL DEFAULT 5,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.game_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    room_category_id UUID NOT NULL REFERENCES public.room_categories(id),
+    game_type_id UUID NOT NULL REFERENCES public.game_types(id),
+    requester_user_id UUID NOT NULL REFERENCES public.users(id),
+    category TEXT NOT NULL, -- duel, arena
+    pay_mode TEXT NOT NULL, -- knockout, split
+    amount DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+    required_players INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'awaiting_opponents', -- awaiting_opponents, ready_to_start, started, cancelled, expired
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    last_login_at TIMESTAMPTZ,
-    
-    -- Future proofing fields
-    wallet_balance DECIMAL(12, 2) DEFAULT 0.00,
-    kyc_status TEXT DEFAULT 'pending',
-    last_seen_at TIMESTAMPTZ DEFAULT NOW()
+    started_at TIMESTAMPTZ,
+    cancelled_at TIMESTAMPTZ
 );
 
--- Extend game_requests
-ALTER TABLE public.game_requests ADD COLUMN IF NOT EXISTS game_variant text;
-
--- Extend match_participants for Phase 5A
-ALTER TABLE public.match_participants ADD COLUMN IF NOT EXISTS disconnect_detected_at timestamptz;
-ALTER TABLE public.match_participants ADD COLUMN IF NOT EXISTS reconnected_at timestamptz;
-ALTER TABLE public.match_participants ADD COLUMN IF NOT EXISTS countdown_expires_at timestamptz;
-ALTER TABLE public.match_participants ADD COLUMN IF NOT EXISTS defeat_reason text;
-
--- Game States Table
-CREATE TABLE IF NOT EXISTS public.game_states (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    match_id uuid UNIQUE NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
-    game_type text NOT NULL,
-    game_variant text NOT NULL,
-    state jsonb NOT NULL DEFAULT '{}'::jsonb,
-    current_round integer NOT NULL DEFAULT 1,
-    total_rounds integer NOT NULL DEFAULT 1,
-    status text NOT NULL DEFAULT 'active',
-    created_at timestamptz DEFAULT now(),
-    updated_at timestamptz DEFAULT now()
+CREATE TABLE IF NOT EXISTS public.game_request_participants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    game_request_id UUID NOT NULL REFERENCES public.game_requests(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id),
+    role TEXT NOT NULL DEFAULT 'player', -- requester, player
+    status TEXT NOT NULL DEFAULT 'joined', -- joined, left, locked_in
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    left_at TIMESTAMPTZ,
+    UNIQUE(game_request_id, user_id)
 );
 
--- Game Moves Table
-CREATE TABLE IF NOT EXISTS public.game_moves (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    match_id uuid NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
-    game_state_id uuid NOT NULL REFERENCES public.game_states(id) ON DELETE CASCADE,
-    user_id uuid NOT NULL REFERENCES public.users(id),
-    move_type text NOT NULL,
-    move_data jsonb NOT NULL DEFAULT '{}'::jsonb,
-    result_data jsonb NOT NULL DEFAULT '{}'::jsonb,
-    round_number integer NOT NULL,
-    move_number integer NOT NULL,
-    is_valid boolean DEFAULT true,
-    created_at timestamptz DEFAULT now()
+CREATE TABLE IF NOT EXISTS public.matches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    game_request_id UUID REFERENCES public.game_requests(id),
+    room_category_id UUID NOT NULL REFERENCES public.room_categories(id),
+    game_type_id UUID NOT NULL REFERENCES public.game_types(id),
+    started_by_user_id UUID NOT NULL REFERENCES public.users(id),
+    category TEXT NOT NULL,
+    pay_mode TEXT NOT NULL,
+    amount DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+    status TEXT NOT NULL DEFAULT 'waiting', -- waiting, in_progress, completed, cancelled
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    started_at TIMESTAMPTZ,
+    ended_at TIMESTAMPTZ,
+    finished_at TIMESTAMPTZ -- Same as ended_at but for consistency with settlement
 );
 
--- Match Results Table
-CREATE TABLE IF NOT EXISTS public.match_results (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    match_id uuid UNIQUE NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
-    pay_mode text NOT NULL,
-    total_pool_kobo bigint NOT NULL DEFAULT 0,
-    house_cut_kobo bigint NOT NULL DEFAULT 0,
-    net_pool_kobo bigint NOT NULL DEFAULT 0,
-    winners_count integer NOT NULL DEFAULT 0,
-    losers_count integer NOT NULL DEFAULT 0,
-    rankings jsonb NOT NULL DEFAULT '[]'::jsonb,
-    settlement_status text NOT NULL DEFAULT 'pending',
-    settled_at timestamptz,
-    failure_reason text,
-    created_at timestamptz DEFAULT now()
-);
-
--- Match Payouts Table
-CREATE TABLE IF NOT EXISTS public.match_payouts (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    match_result_id uuid NOT NULL REFERENCES public.match_results(id) ON DELETE CASCADE,
-    match_id uuid NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
-    user_id uuid NOT NULL REFERENCES public.users(id),
-    rank integer NOT NULL,
-    wager_kobo bigint NOT NULL DEFAULT 0,
-    weight integer,
-    payout_kobo bigint NOT NULL DEFAULT 0,
-    is_winner boolean NOT NULL DEFAULT false,
-    defeat_reason text,
-    wallet_transaction_id uuid,
-    created_at timestamptz DEFAULT now()
-);
-
--- House Revenue Table
-CREATE TABLE IF NOT EXISTS public.house_revenue (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    match_id uuid NOT NULL REFERENCES public.matches(id),
-    match_result_id uuid REFERENCES public.match_results(id),
-    amount_kobo bigint NOT NULL DEFAULT 0,
-    currency text DEFAULT 'NGN',
-    created_at timestamptz DEFAULT now()
-);
-
--- Match Heartbeats Table
-CREATE TABLE IF NOT EXISTS public.match_heartbeats (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    match_id uuid NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
-    user_id uuid NOT NULL REFERENCES public.users(id),
-    last_seen_at timestamptz DEFAULT now(),
-    updated_at timestamptz DEFAULT now(),
+CREATE TABLE IF NOT EXISTS public.match_participants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    match_id UUID NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id),
+    seat_no INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active', -- active, left, defeated, winner, eliminated
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    left_at TIMESTAMPTZ,
+    countdown_expires_at TIMESTAMPTZ, -- for presence logic
+    disconnect_detected_at TIMESTAMPTZ,
     UNIQUE(match_id, user_id)
 );
 
--- Settlement RPCs
+-- 5. Game Gameplay Models
+CREATE TABLE IF NOT EXISTS public.game_states (
+    match_id UUID PRIMARY KEY REFERENCES public.matches(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'active', -- active, paused, ended
+    state JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
+CREATE TABLE IF NOT EXISTS public.match_results (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    match_id UUID UNIQUE NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
+    pay_mode TEXT NOT NULL,
+    total_pool_kobo BIGINT,
+    house_cut_kobo BIGINT,
+    net_pool_kobo BIGINT,
+    winners_count INTEGER,
+    losers_count INTEGER,
+    rankings JSONB,
+    history JSONB DEFAULT '[]'::jsonb,
+    settlement_status TEXT NOT NULL DEFAULT 'pending', -- pending, settled, refunded
+    settled_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.match_payouts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    match_result_id UUID NOT NULL REFERENCES public.match_results(id) ON DELETE CASCADE,
+    match_id UUID NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id),
+    rank INTEGER NOT NULL,
+    wager_kobo BIGINT NOT NULL,
+    weight INTEGER,
+    payout_kobo BIGINT NOT NULL,
+    is_winner BOOLEAN NOT NULL DEFAULT FALSE,
+    defeat_reason TEXT,
+    wallet_transaction_id UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.house_revenue (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    match_id UUID NOT NULL REFERENCES public.matches(id),
+    match_result_id UUID NOT NULL REFERENCES public.match_results(id),
+    amount_kobo BIGINT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.match_heartbeats (
+    match_id UUID NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (match_id, user_id)
+);
+
+-- 6. Social & Communication
+CREATE TABLE IF NOT EXISTS public.chat_rooms (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    match_id UUID REFERENCES public.matches(id) ON DELETE CASCADE,
+    name TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.chat_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chat_room_id UUID NOT NULL REFERENCES public.chat_rooms(id) ON DELETE CASCADE,
+    sender_user_id UUID NOT NULL REFERENCES public.users(id),
+    content TEXT NOT NULL,
+    metadata JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS public.friendships (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    requester_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    addressee_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'pending', -- pending, accepted, blocked, declined
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(requester_user_id, addressee_user_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT,
+    data JSONB,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    read_at TIMESTAMPTZ
+);
+
+-- 7. Helper Functions & Triggers
+
+-- Trigger to update updated_at
+DROP FUNCTION IF EXISTS public.set_updated_at() CASCADE;
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Wallets setup
+DROP FUNCTION IF EXISTS public.update_wallet_total_balance() CASCADE;
+CREATE OR REPLACE FUNCTION public.update_wallet_total_balance()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.total_balance := NEW.available_balance + NEW.locked_balance;
+    NEW.updated_at := NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS on_wallet_balance_change ON public.wallets;
+CREATE TRIGGER on_wallet_balance_change
+BEFORE INSERT OR UPDATE ON public.wallets
+FOR EACH ROW EXECUTE PROCEDURE public.update_wallet_total_balance();
+
+DROP FUNCTION IF EXISTS public.handle_new_user_wallet() CASCADE;
+CREATE OR REPLACE FUNCTION public.handle_new_user_wallet()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.wallets (user_id) VALUES (NEW.id);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS on_user_created_wallet ON public.users;
+CREATE TRIGGER on_user_created_wallet
+AFTER INSERT ON public.users
+FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user_wallet();
+
+-- Uniqueness tracker for registration
+DROP FUNCTION IF EXISTS public.check_user_uniqueness(text, text, text);
+CREATE OR REPLACE FUNCTION public.check_user_uniqueness(p_username text, p_email text, p_phone text)
+RETURNS boolean AS $$
+BEGIN
+    RETURN NOT EXISTS (
+        SELECT 1 FROM public.users
+        WHERE LOWER(username) = LOWER(p_username)
+           OR LOWER(email) = LOWER(p_email)
+           OR phone = p_phone
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 8. Atomic RPCs
+
+-- Settlement
+DROP FUNCTION IF EXISTS public.settle_match_atomic(uuid, text, bigint, bigint, bigint, integer, integer, jsonb, jsonb, jsonb) CASCADE;
 CREATE OR REPLACE FUNCTION public.settle_match_atomic(
     p_match_id uuid,
     p_pay_mode text,
@@ -133,101 +343,105 @@ CREATE OR REPLACE FUNCTION public.settle_match_atomic(
     p_winners_count integer,
     p_losers_count integer,
     p_rankings jsonb,
-    p_payouts jsonb
-) RETURNS jsonb AS $$
+    p_payouts jsonb, -- array of {userId, rank, wagerKobo, payoutKobo, isWinner, weight, defeatReason}
+    p_history jsonb DEFAULT '[]'::jsonb
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-    v_result_id uuid;
-    v_payout record;
-    v_trans_id uuid;
-    v_wallet_id uuid;
+    v_res_id uuid;
+    v_p_rec record;
+    v_t_id uuid;
+    v_target_w_id uuid;
 BEGIN
     INSERT INTO public.match_results (
-        match_id, pay_mode, total_pool_kobo, house_cut_kobo, net_pool_kobo, 
-        winners_count, losers_count, rankings, settlement_status, settled_at
+        match_id, pay_mode, total_pool_kobo, house_cut_kobo, net_pool_kobo,
+        winners_count, losers_count, rankings, history, settlement_status, settled_at
     ) VALUES (
         p_match_id, p_pay_mode, p_total_pool_kobo, p_house_cut_kobo, p_net_pool_kobo,
-        p_winners_count, p_losers_count, p_rankings, 'settled', now()
-    ) RETURNING id INTO v_result_id;
+        p_winners_count, p_losers_count, p_rankings, p_history, 'settled', now()
+    ) RETURNING id INTO v_res_id;
 
     IF p_house_cut_kobo > 0 THEN
         INSERT INTO public.house_revenue (match_id, match_result_id, amount_kobo)
-        VALUES (p_match_id, v_result_id, p_house_cut_kobo);
+        VALUES (p_match_id, v_res_id, p_house_cut_kobo);
     END IF;
 
-    FOR v_payout IN SELECT * FROM jsonb_to_recordset(p_payouts) AS x(
-        "userId" uuid, "rank" integer, "wagerKobo" bigint, "payoutKobo" bigint, 
+    FOR v_p_rec IN SELECT * FROM jsonb_to_recordset(p_payouts) AS x(
+        "userId" uuid, "rank" integer, "wagerKobo" bigint, "payoutKobo" bigint,
         "isWinner" boolean, "weight" integer, "defeatReason" text
     ) LOOP
-        SELECT id INTO v_wallet_id FROM public.wallets WHERE user_id = v_payout."userId" FOR UPDATE;
+        -- Lock and select the wallet ID
+        SELECT id INTO v_target_w_id FROM public.wallets WHERE user_id = v_p_rec."userId" FOR UPDATE;
 
-        UPDATE public.wallets 
-        SET locked_balance = locked_balance - (v_payout."wagerKobo"::numeric / 100.0),
+        UPDATE public.wallets
+        SET locked_balance = locked_balance - (v_p_rec."wagerKobo"::numeric / 100.0),
             updated_at = now()
-        WHERE id = v_wallet_id;
+        WHERE id = v_target_w_id;
 
-        IF NOT v_payout."isWinner" THEN
+        IF NOT v_p_rec."isWinner" THEN
             INSERT INTO public.wallet_transactions (
                 wallet_id, user_id, transaction_type, direction, amount, status, reference, description
             ) VALUES (
-                v_wallet_id, v_payout."userId", 'wager_loss', 'debit', (v_payout."wagerKobo"::numeric / 100.0), 
-                'completed', 'MATCH_LOSS_' || p_match_id, 'Wager loss for match ' || p_match_id
-            ) RETURNING id INTO v_trans_id;
+                v_target_w_id, v_p_rec."userId", 'wager_loss', 'debit', (v_p_rec."wagerKobo"::numeric / 100.0),
+                'completed', 'MATCH_LOSS_' || p_match_id::text, 'Wager loss for match ' || p_match_id::text
+            ) RETURNING id INTO v_t_id;
         ELSE
-            UPDATE public.wallets 
-            SET available_balance = available_balance + (v_payout."payoutKobo"::numeric / 100.0),
+            UPDATE public.wallets
+            SET available_balance = available_balance + (v_p_rec."payoutKobo"::numeric / 100.0),
                 updated_at = now()
-            WHERE id = v_wallet_id;
+            WHERE id = v_target_w_id;
 
             INSERT INTO public.wallet_transactions (
                 wallet_id, user_id, transaction_type, direction, amount, status, reference, description
             ) VALUES (
-                v_wallet_id, v_payout."userId", 'wager_payout', 'credit', (v_payout."payoutKobo"::numeric / 100.0), 
-                'completed', 'MATCH_PAYOUT_' || p_match_id, 'Wager payout for match ' || p_match_id
-            ) RETURNING id INTO v_trans_id;
+                v_target_w_id, v_p_rec."userId", 'wager_payout', 'credit', (v_p_rec."payoutKobo"::numeric / 100.0),
+                'completed', 'MATCH_PAYOUT_' || p_match_id::text, 'Wager payout for match ' || p_match_id::text
+            ) RETURNING id INTO v_t_id;
         END IF;
 
         INSERT INTO public.match_payouts (
-            match_result_id, match_id, user_id, rank, wager_kobo, weight, payout_kobo, 
+            match_result_id, match_id, user_id, rank, wager_kobo, weight, payout_kobo,
             is_winner, defeat_reason, wallet_transaction_id
         ) VALUES (
-            v_result_id, p_match_id, v_payout."userId", v_payout."rank", v_payout."wagerKobo", 
-            v_payout."weight", v_payout."payoutKobo", v_payout."isWinner", v_payout."defeatReason", v_trans_id
+            v_res_id, p_match_id, v_p_rec."userId", v_p_rec."rank", v_p_rec."wagerKobo",
+            v_p_rec."weight", v_p_rec."payoutKobo", v_p_rec."isWinner", v_p_rec."defeatReason", v_t_id
         );
     END LOOP;
 
     UPDATE public.matches SET status = 'finished', finished_at = now() WHERE id = p_match_id;
 
-    RETURN jsonb_build_object('success', true, 'result_id', v_result_id);
+    RETURN jsonb_build_object('success', true, 'result_id', v_res_id);
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
+-- Refund
+DROP FUNCTION IF EXISTS public.refund_match_wagers_atomic(uuid, bigint) CASCADE;
 CREATE OR REPLACE FUNCTION public.refund_match_wagers_atomic(
     p_match_id uuid,
     p_wager_kobo bigint
-) RETURNS jsonb AS $$
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-    v_participant record;
-    v_wallet_id uuid;
+    v_part record;
+    v_target_w_id uuid;
 BEGIN
-    FOR v_participant IN SELECT user_id FROM public.match_participants WHERE match_id = p_match_id LOOP
-        SELECT id INTO v_wallet_id FROM public.wallets WHERE user_id = v_participant.user_id FOR UPDATE;
+    FOR v_part IN SELECT user_id FROM public.match_participants WHERE match_id = p_match_id LOOP
+        SELECT id INTO v_target_w_id FROM public.wallets WHERE user_id = v_part.user_id FOR UPDATE;
 
-        UPDATE public.wallets 
+        UPDATE public.wallets
         SET locked_balance = locked_balance - (p_wager_kobo::numeric / 100.0),
             available_balance = available_balance + (p_wager_kobo::numeric / 100.0),
             updated_at = now()
-        WHERE id = v_wallet_id;
+        WHERE id = v_target_w_id;
 
         INSERT INTO public.wallet_transactions (
             wallet_id, user_id, transaction_type, direction, amount, status, reference, description
         ) VALUES (
-            v_wallet_id, v_participant.user_id, 'wager_release', 'credit', (p_wager_kobo::numeric / 100.0), 
-            'completed', 'MATCH_REFUND_' || p_match_id, 'Wager refund for match ' || p_match_id
+            v_target_w_id, v_part.user_id, 'wager_release', 'credit', (p_wager_kobo::numeric / 100.0),
+            'completed', 'MATCH_REFUND_' || p_match_id::text, 'Wager refund for match ' || p_match_id::text
         );
     END LOOP;
 
     UPDATE public.matches SET status = 'cancelled', finished_at = now() WHERE id = p_match_id;
-    
+
     INSERT INTO public.match_results (
         match_id, pay_mode, settlement_status, settled_at
     ) VALUES (
@@ -236,88 +450,284 @@ BEGIN
 
     RETURN jsonb_build_object('success', true);
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
--- Enable RLS
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-
--- Policies
-DROP POLICY IF EXISTS "Users can read own data" ON public.users;
-CREATE POLICY "Users can read own data" ON public.users
-    FOR SELECT
-    USING (auth.uid() = id);
-
-DROP POLICY IF EXISTS "Users can update own data" ON public.users;
-CREATE POLICY "Users can update own data" ON public.users
-    FOR UPDATE
-    USING (auth.uid() = id);
-
--- Function to handle new user signup
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
+-- Start Game Request
+DROP FUNCTION IF EXISTS public.start_game_request_atomic(uuid, uuid) CASCADE;
+CREATE OR REPLACE FUNCTION public.start_game_request_atomic(
+    p_request_id UUID,
+    p_started_by_user_id UUID
+)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_req RECORD;
+    v_part RECORD;
+    v_match_id UUID;
+    v_target_w_id UUID;
 BEGIN
-    INSERT INTO public.users (
-        id, 
-        username, 
-        email, 
-        phone, 
-        is_adult_confirmed, 
-        terms_accepted, 
-        terms_accepted_at
-    )
-    VALUES (
-        NEW.id,
-        COALESCE(NEW.raw_user_meta_data->>'username', NEW.email),
-        NEW.email,
-        COALESCE(NEW.raw_user_meta_data->>'phone', NEW.phone),
-        COALESCE((NEW.raw_user_meta_data->>'isAdultConfirmed')::boolean, false),
-        COALESCE((NEW.raw_user_meta_data->>'termsAccepted')::boolean, false),
+    SELECT * INTO v_req FROM public.game_requests WHERE id = p_request_id FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Game request not found';
+    END IF;
+
+    IF v_req.status != 'awaiting_opponents' AND v_req.status != 'ready_to_start' THEN
+        RAISE EXCEPTION 'Game request is not in a startable state: %', v_req.status;
+    END IF;
+
+    IF v_req.requester_user_id != p_started_by_user_id THEN
+        RAISE EXCEPTION 'Only the requester can start the game';
+    END IF;
+
+    INSERT INTO public.matches (
+        game_request_id,
+        room_category_id,
+        game_type_id,
+        started_by_user_id,
+        category,
+        pay_mode,
+        amount,
+        status,
+        started_at
+    ) VALUES (
+        v_req.id,
+        v_req.room_category_id,
+        v_req.game_type_id,
+        v_req.requester_user_id,
+        v_req.category,
+        v_req.pay_mode,
+        v_req.amount,
+        'in_progress',
         NOW()
-    );
-    RETURN NEW;
+    ) RETURNING id INTO v_match_id;
+
+    FOR v_part IN (SELECT * FROM public.game_request_participants WHERE game_request_id = p_request_id AND status = 'joined' ORDER BY joined_at ASC) LOOP
+        INSERT INTO public.match_participants (
+            match_id,
+            user_id,
+            seat_no,
+            status
+        ) VALUES (
+            v_match_id,
+            v_part.user_id,
+            (SELECT count(*) + 1 FROM public.match_participants WHERE match_id = v_match_id),
+            'active'
+        );
+
+        IF v_req.amount > 0 THEN
+            SELECT id INTO v_target_w_id FROM public.wallets WHERE user_id = v_part.user_id FOR UPDATE;
+
+            IF (SELECT available_balance FROM public.wallets WHERE id = v_target_w_id) < v_req.amount THEN
+                RAISE EXCEPTION 'User % has insufficient balance', v_part.user_id;
+            END IF;
+
+            UPDATE public.wallets SET
+                available_balance = available_balance - v_req.amount,
+                locked_balance = locked_balance + v_req.amount,
+                updated_at = NOW()
+            WHERE id = v_target_w_id;
+
+            INSERT INTO public.wallet_transactions (
+                wallet_id,
+                user_id,
+                transaction_type,
+                direction,
+                amount,
+                status,
+                reference,
+                description,
+                metadata
+            ) VALUES (
+                v_target_w_id,
+                v_part.user_id,
+                'wager_lock',
+                'debit',
+                v_req.amount,
+                'successful',
+                v_match_id::text,
+                'Wager locked for match ' || v_match_id::text,
+                jsonb_build_object('match_id', v_match_id, 'request_id', p_request_id)
+            );
+        END IF;
+
+        UPDATE public.game_request_participants SET status = 'locked_in' WHERE id = v_part.id;
+    END LOOP;
+
+    UPDATE public.game_requests SET status = 'started', started_at = NOW() WHERE id = p_request_id;
+
+    RETURN jsonb_build_object('success', true, 'match_id', v_match_id);
 END;
 $$;
 
--- Trigger for new user signup
-CREATE TRIGGER on_auth_user_created
-    AFTER INSERT ON auth.users
-    FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
-
--- RPC Function to check uniqueness (needed for anon key backend)
-CREATE OR REPLACE FUNCTION public.check_user_uniqueness(p_username TEXT, p_email TEXT, p_phone TEXT)
-RETURNS JSONB AS $$
+-- 9. Cancel Game Request Function
+DROP FUNCTION IF EXISTS public.cancel_game_request(UUID, UUID) CASCADE;
+CREATE OR REPLACE FUNCTION public.cancel_game_request(
+    p_request_id UUID,
+    p_user_id UUID
+)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-    v_result JSONB;
+    v_req RECORD;
 BEGIN
-    SELECT jsonb_build_object(
-        'username_exists', EXISTS(SELECT 1 FROM public.users WHERE LOWER(username) = LOWER(p_username)),
-        'email_exists', EXISTS(SELECT 1 FROM public.users WHERE LOWER(email) = LOWER(p_email)),
-        'phone_exists', EXISTS(SELECT 1 FROM public.users WHERE phone = p_phone AND p_phone IS NOT NULL)
-    ) INTO v_result;
-    RETURN v_result;
+    SELECT * INTO v_req FROM public.game_requests WHERE id = p_request_id FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Game request not found';
+    END IF;
+
+    IF v_req.requester_user_id != p_user_id THEN
+        RAISE EXCEPTION 'Only the requester can cancel the request';
+    END IF;
+
+    IF v_req.status = 'started' THEN
+        RAISE EXCEPTION 'Cannot cancel a game that has already started';
+    END IF;
+
+    UPDATE public.game_requests SET
+        status = 'cancelled',
+        cancelled_at = NOW(),
+        updated_at = NOW()
+    WHERE id = p_request_id;
+
+    RETURN jsonb_build_object('success', true);
+EXCEPTION WHEN OTHERS THEN
+    RAISE EXCEPTION 'Failed to cancel game request: %', SQLERRM;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$$;
 
--- RPC Function to get email by username (needed for login with username using anon key)
-CREATE OR REPLACE FUNCTION public.get_user_email_by_username(p_username text)
-RETURNS text
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
+-- 10. Leave Game Request Function
+DROP FUNCTION IF EXISTS public.leave_game_request(UUID, UUID) CASCADE;
+CREATE OR REPLACE FUNCTION public.leave_game_request(
+    p_request_id UUID,
+    p_user_id UUID
+)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-    v_email text;
+    v_part RECORD;
 BEGIN
-    SELECT u.email
-    INTO v_email
-    FROM public.users u
-    WHERE LOWER(u.username) = LOWER(p_username)
+    SELECT * INTO v_part FROM public.game_request_participants
+    WHERE game_request_id = p_request_id AND user_id = p_user_id FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Participation not found';
+    END IF;
+
+    IF v_part.role = 'requester' THEN
+        RAISE EXCEPTION 'Requester should cancel the request instead of leaving';
+    END IF;
+
+    DELETE FROM public.game_request_participants WHERE id = v_part.id;
+
+    -- Update request status back to awaiting_opponents if it was ready_to_start
+    UPDATE public.game_requests SET
+        status = 'awaiting_opponents',
+        updated_at = NOW()
+    WHERE id = p_request_id AND status = 'ready_to_start';
+
+    RETURN jsonb_build_object('success', true);
+EXCEPTION WHEN OTHERS THEN
+    RAISE EXCEPTION 'Failed to leave game request: %', SQLERRM;
+END;
+$$;
+
+-- 11. Check Active Participation Function
+DROP FUNCTION IF EXISTS public.check_user_active_participation(UUID) CASCADE;
+CREATE OR REPLACE FUNCTION public.check_user_active_participation(p_user_id UUID)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_a_request_id UUID;
+    v_a_match_id UUID;
+BEGIN
+    -- Check for active pending request (as requester or joined participant)
+    SELECT grp.game_request_id INTO v_a_request_id
+    FROM public.game_request_participants grp
+    JOIN public.game_requests gr ON gr.id = grp.game_request_id
+    WHERE grp.user_id = p_user_id
+    AND grp.status = 'joined'
+    AND gr.status IN ('awaiting_opponents', 'ready_to_start')
     LIMIT 1;
 
-    RETURN v_email;
+    IF v_a_request_id IS NOT NULL THEN
+        RETURN jsonb_build_object('active', true, 'type', 'request', 'id', v_a_request_id);
+    END IF;
+
+    -- Check for active match
+    SELECT mp.match_id INTO v_a_match_id
+    FROM public.match_participants mp
+    JOIN public.matches m ON m.id = mp.match_id
+    WHERE mp.user_id = p_user_id
+    AND mp.status = 'active'
+    AND m.status IN ('waiting', 'in_progress')
+    LIMIT 1;
+
+    IF v_a_match_id IS NOT NULL THEN
+        RETURN jsonb_build_object('active', true, 'type', 'match', 'id', v_a_match_id);
+    END IF;
+
+    RETURN jsonb_build_object('active', false);
 END;
 $$;
+
+-- 12. Seed Data Initialization
+INSERT INTO public.room_categories (name, code, min_wager, max_wager, is_free, sort_order) VALUES
+('Ghetto Yard', 'ghetto_yard', 0.00, 0.00, TRUE, 1),
+('Hustlers Hub', 'hustlers_hub', 100.00, 999.00, FALSE, 2),
+('Pro League', 'pro_league', 1000.00, 9999.00, FALSE, 3),
+('Odogwu Circle', 'odogwu_circle', 10000.00, 99999.00, FALSE, 4),
+('Grandmasters Lounge', 'grandmasters_lounge', 100000.00, NULL, FALSE, 5)
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public.game_types (name, code, min_players, max_players) VALUES
+('Chess', 'chess', 2, 2),
+('Ludo', 'ludo', 2, 4),
+('Dice', 'dice', 2, 5),
+('Whot', 'whot', 2, 4)
+ON CONFLICT (code) DO NOTHING;
+
+-- 13. RLS Policies
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can read own data" ON public.users;
+CREATE POLICY "Users can read own data" ON public.users FOR SELECT USING (auth.uid() = id);
+
+ALTER TABLE public.wallets ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own wallet" ON public.wallets;
+CREATE POLICY "Users can view own wallet" ON public.wallets FOR SELECT USING (auth.uid() = user_id);
+
+ALTER TABLE public.wallet_transactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own transactions" ON public.wallet_transactions;
+CREATE POLICY "Users can view own transactions" ON public.wallet_transactions FOR SELECT USING (auth.uid() = user_id);
+
+ALTER TABLE public.room_categories ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view active room categories" ON public.room_categories;
+CREATE POLICY "Anyone can view active room categories" ON public.room_categories FOR SELECT USING (is_active = TRUE);
+
+ALTER TABLE public.game_types ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view active game types" ON public.game_types;
+CREATE POLICY "Anyone can view active game types" ON public.game_types FOR SELECT USING (is_active = TRUE);
+
+ALTER TABLE public.game_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view open game requests" ON public.game_requests;
+CREATE POLICY "Anyone can view open game requests" ON public.game_requests FOR SELECT USING (status IN ('awaiting_opponents', 'ready_to_start'));
+DROP POLICY IF EXISTS "Users can create game requests" ON public.game_requests;
+CREATE POLICY "Users can create game requests" ON public.game_requests FOR INSERT WITH CHECK (auth.uid() = requester_user_id);
+
+ALTER TABLE public.game_request_participants ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view request participants" ON public.game_request_participants;
+CREATE POLICY "Anyone can view request participants" ON public.game_request_participants FOR SELECT USING (TRUE);
+DROP POLICY IF EXISTS "Users can join requests" ON public.game_request_participants;
+CREATE POLICY "Users can join requests" ON public.game_request_participants FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+ALTER TABLE public.matches ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view matches" ON public.matches;
+CREATE POLICY "Anyone can view matches" ON public.matches FOR SELECT USING (TRUE);
+
+ALTER TABLE public.match_participants ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view match participants" ON public.match_participants;
+CREATE POLICY "Anyone can view match participants" ON public.match_participants FOR SELECT USING (TRUE);
+
+-- 14. Indexes
+CREATE INDEX IF NOT EXISTS idx_wallets_user_id ON public.wallets(user_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_user_id ON public.wallet_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_game_requests_status ON public.game_requests(status);
+CREATE INDEX IF NOT EXISTS idx_match_participants_match_id ON public.match_participants(match_id);
+CREATE INDEX IF NOT EXISTS idx_match_participants_user_id ON public.match_participants(user_id);

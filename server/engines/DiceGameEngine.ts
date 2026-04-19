@@ -223,9 +223,10 @@ export class DiceGameEngine implements GameEngine {
       }
     });
 
-    const rolls = state.activePlayerIds.map(id => ({ id, roll: state.rolls[id]! }));
-    const minRoll = Math.min(...rolls.map(r => r.roll));
-    const lowestRollers = rolls.filter(r => r.roll === minRoll);
+    const rollsCopy = { ...state.rolls };
+    const rollPairs = state.activePlayerIds.map(id => ({ id, roll: state.rolls[id]! }));
+    const minRoll = Math.min(...rollPairs.map(r => r.roll));
+    const lowestRollers = rollPairs.filter(r => r.roll === minRoll);
 
     if (lowestRollers.length > 1) {
       // Tie for lowest
@@ -234,11 +235,25 @@ export class DiceGameEngine implements GameEngine {
         playerIds: lowestRollers.map(r => r.id),
         rolls: {}
       };
+
+      state.history.push({
+        round: state.currentRound,
+        isTieBreakerInitial: true,
+        rolls: rollsCopy
+      });
+
       events.push({ type: 'round_tie', payload: { playerIds: state.tieBreaker.playerIds } });
     } else {
       // Single lowest roller eliminated
       const eliminatedId = lowestRollers[0].id;
       state.lastRoundResults = { ...state.rolls };
+
+      state.history.push({
+        round: state.currentRound,
+        eliminatedPlayerId: eliminatedId,
+        rolls: rollsCopy
+      });
+
       this.eliminatePlayer(state, eliminatedId, events);
 
       // Advance round if not finished
@@ -271,6 +286,13 @@ export class DiceGameEngine implements GameEngine {
     if (lowestRollers.length > 1 && state.tieBreaker.playerIds.length > 1) {
       // Still tied
       state.lastRoundResults = { ...state.tieBreaker.rolls };
+
+      state.history.push({
+        round: state.currentRound,
+        isTieBreakerContinued: true,
+        rolls: { ...state.tieBreaker.rolls }
+      });
+
       state.tieBreaker.rolls = {};
       state.currentTurnPlayerId = state.tieBreaker.playerIds[0];
       events.push({ type: 'tie_still_active', payload: { playerIds: lowestRollers.map(r => r.id) } });
@@ -278,6 +300,14 @@ export class DiceGameEngine implements GameEngine {
       // Tie broken
       const eliminatedId = lowestRollers[0].id;
       state.lastRoundResults = { ...state.tieBreaker.rolls };
+
+      state.history.push({
+        round: state.currentRound,
+        isTieBreakerResolved: true,
+        eliminatedPlayerId: eliminatedId,
+        rolls: { ...state.tieBreaker.rolls }
+      });
+
       state.tieBreaker = undefined;
       this.eliminatePlayer(state, eliminatedId, events);
 

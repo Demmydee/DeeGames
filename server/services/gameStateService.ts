@@ -138,7 +138,7 @@ export class GameStateService {
     const endResult = engine.detectEndCondition(state);
 
     if (endResult) {
-      await SettlementService.settleMatch(match, endResult.rankings);
+      await SettlementService.settleMatch(match, endResult.rankings, state.history);
     }
   }
 }

@@ -25,7 +25,7 @@ export interface ParticipantPayout {
 export class SettlementService {
   private static HOUSE_CUT_PERCENTAGE = 0.10;
 
-  static async settleMatch(match: Match, rankings: RankedParticipant[]): Promise<SettlementResult> {
+  static async settleMatch(match: Match, rankings: RankedParticipant[], history: any[] = []): Promise<SettlementResult> {
     const { pay_mode, amount: wagerAmount } = match.game_request!;
     const wagerKobo = Math.round(wagerAmount * 100); // Convert to kobo
     const totalPlayers = rankings.length;
@@ -59,7 +59,7 @@ export class SettlementService {
     }
 
     try {
-      await this.executeAtomicSettlement(match, rankings, payouts, totalPoolKobo, houseCutKobo, netPoolKobo);
+      await this.executeAtomicSettlement(match, rankings, payouts, totalPoolKobo, houseCutKobo, netPoolKobo, history);
       return {
         matchId: match.id,
         payMode: pay_mode,
@@ -204,7 +204,8 @@ export class SettlementService {
     payouts: ParticipantPayout[],
     totalPoolKobo: number,
     houseCutKobo: number,
-    netPoolKobo: number
+    netPoolKobo: number,
+    history: any[] = []
   ) {
     // 1. Update all participants to their final statuses so redirection logic clears
     const statusUpdates = rankings.map(r => {
@@ -231,7 +232,8 @@ export class SettlementService {
       p_winners_count: payouts.filter(p => p.isWinner).length,
       p_losers_count: payouts.filter(p => !p.isWinner).length,
       p_rankings: rankings,
-      p_payouts: payouts
+      p_payouts: payouts,
+      p_history: history
     });
 
     if (error) throw error;
