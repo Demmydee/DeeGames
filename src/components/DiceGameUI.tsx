@@ -37,8 +37,15 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
         const result = await gameApi.getResult(matchId);
         onGameEnd(result);
       }
+      setError(null);
     } catch (err: any) {
-      console.error('Failed to fetch game state:', err);
+      if (err.response?.status === 404) {
+        // Silently wait for initialization
+        console.warn('Game state not yet available, retrying...');
+      } else {
+        console.error('Failed to fetch game state:', err);
+        setError('Connection lost. Retrying...');
+      }
     } finally {
       setLoading(false);
     }

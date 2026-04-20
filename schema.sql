@@ -1,8 +1,7 @@
 -- Unified Schema for DeeGames
 -- This script contains all tables, functions, and policies needed for the application.
 
--- 1. Explicit cleanup of accidental tables from previous failed runs
--- These names were sometimes misinterpreted as relations by the parser in failed states
+-- 1. Explicit cleanup of accidental tables/objects from previous failed runs
 DROP TABLE IF EXISTS public.v_wallet_id, public.v_user_wallet_id, public.v_result_id, public.v_trans_id CASCADE;
 DROP TABLE IF EXISTS public._l_target_wallet_id, public._l_result_id, public._l_trans_id, public._l_payout CASCADE;
 
@@ -104,9 +103,11 @@ CREATE TABLE IF NOT EXISTS public.room_categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     code TEXT UNIQUE NOT NULL,
+    description TEXT,
     min_wager DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
     max_wager DECIMAL(15, 2),
     is_free BOOLEAN NOT NULL DEFAULT FALSE,
+    icon_name TEXT,
     sort_order INTEGER NOT NULL DEFAULT 0,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -117,6 +118,7 @@ CREATE TABLE IF NOT EXISTS public.game_types (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     code TEXT UNIQUE NOT NULL,
+    description TEXT,
     min_players INTEGER NOT NULL DEFAULT 2,
     max_players INTEGER NOT NULL DEFAULT 5,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -132,6 +134,7 @@ CREATE TABLE IF NOT EXISTS public.game_requests (
     category TEXT NOT NULL, -- duel, arena
     pay_mode TEXT NOT NULL, -- knockout, split
     amount DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+    game_variant TEXT,
     required_players INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'awaiting_opponents', -- awaiting_opponents, ready_to_start, started, cancelled, expired
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -160,11 +163,12 @@ CREATE TABLE IF NOT EXISTS public.matches (
     category TEXT NOT NULL,
     pay_mode TEXT NOT NULL,
     amount DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
-    status TEXT NOT NULL DEFAULT 'waiting', -- waiting, in_progress, completed, cancelled
+    status TEXT NOT NULL DEFAULT 'waiting', -- waiting, in_progress, finished, cancelled
+    winner_user_id UUID REFERENCES public.users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     started_at TIMESTAMPTZ,
     ended_at TIMESTAMPTZ,
-    finished_at TIMESTAMPTZ -- Same as ended_at but for consistency with settlement
+    finished_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS public.match_participants (
@@ -175,17 +179,36 @@ CREATE TABLE IF NOT EXISTS public.match_participants (
     status TEXT NOT NULL DEFAULT 'active', -- active, left, defeated, winner, eliminated
     joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     left_at TIMESTAMPTZ,
-    countdown_expires_at TIMESTAMPTZ, -- for presence logic
+    reconnected_at TIMESTAMPTZ,
+    countdown_expires_at TIMESTAMPTZ,
     disconnect_detected_at TIMESTAMPTZ,
     UNIQUE(match_id, user_id)
 );
 
 -- 5. Game Gameplay Models
 CREATE TABLE IF NOT EXISTS public.game_states (
-    match_id UUID PRIMARY KEY REFERENCES public.matches(id) ON DELETE CASCADE,
-    status TEXT NOT NULL DEFAULT 'active', -- active, paused, ended
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    match_id UUID UNIQUE NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
+    game_type TEXT NOT NULL,
+    game_variant TEXT NOT NULL,
+    current_round INTEGER NOT NULL DEFAULT 1,
+    total_rounds INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active', -- active, paused, completed
     state JSONB NOT NULL DEFAULT '{}'::jsonb,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.game_moves (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    match_id UUID NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
+    game_state_id UUID NOT NULL REFERENCES public.game_states(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id),
+    move_type TEXT NOT NULL,
+    move_data JSONB NOT NULL,
+    result_data JSONB,
+    round_number INTEGER NOT NULL,
+    move_number INTEGER NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.match_results (
@@ -199,7 +222,8 @@ CREATE TABLE IF NOT EXISTS public.match_results (
     losers_count INTEGER,
     rankings JSONB,
     history JSONB DEFAULT '[]'::jsonb,
-    settlement_status TEXT NOT NULL DEFAULT 'pending', -- pending, settled, refunded
+    settlement_status TEXT NOT NULL DEFAULT 'pending', -- pending, settled, refunded, failed
+    failure_reason TEXT,
     settled_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -230,6 +254,7 @@ CREATE TABLE IF NOT EXISTS public.house_revenue (
 CREATE TABLE IF NOT EXISTS public.match_heartbeats (
     match_id UUID NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (match_id, user_id)
 );
@@ -668,7 +693,39 @@ BEGIN
 END;
 $$;
 
--- 12. Seed Data Initialization
+-- 12. Presence Helper Functions
+DROP FUNCTION IF EXISTS public.update_match_presence(uuid, uuid) CASCADE;
+CREATE OR REPLACE FUNCTION public.update_match_presence(
+    p_match_id uuid,
+    p_user_id uuid
+) RETURNS jsonb LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE public.match_participants
+    SET reconnected_at = NOW(),
+        disconnect_detected_at = NULL,
+        countdown_expires_at = NULL
+    WHERE match_id = p_match_id AND user_id = p_user_id;
+
+    INSERT INTO public.match_heartbeats (match_id, user_id, last_seen_at, updated_at)
+    VALUES (p_match_id, p_user_id, NOW(), NOW())
+    ON CONFLICT (match_id, user_id) DO UPDATE SET
+        last_seen_at = EXCLUDED.last_seen_at,
+        updated_at = EXCLUDED.updated_at;
+
+    RETURN jsonb_build_object('success', true);
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.check_match_timeouts(uuid) CASCADE;
+CREATE OR REPLACE FUNCTION public.check_match_timeouts(p_match_id uuid)
+RETURNS jsonb LANGUAGE plpgsql AS $$
+BEGIN
+    -- No logic needed directly here as the Node server handles the timeouts via HeartbeatService
+    RETURN jsonb_build_object('success', true);
+END;
+$$;
+
+-- 13. Seed Data Initialization
 INSERT INTO public.room_categories (name, code, min_wager, max_wager, is_free, sort_order) VALUES
 ('Ghetto Yard', 'ghetto_yard', 0.00, 0.00, TRUE, 1),
 ('Hustlers Hub', 'hustlers_hub', 100.00, 999.00, FALSE, 2),
@@ -684,7 +741,7 @@ INSERT INTO public.game_types (name, code, min_players, max_players) VALUES
 ('Whot', 'whot', 2, 4)
 ON CONFLICT (code) DO NOTHING;
 
--- 13. RLS Policies
+-- 14. RLS Policies
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can read own data" ON public.users;
 CREATE POLICY "Users can read own data" ON public.users FOR SELECT USING (auth.uid() = id);
@@ -725,9 +782,23 @@ ALTER TABLE public.match_participants ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Anyone can view match participants" ON public.match_participants;
 CREATE POLICY "Anyone can view match participants" ON public.match_participants FOR SELECT USING (TRUE);
 
--- 14. Indexes
+ALTER TABLE public.game_states ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view game states" ON public.game_states;
+CREATE POLICY "Anyone can view game states" ON public.game_states FOR SELECT USING (TRUE);
+
+ALTER TABLE public.game_moves ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view game moves" ON public.game_moves;
+CREATE POLICY "Anyone can view game moves" ON public.game_moves FOR SELECT USING (TRUE);
+
+ALTER TABLE public.match_results ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view match results" ON public.match_results;
+CREATE POLICY "Anyone can view match results" ON public.match_results FOR SELECT USING (TRUE);
+
+-- 15. Indexes
 CREATE INDEX IF NOT EXISTS idx_wallets_user_id ON public.wallets(user_id);
 CREATE INDEX IF NOT EXISTS idx_wallet_transactions_user_id ON public.wallet_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_game_requests_status ON public.game_requests(status);
 CREATE INDEX IF NOT EXISTS idx_match_participants_match_id ON public.match_participants(match_id);
 CREATE INDEX IF NOT EXISTS idx_match_participants_user_id ON public.match_participants(user_id);
+CREATE INDEX IF NOT EXISTS idx_game_states_match_id ON public.game_states(match_id);
+CREATE INDEX IF NOT EXISTS idx_game_moves_match_id ON public.game_moves(match_id);

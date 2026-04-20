@@ -22,22 +22,32 @@ export class GameStateService {
 
     const initialState = engine.initializeState(match, match.participants!, config);
 
-    const { data, error } = await supabase
-      .from('game_states')
-      .insert([{
-        match_id: matchId,
-        game_type: match.game_type!.name.toLowerCase(),
-        game_variant: config.variant,
-        state: initialState,
-        current_round: initialState.currentRound,
-        total_rounds: initialState.totalRounds,
-        status: 'active'
-      }])
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('game_states')
+        .insert([{
+          match_id: matchId,
+          game_type: match.game_type!.name.toLowerCase(),
+          game_variant: config.variant,
+          state: initialState,
+          current_round: initialState.currentRound,
+          total_rounds: initialState.totalRounds,
+          status: 'active'
+        }])
+        .select()
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('GameStateService.initializeGame Error:', {
+        message: error.message,
+        details: error.details,
+        code: error.code,
+        matchId
+      });
+      throw error;
+    }
   }
 
   static async getGameState(matchId: string) {
