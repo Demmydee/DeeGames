@@ -1,9 +1,10 @@
 import { supabase, createClientWithToken } from '../config/supabase';
+import { getUserById } from './authService';
 
 export const getWalletByUserId = async (userId: string, token?: string) => {
   const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
   const client = hasServiceKey ? supabase : (token ? createClientWithToken(token) : supabase);
-  
+
   const { data, error } = await client
     .from('wallets')
     .select('*')
@@ -12,21 +13,12 @@ export const getWalletByUserId = async (userId: string, token?: string) => {
 
   if (error) {
     if (error.code === 'PGRST116') { // JSON object requested, but no rows were returned
-      console.log(`Wallet not found for user ${userId}, checking if user exists...`);
+      console.log(`Wallet not found for user ${userId}, ensuring user profile exists...`);
 
-      // Verify user exists in public.users first
-      const { data: userExists, error: userError } = await client
-        .from('users')
-        .select('id')
-        .eq('id', userId)
-        .single();
+      // Use getUserById to self-heal the profile if it's missing
+      await getUserById(userId);
 
-      if (userError || !userExists) {
-        console.error(`User ${userId} not found in public.users. Sync may have failed.`, userError);
-        throw new Error('User profile not found. Please contact support.');
-      }
-
-      console.log(`User ${userId} found, creating missing wallet...`);
+      console.log(`User ${userId} profile is ready, creating missing wallet...`);
       const { data: newWallet, error: createError } = await client
         .from('wallets')
         .insert([{ user_id: userId }])

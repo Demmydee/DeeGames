@@ -126,7 +126,7 @@ export const loginUser = async (identifier: string, password: string) => {
 export const getUserById = async (id: string) => {
   const { data: user, error } = await supabase
     .from('users')
-    .select('id, username, email, phone, created_at, last_login_at, status')
+    .select('id, username, email, phone, created_at, kyc_status, kyc_verified_at')
     .eq('id', id)
     .single();
 
@@ -134,7 +134,6 @@ export const getUserById = async (id: string) => {
     console.warn(`User profile not found in public.users for ID: ${id}. Attempting self-healing sync...`);
 
     // Fallback: Check if the user exists in Supabase Auth
-    // We use the admin client (supabase) to fetch auth data
     const { data: { user: authUser }, error: authError } = await supabase.auth.admin.getUserById(id);
 
     if (authError || !authUser) {
@@ -159,7 +158,7 @@ export const getUserById = async (id: string) => {
         full_name: authUser.user_metadata?.full_name,
         avatar_url: authUser.user_metadata?.avatar_url
       })
-      .select('id, username, email, phone, created_at, last_login_at, status')
+      .select('id, username, email, phone, created_at, kyc_status, kyc_verified_at')
       .single();
 
     if (syncError) {
