@@ -301,6 +301,28 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 
 -- 7. Helper Functions & Triggers
 
+-- Trigger to sync auth.users to public.users
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.users (id, username, email, phone, full_name, avatar_url)
+    VALUES (
+        NEW.id,
+        COALESCE(NEW.raw_user_meta_data->>'username', SPLIT_PART(NEW.email, '@', 1)),
+        NEW.email,
+        NEW.raw_user_meta_data->>'phone',
+        NEW.raw_user_meta_data->>'full_name',
+        NEW.raw_user_meta_data->>'avatar_url'
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
 -- Trigger to update updated_at
 DROP FUNCTION IF EXISTS public.set_updated_at() CASCADE;
 CREATE OR REPLACE FUNCTION public.set_updated_at()

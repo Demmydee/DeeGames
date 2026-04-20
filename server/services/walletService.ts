@@ -12,21 +12,35 @@ export const getWalletByUserId = async (userId: string, token?: string) => {
 
   if (error) {
     if (error.code === 'PGRST116') { // JSON object requested, but no rows were returned
-      console.log(`Wallet not found for user ${userId}, creating one...`);
+      console.log(`Wallet not found for user ${userId}, checking if user exists...`);
+
+      // Verify user exists in public.users first
+      const { data: userExists, error: userError } = await client
+        .from('users')
+        .select('id')
+        .eq('id', userId)
+        .single();
+
+      if (userError || !userExists) {
+        console.error(`User ${userId} not found in public.users. Sync may have failed.`, userError);
+        throw new Error('User profile not found. Please contact support.');
+      }
+
+      console.log(`User ${userId} found, creating missing wallet...`);
       const { data: newWallet, error: createError } = await client
         .from('wallets')
         .insert([{ user_id: userId }])
         .select()
         .single();
-      
+
       if (createError) {
         console.error('Failed to create missing wallet:', createError);
-        throw new Error('Failed to initialize wallet');
+        throw new Error(`Failed to initialize wallet: ${createError.message}`);
       }
       return newWallet;
     }
     console.error('Fetch Wallet Error:', error);
-    throw new Error('Failed to fetch wallet information');
+    throw new Error(`Failed to fetch wallet information: ${error.message}`);
   }
   return data;
 };
