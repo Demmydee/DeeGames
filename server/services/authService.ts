@@ -123,66 +123,88 @@ export const loginUser = async (identifier: string, password: string) => {
   };
 };
 
-export const getUserById = async (id: string) => {
-  const { data: user, error } = await supabase
-    .from('users')
-    .select('id, username, email, phone, created_at, kyc_status, kyc_verified_at')
-    .eq('id', id)
-    .single();
-
-  if (error || !user) {
-    console.warn(`User profile not found in public.users for ID: ${id}. Attempting self-healing sync...`);
-
-    // Fallback: Check if the user exists in Supabase Auth
-    const { data: { user: authUser }, error: authError } = await supabase.auth.admin.getUserById(id);
-
-    if (authError || !authUser) {
-      console.error(`Self-healing failed: User ${id} does not exist in Auth.`, authError);
-      throw { status: 404, message: 'User not found' };
-    }
-
-    // Attempt manual sync to public.users
-    const username = COALESCE(
-      authUser.user_metadata?.username,
-      authUser.email?.split('@')[0],
-      `user_${id.substring(0, 5)}`
-    );
-
-    const { data: newUser, error: syncError } = await supabase
-      .from('users')
-      .insert({
-        id: authUser.id,
-        username: username.toLowerCase(),
-        email: authUser.email?.toLowerCase(),
-        phone: authUser.user_metadata?.phone,
-        full_name: authUser.user_metadata?.full_name,
-        avatar_url: authUser.user_metadata?.avatar_url
-      })
-      .select('id, username, email, phone, created_at, kyc_status, kyc_verified_at')
-      .single();
-
-    if (syncError) {
-      console.error(`Self-healing failed to insert user ${id}:`, syncError);
-      throw { status: 500, message: 'Failed to sync user profile. Please contact support.' };
-    }
-
-    // Also ensure wallet exists
-    await supabase.from('wallets').upsert({ user_id: authUser.id }, { onConflict: 'user_id' });
-
-    console.info(`Self-healing successful for user: ${username} (${id})`);
-    return newUser;
-  }
-
-  return user;
-};
-
-// Simple coalesce helper
-function COALESCE(...args: any[]) {
+// Simple coalesce helper moved for better scoping
+const COALESCE = (...args: any[]) => {
   for (const arg of args) {
     if (arg !== undefined && arg !== null && arg !== '') return arg;
   }
   return null;
-}
+};
+
+export const getUserById = async (id: string) => {
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, username, email, phone, created_at, kyc_status, kyc_verified_at')
+      .eq('id', id)
+      .single();
+
+    if (error || !user) {
+      if (error && error.code !== 'PGRST116') {
+        console.error(`Database error fetching user ${id}:`, error);
+        throw { status: 500, message: 'Database lookup failed' };
+      }
+
+      console.warn(`User profile not found in public.users for ID: ${id}. Attempting self-healing sync...`);
+
+      // Fallback: Check if we have the service key to use admin methods
+      if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        console.error('Self-healing failed: SUPABASE_SERVICE_ROLE_KEY is missing.');
+        throw { status: 404, message: 'User profile not synchronized and admin tools are unavailable.' };
+      }
+
+      // Check if the user exists in Supabase Auth
+      const { data: { user: authUser }, error: authError } = await supabase.auth.admin.getUserById(id);
+
+      if (authError || !authUser) {
+        console.error(`Self-healing failed: User ${id} does not exist in Auth.`, authError);
+        throw { status: 404, message: 'User not found in any system' };
+      }
+
+      // Attempt manual sync to public.users
+      const username = COALESCE(
+        authUser.user_metadata?.username,
+        authUser.email?.split('@')[0],
+        `user_${id.substring(0, 8)}`
+      );
+
+      const { data: newUser, error: syncError } = await supabase
+        .from('users')
+        .insert({
+          id: authUser.id,
+          username: username.toLowerCase(),
+          email: authUser.email?.toLowerCase() || '',
+          phone: authUser.user_metadata?.phone,
+          full_name: authUser.user_metadata?.full_name,
+          avatar_url: authUser.user_metadata?.avatar_url
+        })
+        .select('id, username, email, phone, created_at, kyc_status, kyc_verified_at')
+        .single();
+
+      if (syncError) {
+        console.error(`Self-healing failed to insert user ${id}:`, syncError);
+        throw { status: 500, message: 'Failed to sync user profile. Please contact support.' };
+      }
+
+      // Also ensure wallet exists
+      try {
+        await supabase.from('wallets').upsert({ user_id: authUser.id }, { onConflict: 'user_id' });
+      } catch (walletErr) {
+        console.error(`Self-healing wallet creation failed for user ${id}:`, walletErr);
+        // We don't throw here, as the user profile was successfully created
+      }
+
+      console.info(`Self-healing successful for user: ${username} (${id})`);
+      return newUser;
+    }
+
+    return user;
+  } catch (error: any) {
+    if (error.status) throw error;
+    console.error('getUserById Uncaught Error:', error);
+    throw { status: 500, message: 'Internal server error occurred during user lookup' };
+  }
+};
 
 export const refreshToken = async (refreshToken: string) => {
   const { data, error } = await supabaseAuth.auth.refreshSession({ refresh_token: refreshToken });
