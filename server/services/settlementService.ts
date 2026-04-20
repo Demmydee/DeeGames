@@ -207,22 +207,7 @@ export class SettlementService {
     netPoolKobo: number,
     history: any[] = []
   ) {
-    // 1. Update all participants to their final statuses so redirection logic clears
-    const statusUpdates = rankings.map(r => {
-      let finalStatus: 'winner' | 'defeated' | 'left' = 'defeated';
-      if (r.rank === 1) finalStatus = 'winner';
-      if (r.status === 'left') finalStatus = 'left';
-      
-      return supabase
-        .from('match_participants')
-        .update({ status: finalStatus })
-        .eq('match_id', match.id)
-        .eq('user_id', r.userId);
-    });
-
-    await Promise.all(statusUpdates);
-
-    // 2. We'll use a complex RPC to ensure atomicity for payouts and match status
+    // We'll use a complex RPC to ensure atomicity for payouts, match status, and participant results
     const { error } = await supabase.rpc('settle_match_atomic', {
       p_match_id: match.id,
       p_pay_mode: match.game_request!.pay_mode,
