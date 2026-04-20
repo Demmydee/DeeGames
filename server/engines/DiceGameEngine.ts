@@ -69,7 +69,7 @@ export class DiceGameEngine implements GameEngine {
       // Generate roll server-side
       const roll = this.generateRoll(newState.config.diceCount);
       newState.rolls[userId] = roll;
-
+      
       // Update score immediately
       const participant = newState.participants.find(p => p.userId === userId);
       if (participant) {
@@ -87,7 +87,7 @@ export class DiceGameEngine implements GameEngine {
 
       // Check if all active players have rolled
       const allRolled = newState.activePlayerIds.every(id => newState.rolls[id] !== undefined && newState.rolls[id] !== null);
-
+      
       if (allRolled) {
         this.resolveRound(newState, events);
       }
@@ -105,7 +105,7 @@ export class DiceGameEngine implements GameEngine {
       events.push({ type: 'player_tie_rolled', payload: { userId, roll } });
 
       const allReRolled = newState.tieBreaker.playerIds.every(id => newState.tieBreaker!.rolls[id] !== undefined && newState.tieBreaker!.rolls[id] !== null);
-
+      
       if (allReRolled) {
         this.resolveTieBreaker(newState, events);
       }
@@ -120,7 +120,7 @@ export class DiceGameEngine implements GameEngine {
       events.push({ type: 'player_sudden_death_rolled', payload: { userId, roll } });
 
       const allRolled = newState.tieBreaker.playerIds.every(id => newState.tieBreaker!.rolls[id] !== undefined && newState.tieBreaker!.rolls[id] !== null);
-
+      
       if (allRolled) {
         this.resolveSuddenDeath(newState, events);
       }
@@ -144,7 +144,7 @@ export class DiceGameEngine implements GameEngine {
 
     participant.status = reason === 'left' ? 'left' : 'disconnected';
     participant.defeatReason = reason;
-
+    
     // Remove from active players
     newState.activePlayerIds = newState.activePlayerIds.filter(id => id !== userId);
 
@@ -171,7 +171,7 @@ export class DiceGameEngine implements GameEngine {
       if (allOthersRolled && Object.keys(newState.rolls).length > 0) {
         this.resolveRound(newState, events);
       }
-
+      
       // Check tie-breaker
       if (newState.tieBreaker && newState.tieBreaker.playerIds.includes(userId)) {
         newState.tieBreaker.playerIds = newState.tieBreaker.playerIds.filter(id => id !== userId);
@@ -235,7 +235,7 @@ export class DiceGameEngine implements GameEngine {
         playerIds: lowestRollers.map(r => r.id),
         rolls: {}
       };
-
+      
       state.history.push({
         round: state.currentRound,
         isTieBreakerInitial: true,
@@ -247,7 +247,7 @@ export class DiceGameEngine implements GameEngine {
       // Single lowest roller eliminated
       const eliminatedId = lowestRollers[0].id;
       state.lastRoundResults = { ...state.rolls };
-
+      
       state.history.push({
         round: state.currentRound,
         eliminatedPlayerId: eliminatedId,
@@ -255,7 +255,7 @@ export class DiceGameEngine implements GameEngine {
       });
 
       this.eliminatePlayer(state, eliminatedId, events);
-
+      
       // Advance round if not finished
       if (state.activePlayerIds.length > 1) {
         state.currentRound++;
@@ -272,7 +272,7 @@ export class DiceGameEngine implements GameEngine {
     if (!state.tieBreaker) return;
 
     const rolls = state.tieBreaker.playerIds.map(id => ({ id, roll: state.tieBreaker!.rolls[id]! }));
-
+    
     if (rolls.length === 0) {
         state.tieBreaker = undefined;
         // Reset turn if tie breaker was emptied
@@ -286,7 +286,7 @@ export class DiceGameEngine implements GameEngine {
     if (lowestRollers.length > 1 && state.tieBreaker.playerIds.length > 1) {
       // Still tied
       state.lastRoundResults = { ...state.tieBreaker.rolls };
-
+      
       state.history.push({
         round: state.currentRound,
         isTieBreakerContinued: true,
@@ -300,7 +300,7 @@ export class DiceGameEngine implements GameEngine {
       // Tie broken
       const eliminatedId = lowestRollers[0].id;
       state.lastRoundResults = { ...state.tieBreaker.rolls };
-
+      
       state.history.push({
         round: state.currentRound,
         isTieBreakerResolved: true,
@@ -328,10 +328,10 @@ export class DiceGameEngine implements GameEngine {
       participant.status = 'eliminated';
       participant.defeatReason = 'eliminated';
       participant.eliminatedRound = state.currentRound;
-
+      
       const rank = this.getNextAvailableLowestRank(state);
       participant.rank = rank;
-
+      
       state.activePlayerIds = state.activePlayerIds.filter(id => id !== userId);
       events.push({ type: 'player_eliminated', payload: { userId, rank } });
     }
@@ -339,7 +339,7 @@ export class DiceGameEngine implements GameEngine {
 
   private resolveMarathonRound(state: GameState, events: any[]) {
     // Scores are already updated in processMove for Marathon
-
+    
     state.history.push({
       round: state.currentRound,
       rolls: { ...state.rolls } as Record<string, number>
@@ -398,8 +398,8 @@ export class DiceGameEngine implements GameEngine {
       const winnerId = winners[0].id;
       // Adjust score slightly to break tie for ranking logic
       const winner = state.participants.find(p => p.userId === winnerId);
-      if (winner) winner.score += 0.1;
-
+      if (winner) winner.score += 0.1; 
+      
       state.tieBreaker = undefined;
       state.currentTurnPlayerId = null;
       this.finalizeGame(state, events);
@@ -409,7 +409,7 @@ export class DiceGameEngine implements GameEngine {
   private finalizeGame(state: GameState, events: any[]) {
     state.status = 'completed';
     state.currentTurnPlayerId = null;
-
+    
     // Rank remaining active players
     const activeParticipants = state.participants
       .filter(p => p.status === 'active')
@@ -422,7 +422,7 @@ export class DiceGameEngine implements GameEngine {
     // Ensure all participants have a rank
     const unranked = state.participants.filter(p => !p.rank);
     // Sort unranked by status/score/time if needed, but they should already have ranks from defeat
-
+    
     events.push({ type: 'game_completed', payload: { rankings: this.getRankings(state) } });
   }
 

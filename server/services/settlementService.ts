@@ -78,7 +78,7 @@ export class SettlementService {
 
   static async refundMatch(match: Match, rankings: RankedParticipant[]): Promise<SettlementResult> {
     const wagerKobo = Math.round(match.game_request!.amount * 100);
-
+    
     try {
       const { data, error } = await supabase.rpc('refund_match_wagers_atomic', {
         p_match_id: match.id,
@@ -151,7 +151,7 @@ export class SettlementService {
   private static calculateSplitPayouts(rankings: RankedParticipant[], wagerKobo: number, netPoolKobo: number): ParticipantPayout[] {
     const totalPlayers = rankings.length;
     const winnersCount = Math.ceil(totalPlayers / 2);
-
+    
     // Descending triangular weights
     // Rank 1: winnersCount, Rank 2: winnersCount - 1, ... Rank winnersCount: 1
     const weights: Record<number, number> = {};
@@ -164,12 +164,12 @@ export class SettlementService {
 
     const payouts = rankings.map(r => {
       const rank = r.rank || 0;
-      const isWinner = rank <= winnersCount && r.status === 'active'; // Only active players can win?
+      const isWinner = rank <= winnersCount && r.status === 'active'; // Only active players can win? 
       // Actually, if someone is eliminated but still in top half, do they win?
       // Usually "Split" implies top half of those who finished.
       // But Sudden Drop eliminates. Marathon ranks all.
       // Let's stick to rank.
-
+      
       const weight = weights[rank] || 0;
       let payoutKobo = 0;
       if (weight > 0) {
@@ -199,8 +199,8 @@ export class SettlementService {
   }
 
   private static async executeAtomicSettlement(
-    match: Match,
-    rankings: RankedParticipant[],
+    match: Match, 
+    rankings: RankedParticipant[], 
     payouts: ParticipantPayout[],
     totalPoolKobo: number,
     houseCutKobo: number,
@@ -212,7 +212,7 @@ export class SettlementService {
       let finalStatus: 'winner' | 'defeated' | 'left' = 'defeated';
       if (r.rank === 1) finalStatus = 'winner';
       if (r.status === 'left') finalStatus = 'left';
-
+      
       return supabase
         .from('match_participants')
         .update({ status: finalStatus })

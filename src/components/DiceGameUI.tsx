@@ -54,7 +54,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
   useEffect(() => {
     fetchState();
     const interval = setInterval(fetchState, 3000);
-
+    
     // Heartbeat
     const hbInterval = setInterval(async () => {
       try {
@@ -75,10 +75,10 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
     setRolling(true);
     setError(null);
     try {
-      const moveType = gameState.tieBreaker?.playerIds.includes(user?.id)
+      const moveType = gameState.tieBreaker?.playerIds.includes(user?.id) 
         ? (gameState.variant === 'sudden_drop' ? 'tie_reroll' : 'sudden_death_roll')
         : 'roll';
-
+        
       await gameApi.move(matchId, { type: moveType });
       await fetchState();
     } catch (err: any) {
@@ -100,7 +100,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
   const hasRolled = gameState.rolls[user?.id!] !== undefined && gameState.rolls[user?.id!] !== null;
   const isTieBreaker = gameState.tieBreaker?.playerIds.includes(user?.id);
   const hasTieRolled = isTieBreaker && gameState.tieBreaker.rolls[user?.id!] !== undefined && gameState.tieBreaker.rolls[user?.id!] !== null;
-
+  
   const isMyTurn = gameState.currentTurnPlayerId === user?.id;
   const currentTurnPlayer = gameState.participants.find((p: any) => p.userId === gameState.currentTurnPlayerId);
 
@@ -110,9 +110,9 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
   const displayRoll = currentRoll !== undefined && currentRoll !== null ? currentRoll : (Object.keys(gameState.rolls).length === 0 ? lastRoll : null);
   const hasDisplayRoll = displayRoll !== undefined && displayRoll !== null;
 
-  const canRoll = gameState.status === 'active' &&
+  const canRoll = gameState.status === 'active' && 
                  isMyTurn &&
-                 gameState.activePlayerIds.includes(user?.id) &&
+                 gameState.activePlayerIds.includes(user?.id) && 
                  (!hasRolled || (isTieBreaker && !hasTieRolled));
 
   return (
@@ -151,15 +151,15 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
           {gameState.participants.map((p: any) => {
             const presence = matchParticipants?.find(mp => mp.user_id === p.userId);
             const isCurrentTurn = gameState.currentTurnPlayerId === p.userId;
-
+            
             return (
-              <div
+              <div 
                 key={p.userId}
                 className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${
                   isCurrentTurn
                     ? 'bg-emerald-500/10 border-emerald-500/40 ring-1 ring-emerald-500/20'
-                    : p.status === 'active'
-                      ? 'bg-white/5 border-white/10'
+                    : p.status === 'active' 
+                      ? 'bg-white/5 border-white/10' 
                       : 'bg-red-500/5 border-red-500/20 opacity-60'
                 }`}
               >
@@ -206,7 +206,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
           {/* Dice Display */}
           <div className="aspect-video bg-black/40 border border-white/5 rounded-3xl flex items-center justify-center relative overflow-hidden">
             <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
-
+            
             <AnimatePresence mode="wait">
               {hasDisplayRoll ? (
                 <motion.div

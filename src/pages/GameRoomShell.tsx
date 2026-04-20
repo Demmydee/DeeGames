@@ -220,10 +220,10 @@ const GameRoomShell: React.FC = () => {
           {/* Game Engine UI */}
           <div className="w-full h-full overflow-y-auto flex items-center justify-center">
             {match.game_type?.name.toLowerCase().includes('dice') ? (
-              <DiceGameUI
-                matchId={id!}
+              <DiceGameUI 
+                matchId={id!} 
                 matchParticipants={match.participants}
-                onGameEnd={(result) => setMatchResult(result)}
+                onGameEnd={(result) => setMatchResult(result)} 
               />
             ) : (
               <div className="relative z-10 text-center p-8 max-w-lg">
@@ -239,7 +239,7 @@ const GameRoomShell: React.FC = () => {
                     Game Engine Shell
                   </h1>
                   <p className="text-gray-400 text-lg leading-relaxed">
-                    The multiplayer orchestration is active. Wagers are locked.
+                    The multiplayer orchestration is active. Wagers are locked. 
                     The {match.game_type?.name} module will be plugged in here in the next phase.
                   </p>
                 </motion.div>
@@ -275,10 +275,10 @@ const GameRoomShell: React.FC = () => {
                 <span className="text-xs font-black uppercase tracking-widest text-white/60">Match Chat</span>
               </div>
             </div>
-            <Chat
-              contextType="match"
-              contextId={id!}
-              className="flex-1 border-0 rounded-none bg-transparent"
+            <Chat 
+              contextType="match" 
+              contextId={id!} 
+              className="flex-1 border-0 rounded-none bg-transparent" 
             />
           </div>
 
@@ -316,9 +316,9 @@ const GameRoomShell: React.FC = () => {
       {/* Match Result Overlay */}
       <AnimatePresence>
         {matchResult && (
-          <MatchResultScreen
-            result={matchResult}
-            onClose={() => setMatchResult(null)}
+          <MatchResultScreen 
+            result={matchResult} 
+            onClose={() => setMatchResult(null)} 
             onExit={handleLeave}
           />
         )}

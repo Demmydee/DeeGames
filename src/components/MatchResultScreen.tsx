@@ -25,11 +25,11 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
   const { user } = useAuth();
 
   // Robust winner detection
-  const myRanking = result.rankings?.find((r: any) =>
+  const myRanking = result.rankings?.find((r: any) => 
     (r.userId?.toString().toLowerCase() === user?.id?.toString().toLowerCase()) ||
     (r.id?.toString().toLowerCase() === user?.id?.toString().toLowerCase())
   );
-
+  
   // Use the rank from rankings or the isWinner flag if provided
   const isWinner = myRanking?.rank === 1 || myRanking?.isWinner === true;
   const isTie = result.rankings?.filter((r: any) => r.rank === 1).length > 1;
@@ -48,29 +48,29 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
             isWinner ? 'bg-yellow-500/10' : 'bg-red-500/5'
           }`}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/5 to-transparent opacity-20" />
-
+            
             <motion.div
               initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
               animate={{ scale: 1, opacity: 1, rotate: isWinner ? 12 : -6 }}
               transition={{ type: 'spring', damping: 10, stiffness: 100 }}
               className={`relative z-10 w-40 h-40 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10 shadow-2xl transition-all duration-700 ${
-                isWinner
-                  ? 'bg-gradient-to-br from-yellow-300 via-yellow-500 to-amber-700 shadow-[0_0_50px_rgba(234,179,8,0.4)]'
+                isWinner 
+                  ? 'bg-gradient-to-br from-yellow-300 via-yellow-500 to-amber-700 shadow-[0_0_50px_rgba(234,179,8,0.4)]' 
                   : 'bg-gradient-to-br from-gray-700 to-gray-900 shadow-xl grayscale'
               }`}
             >
               <Trophy className={`w-20 h-20 ${isWinner ? 'text-black' : 'text-white/20'}`} />
               {isWinner && (
-                <motion.div
+                <motion.div 
                   animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.6, 0.3] }}
                   transition={{ duration: 3, repeat: Infinity }}
-                  className="absolute inset-0 bg-yellow-400 rounded-[2.5rem] filter blur-3xl -z-10"
+                  className="absolute inset-0 bg-yellow-400 rounded-[2.5rem] filter blur-3xl -z-10" 
                 />
               )}
             </motion.div>
-
+            
             <div className="relative z-10">
-              <motion.h1
+              <motion.h1 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={`text-8xl font-black uppercase italic tracking-tighter mb-4 leading-none ${
@@ -92,13 +92,13 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
 
           <div className="p-10 space-y-12">
             {/* Earnings Summary */}
-            <motion.div
+            <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
               className={`p-10 rounded-[2.5rem] border-2 flex items-center justify-between shadow-2xl relative overflow-hidden group ${
-                profitKobo >= 0
-                  ? 'bg-[#0f1715] border-emerald-500/30'
+                profitKobo >= 0 
+                  ? 'bg-[#0f1715] border-emerald-500/30' 
                   : 'bg-[#1a1111] border-red-500/20'
               }`}
             >
@@ -137,7 +137,7 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
                 </div>
                 <div className="grid gap-6">
                   {result.history.map((round: any, idx: number) => (
-                    <motion.div
+                    <motion.div 
                       key={idx}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -203,16 +203,16 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.5 + (index * 0.05) }}
                     className={`p-6 rounded-3xl border transition-all hover:scale-[1.02] duration-300 ${
-                      p.rank === 1
-                        ? 'bg-emerald-500/10 border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.1)]'
+                      p.rank === 1 
+                        ? 'bg-emerald-500/10 border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.1)]' 
                         : 'bg-white/5 border-white/10 opacity-90'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-5">
                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl ${
-                          p.rank === 1
-                            ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black shadow-lg'
+                          p.rank === 1 
+                            ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black shadow-lg' 
                             : 'bg-white/5 text-gray-400'
                         }`}>
                           {p.rank === 1 ? <Award className="w-8 h-8" /> : p.rank}

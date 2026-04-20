@@ -58,7 +58,7 @@ export const getMatchResult = async (req: Request, res: Response) => {
       `)
       .eq('match_id', matchId)
       .single();
-
+    
     if (error) throw error;
 
     // Merge payout data into rankings for easier frontend consumption

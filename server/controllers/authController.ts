@@ -28,3 +28,14 @@ export const getMe = async (req: any, res: Response) => {
     res.status(error.status || 404).json({ error: error.message });
   }
 };
+
+export const refresh = async (req: Request, res: Response) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) throw { status: 400, message: 'Refresh token required' };
+    const result = await authService.refreshToken(refreshToken);
+    res.status(200).json(result);
+  } catch (error: any) {
+    res.status(error.status || 401).json({ error: error.message });
+  }
+};

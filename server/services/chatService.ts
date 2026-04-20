@@ -47,14 +47,14 @@ export const getChatMessages = async (chatRoomId: string, limit = 50) => {
       .limit(limit);
 
     if (rawError) throw new Error(`Failed to fetch raw chat messages: ${rawError.message}`);
-
+    
     if (rawMessages && rawMessages.length > 0) {
       const userIds = [...new Set(rawMessages.map(m => m.sender_user_id))];
       const { data: users, error: userError } = await supabase
         .from('users')
         .select('id, username')
         .in('id', userIds);
-
+      
       if (!userError && users) {
         const userMap = Object.fromEntries(users.map(u => [u.id, u]));
         messages = rawMessages.map(m => ({

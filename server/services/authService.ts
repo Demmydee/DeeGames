@@ -127,3 +127,22 @@ export const getUserById = async (id: string) => {
 
   return user;
 };
+
+export const refreshToken = async (refreshToken: string) => {
+  const { data, error } = await supabaseAuth.auth.refreshSession({ refresh_token: refreshToken });
+
+  if (error) {
+    console.error('Refresh Token Error:', error);
+    throw { status: 401, message: 'Session expired. Please log in again.' };
+  }
+
+  return {
+    message: 'Session refreshed',
+    user: { 
+      id: data.user?.id, 
+      email: data.user?.email,
+      username: data.user?.user_metadata?.username 
+    },
+    session: data.session
+  };
+};
