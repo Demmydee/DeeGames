@@ -14,17 +14,26 @@ export const registerUser = async (userData: any) => {
     .rpc('check_user_uniqueness', {
       p_username: lowerUsername,
       p_email: lowerEmail,
-      p_phone: phone
+      p_phone: phone || null
     });
 
   if (checkError) {
     console.error('Pre-registration check error:', checkError);
+    // If the RPC itself fails (e.g. not found), we should probably stop to avoid the "Database error" later
+    throw { status: 500, message: 'Registration service is temporarily unavailable. Please try again soon.' };
   }
 
   if (uniqueness) {
-    if (uniqueness.username_exists) throw { status: 400, message: 'Username is already taken' };
-    if (uniqueness.email_exists) throw { status: 400, message: 'Email is already registered' };
-    if (uniqueness.phone_exists) throw { status: 400, message: 'Phone number is already registered' };
+    // Handle both old boolean format and new jsonb format for robustness
+    if (typeof uniqueness === 'boolean') {
+      if (!uniqueness) {
+        throw { status: 400, message: 'Username, email or phone is already registered' };
+      }
+    } else {
+      if (uniqueness.username_exists) throw { status: 400, message: 'Username is already taken' };
+      if (uniqueness.email_exists) throw { status: 400, message: 'Email is already registered' };
+      if (uniqueness.phone_exists) throw { status: 400, message: 'Phone number is already registered' };
+    }
   }
 
   // Sign up with Supabase Auth

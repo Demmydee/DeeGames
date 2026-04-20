@@ -308,15 +308,16 @@ BEGIN
     INSERT INTO public.users (id, username, email, phone, full_name, avatar_url)
     VALUES (
         NEW.id,
-        COALESCE(NEW.raw_user_meta_data->>'username', SPLIT_PART(NEW.email, '@', 1)),
+        COALESCE(NULLIF(NEW.raw_user_meta_data->>'username', ''), SPLIT_PART(NEW.email, '@', 1)),
         NEW.email,
-        NEW.raw_user_meta_data->>'phone',
-        NEW.raw_user_meta_data->>'full_name',
-        NEW.raw_user_meta_data->>'avatar_url'
-    );
+        NULLIF(NEW.raw_user_meta_data->>'phone', ''),
+        NULLIF(NEW.raw_user_meta_data->>'full_name', ''),
+        NULLIF(NEW.raw_user_meta_data->>'avatar_url', '')
+    )
+    ON CONFLICT (id) DO NOTHING;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -331,7 +332,7 @@ BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Wallets setup
 DROP FUNCTION IF EXISTS public.update_wallet_total_balance() CASCADE;
@@ -342,7 +343,7 @@ BEGIN
     NEW.updated_at := NOW();
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 DROP TRIGGER IF EXISTS on_wallet_balance_change ON public.wallets;
 CREATE TRIGGER on_wallet_balance_change
@@ -353,10 +354,11 @@ DROP FUNCTION IF EXISTS public.handle_new_user_wallet() CASCADE;
 CREATE OR REPLACE FUNCTION public.handle_new_user_wallet()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.wallets (user_id) VALUES (NEW.id);
+    INSERT INTO public.wallets (user_id) VALUES (NEW.id)
+    ON CONFLICT (user_id) DO NOTHING;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 DROP TRIGGER IF EXISTS on_user_created_wallet ON public.users;
 CREATE TRIGGER on_user_created_wallet
@@ -366,16 +368,23 @@ FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user_wallet();
 -- Uniqueness tracker for registration
 DROP FUNCTION IF EXISTS public.check_user_uniqueness(text, text, text);
 CREATE OR REPLACE FUNCTION public.check_user_uniqueness(p_username text, p_email text, p_phone text)
-RETURNS boolean AS $$
+RETURNS jsonb AS $$
+DECLARE
+    v_username_exists boolean;
+    v_email_exists boolean;
+    v_phone_exists boolean;
 BEGIN
-    RETURN NOT EXISTS (
-        SELECT 1 FROM public.users 
-        WHERE LOWER(username) = LOWER(p_username) 
-           OR LOWER(email) = LOWER(p_email) 
-           OR phone = p_phone
+    SELECT EXISTS (SELECT 1 FROM public.users WHERE LOWER(username) = LOWER(p_username)) INTO v_username_exists;
+    SELECT EXISTS (SELECT 1 FROM public.users WHERE LOWER(email) = LOWER(p_email)) INTO v_email_exists;
+    SELECT EXISTS (SELECT 1 FROM public.users WHERE phone = p_phone) INTO v_phone_exists;
+
+    RETURN jsonb_build_object(
+        'username_exists', v_username_exists,
+        'email_exists', v_email_exists,
+        'phone_exists', v_phone_exists
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 8. Atomic RPCs
 
