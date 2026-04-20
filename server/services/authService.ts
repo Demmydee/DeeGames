@@ -130,12 +130,60 @@ export const getUserById = async (id: string) => {
     .eq('id', id)
     .single();
 
-  if (!user || error) {
-    throw { status: 404, message: 'User not found' };
+  if (error || !user) {
+    console.warn(`User profile not found in public.users for ID: ${id}. Attempting self-healing sync...`);
+
+    // Fallback: Check if the user exists in Supabase Auth
+    // We use the admin client (supabase) to fetch auth data
+    const { data: { user: authUser }, error: authError } = await supabase.auth.admin.getUserById(id);
+
+    if (authError || !authUser) {
+      console.error(`Self-healing failed: User ${id} does not exist in Auth.`, authError);
+      throw { status: 404, message: 'User not found' };
+    }
+
+    // Attempt manual sync to public.users
+    const username = COALESCE(
+      authUser.user_metadata?.username,
+      authUser.email?.split('@')[0],
+      `user_${id.substring(0, 5)}`
+    );
+
+    const { data: newUser, error: syncError } = await supabase
+      .from('users')
+      .insert({
+        id: authUser.id,
+        username: username.toLowerCase(),
+        email: authUser.email?.toLowerCase(),
+        phone: authUser.user_metadata?.phone,
+        full_name: authUser.user_metadata?.full_name,
+        avatar_url: authUser.user_metadata?.avatar_url
+      })
+      .select('id, username, email, phone, created_at, last_login_at, status')
+      .single();
+
+    if (syncError) {
+      console.error(`Self-healing failed to insert user ${id}:`, syncError);
+      throw { status: 500, message: 'Failed to sync user profile. Please contact support.' };
+    }
+
+    // Also ensure wallet exists
+    await supabase.from('wallets').upsert({ user_id: authUser.id }, { onConflict: 'user_id' });
+
+    console.info(`Self-healing successful for user: ${username} (${id})`);
+    return newUser;
   }
 
   return user;
 };
+
+// Simple coalesce helper
+function COALESCE(...args: any[]) {
+  for (const arg of args) {
+    if (arg !== undefined && arg !== null && arg !== '') return arg;
+  }
+  return null;
+}
 
 export const refreshToken = async (refreshToken: string) => {
   const { data, error } = await supabaseAuth.auth.refreshSession({ refresh_token: refreshToken });

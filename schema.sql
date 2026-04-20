@@ -2,6 +2,7 @@
 -- This script contains all tables, functions, and policies needed for the application.
 
 -- 1. Explicit cleanup of accidental tables/objects from previous failed runs
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 DROP TABLE IF EXISTS public.v_wallet_id, public.v_user_wallet_id, public.v_result_id, public.v_trans_id CASCADE;
 DROP TABLE IF EXISTS public._l_target_wallet_id, public._l_result_id, public._l_trans_id, public._l_payout CASCADE;
 
@@ -19,6 +20,10 @@ CREATE TABLE IF NOT EXISTS public.users (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Case-insensitive uniqueness for critical fields
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_lower ON public.users (LOWER(username));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON public.users (LOWER(email));
 
 -- 3. Wallets & Transactions
 CREATE TABLE IF NOT EXISTS public.wallets (
@@ -180,7 +185,7 @@ CREATE TABLE IF NOT EXISTS public.match_participants (
     joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     left_at TIMESTAMPTZ,
     reconnected_at TIMESTAMPTZ,
-    countdown_expires_at TIMESTAMPTZ, 
+    countdown_expires_at TIMESTAMPTZ,
     disconnect_detected_at TIMESTAMPTZ,
     UNIQUE(match_id, user_id)
 );
@@ -301,20 +306,43 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 
 -- 7. Helper Functions & Triggers
 
--- Trigger to sync auth.users to public.users
+-- Single robust trigger to sync auth.users to public.users AND create wallet
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.users (id, username, email, phone, full_name, avatar_url)
-    VALUES (
-        NEW.id,
-        COALESCE(NULLIF(NEW.raw_user_meta_data->>'username', ''), SPLIT_PART(NEW.email, '@', 1)),
-        NEW.email,
-        NULLIF(NEW.raw_user_meta_data->>'phone', ''),
-        NULLIF(NEW.raw_user_meta_data->>'full_name', ''),
-        NULLIF(NEW.raw_user_meta_data->>'avatar_url', '')
-    )
-    ON CONFLICT (id) DO NOTHING;
+    -- 1. Sync to public.users
+    -- Using internal BEGIN/EXCEPTION to ensure Auth registration doesn't fail
+    -- if there's a constraint violation in public.users (e.g. duplicate username from deleted account)
+    BEGIN
+        INSERT INTO public.users (id, username, email, phone, full_name, avatar_url)
+        VALUES (
+            NEW.id,
+            COALESCE(LOWER(NULLIF(NEW.raw_user_meta_data->>'username', '')), SPLIT_PART(LOWER(NEW.email), '@', 1)),
+            LOWER(COALESCE(NEW.email, '')),
+            NULLIF(NEW.raw_user_meta_data->>'phone', ''),
+            NULLIF(NEW.raw_user_meta_data->>'full_name', ''),
+            NULLIF(NEW.raw_user_meta_data->>'avatar_url', '')
+        )
+        ON CONFLICT (id) DO UPDATE SET
+            username = EXCLUDED.username,
+            email = EXCLUDED.email,
+            phone = EXCLUDED.phone,
+            full_name = EXCLUDED.full_name,
+            avatar_url = EXCLUDED.avatar_url,
+            updated_at = NOW();
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'Registration Trigger Failure (Users Sync): %, Err: %', NEW.id, SQLERRM;
+    END;
+
+    -- 2. Create Wallet
+    BEGIN
+        INSERT INTO public.wallets (user_id)
+        VALUES (NEW.id)
+        ON CONFLICT (user_id) DO NOTHING;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'Registration Trigger Failure (Wallet Creation): %, Err: %', NEW.id, SQLERRM;
+    END;
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
@@ -324,8 +352,7 @@ CREATE TRIGGER on_auth_user_created
 AFTER INSERT ON auth.users
 FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- Trigger to update updated_at
-DROP FUNCTION IF EXISTS public.set_updated_at() CASCADE;
+-- Trigger for updated_at
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -334,8 +361,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- Wallets setup
-DROP FUNCTION IF EXISTS public.update_wallet_total_balance() CASCADE;
+-- Wallet triggers
 CREATE OR REPLACE FUNCTION public.update_wallet_total_balance()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -350,20 +376,9 @@ CREATE TRIGGER on_wallet_balance_change
 BEFORE INSERT OR UPDATE ON public.wallets
 FOR EACH ROW EXECUTE PROCEDURE public.update_wallet_total_balance();
 
-DROP FUNCTION IF EXISTS public.handle_new_user_wallet() CASCADE;
-CREATE OR REPLACE FUNCTION public.handle_new_user_wallet()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO public.wallets (user_id) VALUES (NEW.id)
-    ON CONFLICT (user_id) DO NOTHING;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
-
+-- Cleanup orphaned triggers/functions
 DROP TRIGGER IF EXISTS on_user_created_wallet ON public.users;
-CREATE TRIGGER on_user_created_wallet
-AFTER INSERT ON public.users
-FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user_wallet();
+DROP FUNCTION IF EXISTS public.handle_new_user_wallet() CASCADE;
 
 -- Uniqueness tracker for registration
 DROP FUNCTION IF EXISTS public.check_user_uniqueness(text, text, text);
@@ -371,20 +386,26 @@ CREATE OR REPLACE FUNCTION public.check_user_uniqueness(p_username text, p_email
 RETURNS jsonb AS $$
 DECLARE
     v_username_exists boolean;
-    v_email_exists boolean;
+    v_email_exists_public boolean;
+    v_email_exists_auth boolean;
     v_phone_exists boolean;
 BEGIN
+    -- Check local public.users
     SELECT EXISTS (SELECT 1 FROM public.users WHERE LOWER(username) = LOWER(p_username)) INTO v_username_exists;
-    SELECT EXISTS (SELECT 1 FROM public.users WHERE LOWER(email) = LOWER(p_email)) INTO v_email_exists;
+    SELECT EXISTS (SELECT 1 FROM public.users WHERE LOWER(email) = LOWER(p_email)) INTO v_email_exists_public;
     SELECT EXISTS (SELECT 1 FROM public.users WHERE phone = p_phone) INTO v_phone_exists;
+
+    -- Also check auth.users directly to catch users who exist but whose sync failed
+    -- This helps prevent the "Database error" by failing early with a clean message
+    SELECT EXISTS (SELECT 1 FROM auth.users WHERE LOWER(email) = LOWER(p_email)) INTO v_email_exists_auth;
 
     RETURN jsonb_build_object(
         'username_exists', v_username_exists,
-        'email_exists', v_email_exists,
+        'email_exists', v_email_exists_public OR v_email_exists_auth,
         'phone_exists', v_phone_exists
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth;
 
 -- 8. Atomic RPCs
 
