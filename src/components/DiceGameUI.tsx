@@ -10,7 +10,8 @@ import {
   CheckCircle2,
   Clock,
   Zap,
-  ArrowRight
+  ArrowRight,
+  History
 } from 'lucide-react';
 import { gameApi } from '../services/multiplayerApi';
 import { useAuth } from '../context/AuthContext';
