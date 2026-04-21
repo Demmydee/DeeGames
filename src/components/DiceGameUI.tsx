@@ -148,54 +148,101 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Players List */}
         <div className="lg:col-span-1 space-y-3">
-          <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-2">Participants</h3>
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Participants / History</h3>
+            <History className="w-3 h-3 text-gray-500" />
+          </div>
           {gameState.participants.map((p: any) => {
             const presence = matchParticipants?.find(mp => mp.user_id === p.userId);
             const isCurrentTurn = gameState.currentTurnPlayerId === p.userId;
-            
+
             return (
-              <div 
+              <div
                 key={p.userId}
-                className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${
+                className={`p-4 rounded-2xl border transition-all flex flex-col gap-3 ${
                   isCurrentTurn
-                    ? 'bg-emerald-500/10 border-emerald-500/40 ring-1 ring-emerald-500/20'
-                    : p.status === 'active' 
-                      ? 'bg-white/5 border-white/10' 
+                    ? 'bg-emerald-500/10 border-emerald-500/40 ring-1 ring-emerald-500/20 shadow-lg shadow-emerald-500/5'
+                    : p.status === 'active'
+                      ? 'bg-white/5 border-white/10'
                       : 'bg-red-500/5 border-red-500/20 opacity-60'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-[10px] relative ${
-                    p.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-800 text-gray-500'
-                  }`}>
-                    {p.username.substring(0, 2).toUpperCase()}
-                    {presence?.is_away && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border-2 border-black" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="text-xs font-bold text-white leading-tight">{p.username}</div>
-                      {isCurrentTurn && <ArrowRight className="w-3 h-3 text-emerald-500" />}
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-[10px] relative ${
+                      p.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-800 text-gray-500'
+                    }`}>
+                      {p.username.substring(0, 2).toUpperCase()}
+                      {presence?.is_away && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border-2 border-black" />
+                      )}
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <div className={`text-[8px] uppercase tracking-widest ${presence?.is_away ? 'text-orange-400' : 'text-gray-500'}`}>
-                        {presence?.is_away ? 'Away' : p.status}
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="text-xs font-bold text-white leading-tight">{p.username}</div>
+                        {isCurrentTurn && <ArrowRight className="w-3 h-3 text-emerald-500" />}
                       </div>
-                      {presence?.is_away && presence.away_since && (
-                        <div className="text-[8px] font-mono text-orange-500 font-bold">
-                          {Math.max(0, 300 - Math.floor((Date.now() - new Date(presence.away_since).getTime()) / 1000))}s
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <div className={`text-[8px] uppercase tracking-widest ${presence?.is_away ? 'text-orange-400' : 'text-gray-500'}`}>
+                          {presence?.is_away ? 'Away' : p.status}
                         </div>
-                      )}
-                      {p.rank && (
-                        <div className="text-[8px] px-1 bg-white/10 text-gray-400 rounded">Rank {p.rank}</div>
-                      )}
+                        {presence?.is_away && presence.away_since && (
+                          <div className="text-[8px] font-mono text-orange-500 font-bold">
+                            {Math.max(0, 300 - Math.floor((Date.now() - new Date(presence.away_since).getTime()) / 1000))}s
+                          </div>
+                        )}
+                        {p.rank && (
+                          <div className="text-[8px] px-1 bg-white/10 text-gray-400 rounded">Rank {p.rank}</div>
+                        )}
+                      </div>
                     </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-black text-white">{p.score.toFixed(0)}</div>
+                    <div className="text-[8px] text-gray-500 uppercase tracking-widest leading-none mt-0.5">Total</div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xs font-black text-white">{p.score.toFixed(0)}</div>
-                  <div className="text-[8px] text-gray-500 uppercase tracking-widest leading-none mt-0.5">Score</div>
+
+                {/* Round-by-Round History for this Player */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-white/5">
+                  <div className="text-[8px] font-bold text-gray-600 uppercase tracking-tighter mr-1 flex items-center gap-1">
+                    <History className="w-2 h-2" />
+                    Rolls
+                  </div>
+                  {gameState.history.map((round: any, rIdx: number) => {
+                    const playerRoll = round.rolls[p.userId];
+                    if (playerRoll === undefined) return null;
+                    const isElimRound = round.eliminatedPlayerId === p.userId;
+                    return (
+                      <div
+                        key={rIdx}
+                        className={`min-w-[22px] h-[22px] rounded flex items-center justify-center text-[9px] font-mono font-bold transition-colors ${
+                          isElimRound ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-white/5 text-gray-400 border border-white/10'
+                        }`}
+                        title={`Round ${round.round}`}
+                      >
+                        {playerRoll}
+                      </div>
+                    );
+                  })}
+                  {/* Current Round Pending Roll */}
+                  {gameState.rolls[p.userId] !== undefined && (
+                    <motion.div
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="min-w-[22px] h-[22px] rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-[9px] font-mono font-bold"
+                      title="Current Round"
+                    >
+                      {gameState.rolls[p.userId]}
+                    </motion.div>
+                  )}
+                  {/* Status Indicator */}
+                  {p.status === 'eliminated' && (
+                    <span className="text-[8px] font-black text-red-500/60 ml-auto uppercase italic">ELIMINATED</span>
+                  )}
+                  {p.status === 'active' && isCurrentTurn && (
+                    <span className="text-[8px] font-black text-emerald-500/60 ml-auto uppercase italic animate-pulse">ROLLING...</span>
+                  )}
                 </div>
               </div>
             );
@@ -207,7 +254,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
           {/* Dice Display */}
           <div className="aspect-video bg-black/40 border border-white/5 rounded-3xl flex items-center justify-center relative overflow-hidden">
             <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
-            
+
             <AnimatePresence mode="wait">
               {hasDisplayRoll ? (
                 <motion.div
@@ -263,8 +310,8 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
             onClick={handleRoll}
             disabled={!canRoll || rolling}
             className={`w-full py-6 rounded-2xl font-black uppercase italic tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 ${
-              canRoll 
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/20' 
+              canRoll
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/20'
                 : 'bg-white/5 text-gray-600 cursor-not-allowed border border-white/5'
             }`}
           >
@@ -293,7 +340,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                 const p = gameState.participants.find((p: any) => p.userId === id);
                 const rolled = gameState.rolls[id] !== undefined && gameState.rolls[id] !== null;
                 return (
-                  <div 
+                  <div
                     key={id}
                     className={`px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${
                       rolled ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-gray-500'
@@ -304,45 +351,6 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                   </div>
                 );
               })}
-            </div>
-          </div>
-
-          {/* Detailed Game History */}
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 overflow-hidden flex flex-col">
-            <div className="flex items-center gap-2 mb-4">
-              <History className="w-3 h-3 text-emerald-500" />
-              <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-none">Live Game Log</h4>
-            </div>
-            <div className="max-h-[200px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-              {[...gameState.history].reverse().map((round: any, idx: number) => (
-                <div key={idx} className="p-3 bg-white/[0.02] border border-white/5 rounded-xl text-[10px]">
-                  <div className="flex justify-between items-center mb-2 border-b border-white/5 pb-1">
-                    <span className="font-black text-emerald-500 uppercase">Round {round.round}</span>
-                    {round.eliminatedPlayerId && (
-                      <span className="text-red-400 font-bold uppercase italic">
-                        {gameState.participants.find((p: any) => p.userId === round.eliminatedPlayerId)?.username} OUT
-                      </span>
-                    )}
-                    {round.isTieBreakerInitial && <span className="text-yellow-500 font-bold uppercase">Tie Breaker</span>}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(round.rolls).map(([uid, roll]: [string, any]) => {
-                      const p = gameState.participants.find((p: any) => p.userId === uid);
-                      return (
-                        <div key={uid} className="flex justify-between items-center text-gray-400">
-                          <span>{p?.username}:</span>
-                          <span className="font-mono text-white font-bold">{roll}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-              {gameState.history.length === 0 && (
-                <div className="text-center py-6 text-gray-600 italic">
-                  No rounds recorded yet
-                </div>
-              )}
             </div>
           </div>
         </div>

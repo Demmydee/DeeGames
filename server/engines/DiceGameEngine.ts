@@ -104,8 +104,10 @@ export class DiceGameEngine implements GameEngine {
       newState.tieBreaker.rolls[userId] = roll;
       events.push({ type: 'player_tie_rolled', payload: { userId, roll } });
 
+      this.rotateTurn(newState);
+
       const allReRolled = newState.tieBreaker.playerIds.every(id => newState.tieBreaker!.rolls[id] !== undefined && newState.tieBreaker!.rolls[id] !== null);
-      
+
       if (allReRolled) {
         this.resolveTieBreaker(newState, events);
       }
@@ -119,8 +121,10 @@ export class DiceGameEngine implements GameEngine {
       newState.tieBreaker.rolls[userId] = roll;
       events.push({ type: 'player_sudden_death_rolled', payload: { userId, roll } });
 
+      this.rotateTurn(newState);
+
       const allRolled = newState.tieBreaker.playerIds.every(id => newState.tieBreaker!.rolls[id] !== undefined && newState.tieBreaker!.rolls[id] !== null);
-      
+
       if (allRolled) {
         this.resolveSuddenDeath(newState, events);
       }
@@ -144,7 +148,7 @@ export class DiceGameEngine implements GameEngine {
 
     participant.status = reason === 'left' ? 'left' : 'disconnected';
     participant.defeatReason = reason;
-    
+
     // Remove from active players
     newState.activePlayerIds = newState.activePlayerIds.filter(id => id !== userId);
 
@@ -171,7 +175,7 @@ export class DiceGameEngine implements GameEngine {
       if (allOthersRolled && Object.keys(newState.rolls).length > 0) {
         this.resolveRound(newState, events);
       }
-      
+
       // Check tie-breaker (Sudden Drop or Marathon Sudden Death)
       if (newState.tieBreaker && newState.tieBreaker.playerIds.includes(userId)) {
         newState.tieBreaker.playerIds = newState.tieBreaker.playerIds.filter(id => id !== userId);
