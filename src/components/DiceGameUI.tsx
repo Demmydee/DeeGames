@@ -305,6 +305,45 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
               })}
             </div>
           </div>
+
+          {/* Detailed Game History */}
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 overflow-hidden flex flex-col">
+            <div className="flex items-center gap-2 mb-4">
+              <History className="w-3 h-3 text-emerald-500" />
+              <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-none">Live Game Log</h4>
+            </div>
+            <div className="max-h-[200px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+              {[...gameState.history].reverse().map((round: any, idx: number) => (
+                <div key={idx} className="p-3 bg-white/[0.02] border border-white/5 rounded-xl text-[10px]">
+                  <div className="flex justify-between items-center mb-2 border-b border-white/5 pb-1">
+                    <span className="font-black text-emerald-500 uppercase">Round {round.round}</span>
+                    {round.eliminatedPlayerId && (
+                      <span className="text-red-400 font-bold uppercase italic">
+                        {gameState.participants.find((p: any) => p.userId === round.eliminatedPlayerId)?.username} OUT
+                      </span>
+                    )}
+                    {round.isTieBreakerInitial && <span className="text-yellow-500 font-bold uppercase">Tie Breaker</span>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(round.rolls).map(([uid, roll]: [string, any]) => {
+                      const p = gameState.participants.find((p: any) => p.userId === uid);
+                      return (
+                        <div key={uid} className="flex justify-between items-center text-gray-400">
+                          <span>{p?.username}:</span>
+                          <span className="font-mono text-white font-bold">{roll}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {gameState.history.length === 0 && (
+                <div className="text-center py-6 text-gray-600 italic">
+                  No rounds recorded yet
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -42,17 +42,24 @@ const GameRequestCard: React.FC<Props> = ({ request, onJoin, onCancel, onLeave, 
         <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
           <Gamepad2 className="w-5 h-5" />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2 max-w-[70%]">
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-            request.category === 'arena' 
-              ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' 
+            request.pay_mode === 'knockout'
+              ? 'bg-red-500/10 text-red-500 border-red-500/30'
+              : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
+          }`}>
+            {request.pay_mode}
+          </span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+            request.category === 'arena'
+              ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
               : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
           }`}>
             {request.category}
           </span>
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-            request.status === 'ready_to_start' 
-              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+            request.status === 'ready_to_start'
+              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
               : 'bg-orange-500/20 text-orange-400 border-orange-500/30'
           }`}>
             {request.status.replace('_', ' ')}
@@ -64,6 +71,11 @@ const GameRequestCard: React.FC<Props> = ({ request, onJoin, onCancel, onLeave, 
       <div className="mb-4">
         <h3 className="text-xl font-black text-white uppercase italic tracking-tight mb-1">
           {request.game_type?.name}
+          {request.game_variant && (
+            <span className="ml-2 text-[10px] not-italic font-black text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 align-middle">
+              {request.game_variant.replace('_', ' ')}
+            </span>
+          )}
         </h3>
         <div className="flex items-center gap-2 text-xs text-gray-500">
           <User className="w-3 h-3" />

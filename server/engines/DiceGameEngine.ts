@@ -172,11 +172,19 @@ export class DiceGameEngine implements GameEngine {
         this.resolveRound(newState, events);
       }
       
-      // Check tie-breaker
+      // Check tie-breaker (Sudden Drop or Marathon Sudden Death)
       if (newState.tieBreaker && newState.tieBreaker.playerIds.includes(userId)) {
         newState.tieBreaker.playerIds = newState.tieBreaker.playerIds.filter(id => id !== userId);
+
         if (newState.tieBreaker.playerIds.length <= 1) {
-          this.resolveTieBreaker(newState, events);
+          if (newState.variant === 'sudden_drop') {
+            this.resolveTieBreaker(newState, events);
+          } else {
+            this.resolveSuddenDeath(newState, events);
+          }
+        } else {
+          // Still in tie-breaker, but pool changed. Re-calculate turn.
+          this.rotateTurn(newState);
         }
       }
     }
@@ -235,7 +243,7 @@ export class DiceGameEngine implements GameEngine {
         playerIds: lowestRollers.map(r => r.id),
         rolls: {}
       };
-      
+
       state.history.push({
         round: state.currentRound,
         isTieBreakerInitial: true,
@@ -373,7 +381,7 @@ export class DiceGameEngine implements GameEngine {
         playerIds: topScorers.map(p => p.userId),
         rolls: {}
       };
-      state.currentTurnPlayerId = state.tieBreaker.playerIds[0];
+      this.rotateTurn(state);
       events.push({ type: 'sudden_death_started', payload: { playerIds: state.tieBreaker.playerIds } });
     } else {
       this.finalizeGame(state, events);
@@ -406,7 +414,7 @@ export class DiceGameEngine implements GameEngine {
       state.lastRoundResults = { ...state.tieBreaker.rolls };
       state.tieBreaker.playerIds = winners.map(r => r.id);
       state.tieBreaker.rolls = {};
-      state.currentTurnPlayerId = state.tieBreaker.playerIds[0];
+      this.rotateTurn(state);
       events.push({ type: 'sudden_death_still_active', payload: { playerIds: state.tieBreaker.playerIds } });
     } else {
       // Sudden death winner found

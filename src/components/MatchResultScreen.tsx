@@ -81,6 +81,9 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
               </motion.h1>
               <div className="flex items-center justify-center gap-3">
                 <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                  {result.game_variant?.replace('_', ' ') || 'Classic'}
+                </span>
+                <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] bg-white/5 px-3 py-1 rounded-full border border-white/10">
                   {result.pay_mode} Mode
                 </span>
                 <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] bg-white/5 px-3 py-1 rounded-full border border-white/10">
@@ -92,13 +95,13 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
 
           <div className="p-10 space-y-12">
             {/* Earnings Summary */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
               className={`p-10 rounded-[2.5rem] border-2 flex items-center justify-between shadow-2xl relative overflow-hidden group ${
-                profitKobo >= 0 
-                  ? 'bg-[#0f1715] border-emerald-500/30' 
+                profitKobo >= 0
+                  ? 'bg-[#0f1715] border-emerald-500/30'
                   : 'bg-[#1a1111] border-red-500/20'
               }`}
             >
@@ -126,63 +129,60 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
               </div>
             </motion.div>
 
-            {/* Match History / Timeline (Results of each round) */}
+            {/* Match History Table */}
             {result.history && result.history.length > 0 && (
               <section>
                 <div className="flex items-center gap-3 mb-8">
                   <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center">
                     <History className="w-4 h-4 text-emerald-500" />
                   </div>
-                  <h3 className="text-sm font-black text-white uppercase tracking-widest leading-none">Match Timeline</h3>
+                  <h3 className="text-sm font-black text-white uppercase tracking-widest leading-none">Match Summary</h3>
                 </div>
-                <div className="grid gap-6">
-                  {result.history.map((round: any, idx: number) => (
-                    <motion.div 
-                      key={idx}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.3 + (idx * 0.1) }}
-                      className="bg-white/[0.03] border border-white/10 rounded-3xl p-6 hover:bg-white/[0.05] transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-5">
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-black text-emerald-500">
-                            ROUND {round.round}
-                          </span>
-                          {round.isTieBreakerInitial && (
-                            <span className="text-[9px] font-black uppercase text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded">Tie Triggered</span>
-                          )}
-                          {(round.isTieBreakerContinued || round.isTieBreakerResolved) && (
-                            <span className="text-[9px] font-black uppercase text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded">Tie Breaker</span>
-                          )}
-                        </div>
-                        {round.eliminatedPlayerId && (
-                          <div className="flex items-center gap-2 text-red-400">
-                            <ShieldAlert className="w-3 h-3" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">
-                              {result.rankings.find((r: any) => r.userId === round.eliminatedPlayerId)?.username || 'Player'} Out
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-6">
-                        {Object.entries(round.rolls).map(([uid, roll]: [string, any]) => {
-                          const p = result.rankings.find((r: any) => r.userId === uid);
-                          return (
-                            <div key={uid} className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[11px] font-black text-gray-500">
-                                {p?.username?.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="text-[9px] font-black text-gray-600 uppercase tracking-tighter">{p?.username}</span>
-                                <span className="text-lg font-black text-white leading-none">{roll}</span>
-                              </div>
+                <div className="overflow-x-auto rounded-[2rem] border border-white/10 bg-white/5 backdrop-blur-md">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="p-4 px-6 text-[10px] font-black text-gray-500 uppercase tracking-widest">Round</th>
+                        {result.rankings.map((p: any) => (
+                          <th key={p.userId} className="p-4 text-center">
+                            <div className="flex flex-col items-center">
+                              <span className="text-[10px] font-black text-white uppercase tracking-tight">{p.username}</span>
+                              <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest leading-none mt-1">Final: {p.score}</span>
                             </div>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  ))}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.history.map((round: any, idx: number) => (
+                        <tr key={idx} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                          <td className="p-4 px-6">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-emerald-500 italic">#{round.round}</span>
+                              {(round.isTieBreakerInitial || round.isTieBreakerContinued || round.isTieBreakerResolved) && (
+                                <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" title="Tie Breaker" />
+                              )}
+                            </div>
+                          </td>
+                          {result.rankings.map((p: any) => {
+                            const roll = round.rolls[p.userId];
+                            const isEliminated = round.eliminatedPlayerId === p.userId;
+                            return (
+                              <td key={p.userId} className="p-4 text-center">
+                                {roll !== undefined ? (
+                                  <span className={`text-sm font-black ${isEliminated ? 'text-red-500' : 'text-white'}`}>
+                                    {roll}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-700">—</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </section>
             )}
@@ -203,16 +203,16 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.5 + (index * 0.05) }}
                     className={`p-6 rounded-3xl border transition-all hover:scale-[1.02] duration-300 ${
-                      p.rank === 1 
-                        ? 'bg-emerald-500/10 border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.1)]' 
+                      p.rank === 1
+                        ? 'bg-emerald-500/10 border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.1)]'
                         : 'bg-white/5 border-white/10 opacity-90'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-5">
                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl ${
-                          p.rank === 1 
-                            ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black shadow-lg' 
+                          p.rank === 1
+                            ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black shadow-lg'
                             : 'bg-white/5 text-gray-400'
                         }`}>
                           {p.rank === 1 ? <Award className="w-8 h-8" /> : p.rank}
@@ -228,7 +228,7 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
                             )}
                           </div>
                           <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">
-                            Final: {p.score} pts • {p.defeatReason || 'Completed'}
+                            Final: {p.score} pts • {p.status === 'left' ? 'Left Game' : (p.defeatReason || 'Completed')}
                           </div>
                         </div>
                       </div>
