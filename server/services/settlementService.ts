@@ -164,12 +164,6 @@ export class SettlementService {
 
     const payouts = rankings.map(r => {
       const rank = r.rank || 0;
-      const isWinner = rank <= winnersCount && r.status === 'active'; // Only active players can win? 
-      // Actually, if someone is eliminated but still in top half, do they win?
-      // Usually "Split" implies top half of those who finished.
-      // But Sudden Drop eliminates. Marathon ranks all.
-      // Let's stick to rank.
-      
       const weight = weights[rank] || 0;
       let payoutKobo = 0;
       if (weight > 0) {

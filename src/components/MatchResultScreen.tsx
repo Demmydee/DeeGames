@@ -36,44 +36,44 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
   const profitKobo = myRanking ? (myRanking.payoutKobo - myRanking.wagerKobo) : 0;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-[#050505]/98 backdrop-blur-2xl flex items-center justify-center p-4 overflow-y-auto">
-      <div className="w-full max-w-2xl my-12">
+    <div className="fixed inset-0 z-[100] bg-[#050505]/98 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="w-full max-w-xl my-4 sm:my-12">
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 40 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="bg-[#0a0a0a] border border-white/10 rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)] relative"
+          className="bg-[#0a0a0a] border border-white/10 rounded-[2rem] sm:rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)] relative"
         >
           {/* Top Banner with Dynamic Status */}
-          <div className={`p-14 text-center relative overflow-hidden ${
+          <div className={`p-8 sm:p-14 text-center relative overflow-hidden ${
             isWinner ? 'bg-yellow-500/10' : 'bg-red-500/5'
           }`}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/5 to-transparent opacity-20" />
-            
+
             <motion.div
               initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
               animate={{ scale: 1, opacity: 1, rotate: isWinner ? 12 : -6 }}
               transition={{ type: 'spring', damping: 10, stiffness: 100 }}
-              className={`relative z-10 w-40 h-40 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10 shadow-2xl transition-all duration-700 ${
-                isWinner 
-                  ? 'bg-gradient-to-br from-yellow-300 via-yellow-500 to-amber-700 shadow-[0_0_50px_rgba(234,179,8,0.4)]' 
+              className={`relative z-10 w-28 h-28 sm:w-40 sm:h-40 rounded-2xl sm:rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 sm:mb-10 shadow-2xl transition-all duration-700 ${
+                isWinner
+                  ? 'bg-gradient-to-br from-yellow-300 via-yellow-500 to-amber-700 shadow-[0_0_50px_rgba(234,179,8,0.4)]'
                   : 'bg-gradient-to-br from-gray-700 to-gray-900 shadow-xl grayscale'
               }`}
             >
-              <Trophy className={`w-20 h-20 ${isWinner ? 'text-black' : 'text-white/20'}`} />
+              <Trophy className={`w-12 h-12 sm:w-20 sm:h-20 ${isWinner ? 'text-black' : 'text-white/20'}`} />
               {isWinner && (
-                <motion.div 
+                <motion.div
                   animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.6, 0.3] }}
                   transition={{ duration: 3, repeat: Infinity }}
-                  className="absolute inset-0 bg-yellow-400 rounded-[2.5rem] filter blur-3xl -z-10" 
+                  className="absolute inset-0 bg-yellow-400 rounded-2xl sm:rounded-[2.5rem] filter blur-3xl -z-10"
                 />
               )}
             </motion.div>
-            
+
             <div className="relative z-10">
-              <motion.h1 
+              <motion.h1
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`text-8xl font-black uppercase italic tracking-tighter mb-4 leading-none ${
+                className={`text-5xl sm:text-8xl font-black uppercase italic tracking-tighter mb-2 sm:mb-4 leading-none ${
                   isWinner ? 'text-yellow-400 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]' : 'text-white/80'
                 }`}
               >
@@ -93,13 +93,13 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
             </div>
           </div>
 
-          <div className="p-10 space-y-12">
+          <div className="p-6 sm:p-10 space-y-8 sm:space-y-12">
             {/* Earnings Summary */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className={`p-10 rounded-[2.5rem] border-2 flex items-center justify-between shadow-2xl relative overflow-hidden group ${
+              className={`p-6 sm:p-10 rounded-3xl sm:rounded-[2.5rem] border-2 flex items-center justify-between shadow-2xl relative overflow-hidden group ${
                 profitKobo >= 0
                   ? 'bg-[#0f1715] border-emerald-500/30'
                   : 'bg-[#1a1111] border-red-500/20'
@@ -107,24 +107,24 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-1000" />
               <div className="relative z-10">
-                <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest mb-3">Profit / Loss Summary</p>
-                <h2 className={`text-6xl font-black tracking-tighter ${profitKobo >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 sm:mb-3">Profit / Loss Summary</p>
+                <h2 className={`text-4xl sm:text-6xl font-black tracking-tighter ${profitKobo >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {profitKobo >= 0 ? '+' : ''}₦{(profitKobo / 100).toLocaleString()}
                 </h2>
-                <div className="flex items-center gap-4 mt-2">
-                  <div className="text-[10px] text-gray-400 font-bold uppercase border-r border-white/10 pr-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-2">
+                  <div className="text-[9px] sm:text-[10px] text-gray-400 font-bold uppercase sm:border-r sm:border-white/10 sm:pr-4">
                     Wager: ₦{((myRanking?.wagerKobo || 0) / 100).toLocaleString()}
                   </div>
-                  <div className="text-[10px] text-gray-400 font-bold uppercase">
+                  <div className="text-[9px] sm:text-[10px] text-gray-400 font-bold uppercase">
                     Payout: ₦{((myRanking?.payoutKobo || 0) / 100).toLocaleString()}
                   </div>
                 </div>
               </div>
-              <div className="relative z-10">
-                <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-inner ${
+              <div className="relative z-10 hidden sm:block">
+                <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl flex items-center justify-center shadow-inner ${
                   profitKobo >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-500'
                 }`}>
-                  {profitKobo >= 0 ? <TrendingUp className="w-10 h-10" /> : <TrendingDown className="w-10 h-10" />}
+                  {profitKobo >= 0 ? <TrendingUp className="w-8 h-8 sm:w-10 sm:h-10" /> : <TrendingDown className="w-8 h-8 sm:w-10 sm:h-10" />}
                 </div>
               </div>
             </motion.div>
@@ -250,16 +250,16 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
           </div>
 
           {/* Action Footer */}
-          <div className="p-10 pt-4 pb-14">
+          <div className="p-6 sm:p-10 pt-4 pb-8 sm:pb-14">
             <button
               onClick={() => {
                 if (onExit) onExit();
                 else navigate('/lobby');
               }}
-              className="w-full py-7 bg-white hover:bg-emerald-500 text-black rounded-[2.5rem] font-black uppercase italic tracking-tighter transition-all shadow-[0_20px_40px_rgba(0,0,0,0.3)] hover:shadow-emerald-500/20 flex items-center justify-center gap-5 group"
+              className="w-full py-5 sm:py-7 bg-white hover:bg-emerald-500 text-black rounded-2xl sm:rounded-[2.5rem] font-black uppercase italic tracking-tighter transition-all shadow-[0_20px_40px_rgba(0,0,0,0.3)] hover:shadow-emerald-500/20 flex items-center justify-center gap-3 sm:gap-5 group"
             >
-              <LogOut className="w-7 h-7 transition-all group-hover:translate-x-2" />
-              <span className="text-xl">Exit to Match Lobby</span>
+              <LogOut className="w-5 h-5 sm:w-7 sm:h-7 transition-all group-hover:translate-x-2" />
+              <span className="text-lg sm:text-xl">Exit to Lobby</span>
             </button>
           </div>
         </motion.div>

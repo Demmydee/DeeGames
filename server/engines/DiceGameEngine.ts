@@ -152,11 +152,7 @@ export class DiceGameEngine implements GameEngine {
     // Remove from active players
     newState.activePlayerIds = newState.activePlayerIds.filter(id => id !== userId);
 
-    // Assign rank
-    const currentRank = this.getNextAvailableLowestRank(newState);
-    participant.rank = currentRank;
-
-    events.push({ type: 'player_defeated', payload: { userId, reason, rank: currentRank } });
+    events.push({ type: 'player_defeated', payload: { userId, reason } });
 
     // If it was this player's turn, rotate it
     if (newState.currentTurnPlayerId === userId) {
@@ -342,11 +338,8 @@ export class DiceGameEngine implements GameEngine {
       participant.defeatReason = 'eliminated';
       participant.eliminatedRound = state.currentRound;
 
-      const rank = this.getNextAvailableLowestRank(state);
-      participant.rank = rank;
-
       state.activePlayerIds = state.activePlayerIds.filter(id => id !== userId);
-      events.push({ type: 'player_eliminated', payload: { userId, rank } });
+      events.push({ type: 'player_eliminated', payload: { userId } });
     }
   }
 
@@ -426,8 +419,8 @@ export class DiceGameEngine implements GameEngine {
       const winnerId = winners[0].id;
       // Adjust score slightly to break tie for ranking logic
       const winner = state.participants.find(p => p.userId === winnerId);
-      if (winner) winner.score += 0.1; 
-      
+      if (winner) winner.score += 0.1;
+
       state.tieBreaker = undefined;
       state.currentTurnPlayerId = null;
       this.finalizeGame(state, events);
@@ -437,19 +430,45 @@ export class DiceGameEngine implements GameEngine {
   private finalizeGame(state: GameState, events: any[]) {
     state.status = 'completed';
     state.currentTurnPlayerId = null;
-    
-    // Rank remaining active players
-    const activeParticipants = state.participants
-      .filter(p => p.status === 'active')
-      .sort((a, b) => b.score - a.score);
 
-    activeParticipants.forEach((p, index) => {
-      p.rank = index + 1;
+    // Rank all players based on their achievement
+    // Priority:
+    // 1. Active or Left (Tier 1) - Rank by score
+    // 2. Eliminated (Tier 2) - Rank by round survived, then score
+    // 3. Disconnected (Tier 3) - Rank by score
+
+    const allParticipants = [...state.participants].sort((a, b) => {
+      // Status tier priority
+      const getTier = (status: string) => {
+        if (status === 'active' || status === 'left') return 1;
+        if (status === 'eliminated') return 2;
+        return 3; // disconnected
+      };
+
+      const tierA = getTier(a.status);
+      const tierB = getTier(b.status);
+
+      if (tierA !== tierB) return tierA - tierB;
+
+      // Inside Tier 2 (Eliminated), check round
+      if (tierA === 2) {
+        const roundA = a.eliminatedRound || 0;
+        const roundB = b.eliminatedRound || 0;
+        if (roundA !== roundB) return roundB - roundA;
+      }
+
+      // Tie-breaker: Score
+      if (b.score !== a.score) return b.score - a.score;
+
+      // Final fallback: stability
+      return a.userId.localeCompare(b.userId);
     });
 
-    // Ensure all participants have a rank
-    const unranked = state.participants.filter(p => !p.rank);
-    // Sort unranked by status/score/time if needed, but they should already have ranks from defeat
+    allParticipants.forEach((p, index) => {
+      // Find the original participant object to update it
+      const original = state.participants.find(op => op.userId === p.userId);
+      if (original) original.rank = index + 1;
+    });
     
     events.push({ type: 'game_completed', payload: { rankings: this.getRankings(state) } });
   }
