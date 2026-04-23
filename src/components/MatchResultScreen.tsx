@@ -36,15 +36,15 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
   const profitKobo = myRanking ? (myRanking.payoutKobo - myRanking.wagerKobo) : 0;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-[#050505]/98 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-      <div className="w-full max-w-xl my-4 sm:my-12">
+    <div className="fixed inset-0 z-[100] bg-[#050505]/98 backdrop-blur-2xl flex items-start justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="w-full max-w-xl my-auto py-8">
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 40 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="bg-[#0a0a0a] border border-white/10 rounded-[2rem] sm:rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)] relative"
+          className="bg-[#0a0a0a] border border-white/10 rounded-[2rem] sm:rounded-[3rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)] relative flex flex-col max-h-[85vh]"
         >
           {/* Top Banner with Dynamic Status */}
-          <div className={`p-8 sm:p-14 text-center relative overflow-hidden ${
+          <div className={`p-6 sm:p-10 text-center relative overflow-hidden flex-shrink-0 ${
             isWinner ? 'bg-yellow-500/10' : 'bg-red-500/5'
           }`}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/5 to-transparent opacity-20" />
@@ -53,18 +53,18 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
               initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
               animate={{ scale: 1, opacity: 1, rotate: isWinner ? 12 : -6 }}
               transition={{ type: 'spring', damping: 10, stiffness: 100 }}
-              className={`relative z-10 w-28 h-28 sm:w-40 sm:h-40 rounded-2xl sm:rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 sm:mb-10 shadow-2xl transition-all duration-700 ${
+              className={`relative z-10 w-24 h-24 sm:w-32 sm:h-32 rounded-2xl sm:rounded-[2rem] flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-2xl transition-all duration-700 ${
                 isWinner
                   ? 'bg-gradient-to-br from-yellow-300 via-yellow-500 to-amber-700 shadow-[0_0_50px_rgba(234,179,8,0.4)]'
                   : 'bg-gradient-to-br from-gray-700 to-gray-900 shadow-xl grayscale'
               }`}
             >
-              <Trophy className={`w-12 h-12 sm:w-20 sm:h-20 ${isWinner ? 'text-black' : 'text-white/20'}`} />
+              <Trophy className={`w-10 h-10 sm:w-16 sm:h-16 ${isWinner ? 'text-black' : 'text-white/20'}`} />
               {isWinner && (
                 <motion.div
                   animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.6, 0.3] }}
                   transition={{ duration: 3, repeat: Infinity }}
-                  className="absolute inset-0 bg-yellow-400 rounded-2xl sm:rounded-[2.5rem] filter blur-3xl -z-10"
+                  className="absolute inset-0 bg-yellow-400 rounded-2xl sm:rounded-[2rem] filter blur-3xl -z-10"
                 />
               )}
             </motion.div>
@@ -73,27 +73,27 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
               <motion.h1
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`text-5xl sm:text-8xl font-black uppercase italic tracking-tighter mb-2 sm:mb-4 leading-none ${
+                className={`text-4xl sm:text-6xl font-black uppercase italic tracking-tighter mb-2 leading-none ${
                   isWinner ? 'text-yellow-400 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]' : 'text-white/80'
                 }`}
               >
                 {isWinner ? (isTie ? 'Tie!' : 'Winner') : 'Defeat'}
               </motion.h1>
-              <div className="flex items-center justify-center gap-3">
-                <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] bg-white/5 px-3 py-1 rounded-full border border-white/10">
+              <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-3">
+                <span className="text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] bg-white/5 px-2 sm:px-3 py-1 rounded-full border border-white/10">
                   {result.game_variant?.replace('_', ' ') || 'Classic'}
                 </span>
-                <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                <span className="text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] bg-white/5 px-2 sm:px-3 py-1 rounded-full border border-white/10">
                   {result.pay_mode} Mode
                 </span>
-                <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                <span className="text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] bg-white/5 px-2 sm:px-3 py-1 rounded-full border border-white/10">
                   {new Date(result.settled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="p-6 sm:p-10 space-y-8 sm:space-y-12">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-10 pt-4 sm:pt-6 space-y-8 sm:space-y-12 custom-scrollbar">
             {/* Earnings Summary */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}

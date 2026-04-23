@@ -119,6 +119,10 @@ const GameRoomShell: React.FC = () => {
     );
   }
 
+  const totalParticipants = match.participants?.length || 0;
+  const wagerAmount = match.game_request?.amount || 0;
+  const totalPrizePool = totalParticipants * wagerAmount;
+
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col">
       {/* Top Bar */}
@@ -147,18 +151,18 @@ const GameRoomShell: React.FC = () => {
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-6 mr-4">
             <div className="text-center">
-              <div className="text-xs font-black text-white">₦{((match.participants?.length || 0) * 1000).toLocaleString()}</div>
+              <div className="text-xs font-black text-white">₦{totalPrizePool.toLocaleString()}</div>
               <div className="text-[8px] text-gray-500 uppercase tracking-widest">Prize Pool</div>
             </div>
             <div className="text-center">
-              <div className="text-xs font-black text-white">{match.participants?.length}</div>
+              <div className="text-xs font-black text-white">{totalParticipants}</div>
               <div className="text-[8px] text-gray-500 uppercase tracking-widest">Players</div>
             </div>
           </div>
           <button className="p-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors">
             <Settings className="w-5 h-5" />
           </button>
-          <button 
+          <button
             onClick={() => setShowLeaveConfirm(true)}
             disabled={leaving}
             className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-xs font-bold uppercase tracking-widest transition-all border border-red-500/20"
@@ -211,14 +215,16 @@ const GameRoomShell: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Game Viewport */}
-        <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
-          {/* Voice Chat Overlay */}
-          <div className="absolute top-8 left-8 z-20 w-72">
-            <VoiceChat matchId={id!} />
+        <div className="flex-1 relative bg-black flex flex-col overflow-hidden">
+          {/* Voice Chat Integrated Bar */}
+          <div className="px-6 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-center">
+            <div className="w-full max-w-4xl">
+              <VoiceChat matchId={id!} />
+            </div>
           </div>
-          
+
           {/* Game Engine UI */}
-          <div className="w-full h-full overflow-y-auto flex items-center justify-center">
+          <div className="flex-1 w-full overflow-y-auto flex items-start justify-center pt-8">
             {match.game_type?.name.toLowerCase().includes('dice') ? (
               <DiceGameUI 
                 matchId={id!} 

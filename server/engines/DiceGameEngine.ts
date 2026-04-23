@@ -438,11 +438,15 @@ export class DiceGameEngine implements GameEngine {
     // 3. Disconnected (Tier 3) - Rank by score
 
     const allParticipants = [...state.participants].sort((a, b) => {
-      // Status tier priority
+      // 1. If scores are different, use score
+      if (b.score !== a.score) return b.score - a.score;
+
+      // 2. If scores are same, prioritize status: active > left > eliminated > disconnected
       const getTier = (status: string) => {
-        if (status === 'active' || status === 'left') return 1;
-        if (status === 'eliminated') return 2;
-        return 3; // disconnected
+        if (status === 'active') return 1;
+        if (status === 'left') return 2;
+        if (status === 'eliminated') return 3;
+        return 4; // disconnected
       };
 
       const tierA = getTier(a.status);
@@ -450,15 +454,12 @@ export class DiceGameEngine implements GameEngine {
 
       if (tierA !== tierB) return tierA - tierB;
 
-      // Inside Tier 2 (Eliminated), check round
-      if (tierA === 2) {
+      // 3. Inside Tier 3 (Eliminated), check round
+      if (tierA === 3) {
         const roundA = a.eliminatedRound || 0;
         const roundB = b.eliminatedRound || 0;
         if (roundA !== roundB) return roundB - roundA;
       }
-
-      // Tie-breaker: Score
-      if (b.score !== a.score) return b.score - a.score;
 
       // Final fallback: stability
       return a.userId.localeCompare(b.userId);
