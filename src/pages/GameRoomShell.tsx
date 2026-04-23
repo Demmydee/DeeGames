@@ -26,6 +26,7 @@ import VoiceChat from '../components/VoiceChat';
 import Chat from '../components/Chat';
 import ReportModal from '../components/ReportModal';
 import DiceGameUI from '../components/DiceGameUI';
+import ChessGameUI from '../components/ChessGameUI';
 import MatchResultScreen from '../components/MatchResultScreen';
 
 const GameRoomShell: React.FC = () => {
@@ -162,7 +163,7 @@ const GameRoomShell: React.FC = () => {
           <button className="p-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors">
             <Settings className="w-5 h-5" />
           </button>
-          <button
+          <button 
             onClick={() => setShowLeaveConfirm(true)}
             disabled={leaving}
             className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-xs font-bold uppercase tracking-widest transition-all border border-red-500/20"
@@ -222,7 +223,7 @@ const GameRoomShell: React.FC = () => {
               <VoiceChat matchId={id!} />
             </div>
           </div>
-
+          
           {/* Game Engine UI */}
           <div className="flex-1 w-full overflow-y-auto flex items-start justify-center pt-8">
             {match.game_type?.name.toLowerCase().includes('dice') ? (
@@ -230,6 +231,12 @@ const GameRoomShell: React.FC = () => {
                 matchId={id!} 
                 matchParticipants={match.participants}
                 onGameEnd={(result) => setMatchResult(result)} 
+              />
+            ) : match.game_type?.name.toLowerCase().includes('chess') ? (
+              <ChessGameUI
+                matchId={id!}
+                matchParticipants={match.participants}
+                onGameEnd={(result) => setMatchResult(result)}
               />
             ) : (
               <div className="relative z-10 text-center p-8 max-w-lg">

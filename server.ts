@@ -62,6 +62,11 @@ async function startServer() {
     HeartbeatService.checkExpiredCountdowns().catch(console.error);
   }, 15000); // Check every 15 seconds
 
+  // Chess Timer Check (More frequent)
+  setInterval(() => {
+    HeartbeatService.checkChessClocks().catch(console.error);
+  }, parseInt(process.env.CHESS_TIMER_CHECK_INTERVAL_SECONDS || '5') * 1000);
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

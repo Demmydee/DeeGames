@@ -97,4 +97,30 @@ export class HeartbeatService {
       await GameStateService.handlePlayerDefeat(p.match_id, p.user_id, 'disconnected');
     }
   }
+
+  static async checkChessClocks() {
+    const { data: activeChessGames, error } = await supabase
+      .from('game_states')
+      .select('*')
+      .eq('game_type', 'chess')
+      .eq('status', 'active');
+
+    if (error || !activeChessGames) return;
+
+    for (const game of activeChessGames) {
+      const state = game.state;
+      const now = Date.now();
+      const turnStartedAt = new Date(state.turn_started_at).getTime();
+      const elapsed = now - turnStartedAt;
+      
+      const currentTurnUserId = state.currentTurnPlayerId;
+      const isWhite = currentTurnUserId === state.white_user_id;
+      const remaining = isWhite ? state.white_time_remaining_ms : state.black_time_remaining_ms;
+
+      if (remaining - elapsed <= 0) {
+        console.log(`Time forfeit detected for match ${game.match_id}, player ${currentTurnUserId}`);
+        await GameStateService.handlePlayerDefeat(game.match_id, currentTurnUserId, 'time_forfeit');
+      }
+    }
+  }
 }

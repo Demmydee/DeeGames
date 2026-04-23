@@ -146,7 +146,7 @@ export const getUserById = async (id: string) => {
       }
 
       console.warn(`User profile not found in public.users for ID: ${id}. Attempting self-healing sync...`);
-
+      
       // Fallback: Check if we have the service key to use admin methods
       if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
         console.error('Self-healing failed: SUPABASE_SERVICE_ROLE_KEY is missing.');
@@ -155,7 +155,7 @@ export const getUserById = async (id: string) => {
 
       // Check if the user exists in Supabase Auth
       const { data: { user: authUser }, error: authError } = await supabase.auth.admin.getUserById(id);
-
+      
       if (authError || !authUser) {
         console.error(`Self-healing failed: User ${id} does not exist in Auth.`, authError);
         throw { status: 404, message: 'User not found in any system' };
@@ -163,7 +163,7 @@ export const getUserById = async (id: string) => {
 
       // Attempt manual sync to public.users
       const username = COALESCE(
-        authUser.user_metadata?.username,
+        authUser.user_metadata?.username, 
         authUser.email?.split('@')[0],
         `user_${id.substring(0, 8)}`
       );

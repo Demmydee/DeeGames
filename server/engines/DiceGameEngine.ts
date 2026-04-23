@@ -107,7 +107,7 @@ export class DiceGameEngine implements GameEngine {
       this.rotateTurn(newState);
 
       const allReRolled = newState.tieBreaker.playerIds.every(id => newState.tieBreaker!.rolls[id] !== undefined && newState.tieBreaker!.rolls[id] !== null);
-
+      
       if (allReRolled) {
         this.resolveTieBreaker(newState, events);
       }
@@ -124,7 +124,7 @@ export class DiceGameEngine implements GameEngine {
       this.rotateTurn(newState);
 
       const allRolled = newState.tieBreaker.playerIds.every(id => newState.tieBreaker!.rolls[id] !== undefined && newState.tieBreaker!.rolls[id] !== null);
-
+      
       if (allRolled) {
         this.resolveSuddenDeath(newState, events);
       }
@@ -136,7 +136,7 @@ export class DiceGameEngine implements GameEngine {
   handlePlayerDefeat(
     currentState: GameState,
     userId: string,
-    reason: 'left' | 'disconnected'
+    reason: 'left' | 'disconnected' | 'time_forfeit'
   ): GameStateUpdateResult {
     const newState = JSON.parse(JSON.stringify(currentState)) as GameState;
     const events: any[] = [];
@@ -148,7 +148,7 @@ export class DiceGameEngine implements GameEngine {
 
     participant.status = reason === 'left' ? 'left' : 'disconnected';
     participant.defeatReason = reason;
-
+    
     // Remove from active players
     newState.activePlayerIds = newState.activePlayerIds.filter(id => id !== userId);
 
@@ -171,11 +171,11 @@ export class DiceGameEngine implements GameEngine {
       if (allOthersRolled && Object.keys(newState.rolls).length > 0) {
         this.resolveRound(newState, events);
       }
-
+      
       // Check tie-breaker (Sudden Drop or Marathon Sudden Death)
       if (newState.tieBreaker && newState.tieBreaker.playerIds.includes(userId)) {
         newState.tieBreaker.playerIds = newState.tieBreaker.playerIds.filter(id => id !== userId);
-
+        
         if (newState.tieBreaker.playerIds.length <= 1) {
           if (newState.variant === 'sudden_drop') {
             this.resolveTieBreaker(newState, events);
@@ -197,6 +197,7 @@ export class DiceGameEngine implements GameEngine {
 
     const winner = currentState.participants.find(p => p.rank === 1);
     return {
+      isOver: true,
       winnerId: winner ? winner.userId : null,
       rankings: this.getRankings(currentState)
     };
@@ -243,7 +244,7 @@ export class DiceGameEngine implements GameEngine {
         playerIds: lowestRollers.map(r => r.id),
         rolls: {}
       };
-
+      
       state.history.push({
         round: state.currentRound,
         isTieBreakerInitial: true,
@@ -256,7 +257,7 @@ export class DiceGameEngine implements GameEngine {
       // Single lowest roller eliminated
       const eliminatedId = lowestRollers[0].id;
       state.lastRoundResults = { ...state.rolls };
-
+      
       state.history.push({
         round: state.currentRound,
         eliminatedPlayerId: eliminatedId,
@@ -264,7 +265,7 @@ export class DiceGameEngine implements GameEngine {
       });
 
       this.eliminatePlayer(state, eliminatedId, events);
-
+      
       // Advance round if not finished
       if (state.activePlayerIds.length > 1) {
         state.currentRound++;
@@ -289,7 +290,7 @@ export class DiceGameEngine implements GameEngine {
     const rolls = state.tieBreaker.playerIds
       .filter(id => state.tieBreaker!.rolls[id] !== undefined && state.tieBreaker!.rolls[id] !== null)
       .map(id => ({ id, roll: state.tieBreaker!.rolls[id]! }));
-
+    
     if (rolls.length < state.tieBreaker.playerIds.length) {
       // Not everyone has rolled yet (can happen if someone just left)
       return;
@@ -309,7 +310,7 @@ export class DiceGameEngine implements GameEngine {
       // Tie broken
       const eliminatedId = lowestRollers[0].id;
       state.lastRoundResults = { ...state.tieBreaker.rolls };
-
+      
       state.history.push({
         round: state.currentRound,
         isTieBreakerResolved: true,
@@ -337,7 +338,7 @@ export class DiceGameEngine implements GameEngine {
       participant.status = 'eliminated';
       participant.defeatReason = 'eliminated';
       participant.eliminatedRound = state.currentRound;
-
+      
       state.activePlayerIds = state.activePlayerIds.filter(id => id !== userId);
       events.push({ type: 'player_eliminated', payload: { userId } });
     }
@@ -345,7 +346,7 @@ export class DiceGameEngine implements GameEngine {
 
   private resolveMarathonRound(state: GameState, events: any[]) {
     // Scores are already updated in processMove for Marathon
-
+    
     state.history.push({
       round: state.currentRound,
       rolls: { ...state.rolls } as Record<string, number>
@@ -397,7 +398,7 @@ export class DiceGameEngine implements GameEngine {
     const rolls = state.tieBreaker.playerIds
       .filter(id => state.tieBreaker!.rolls[id] !== undefined && state.tieBreaker!.rolls[id] !== null)
       .map(id => ({ id, roll: state.tieBreaker!.rolls[id]! }));
-
+    
     if (rolls.length < state.tieBreaker.playerIds.length) {
       // Not everyone has rolled yet
       return;
@@ -419,8 +420,8 @@ export class DiceGameEngine implements GameEngine {
       const winnerId = winners[0].id;
       // Adjust score slightly to break tie for ranking logic
       const winner = state.participants.find(p => p.userId === winnerId);
-      if (winner) winner.score += 0.1;
-
+      if (winner) winner.score += 0.1; 
+      
       state.tieBreaker = undefined;
       state.currentTurnPlayerId = null;
       this.finalizeGame(state, events);
@@ -430,13 +431,13 @@ export class DiceGameEngine implements GameEngine {
   private finalizeGame(state: GameState, events: any[]) {
     state.status = 'completed';
     state.currentTurnPlayerId = null;
-
+    
     // Rank all players based on their achievement
     // Priority:
     // 1. Active or Left (Tier 1) - Rank by score
     // 2. Eliminated (Tier 2) - Rank by round survived, then score
     // 3. Disconnected (Tier 3) - Rank by score
-
+    
     const allParticipants = [...state.participants].sort((a, b) => {
       // 1. If scores are different, use score
       if (b.score !== a.score) return b.score - a.score;

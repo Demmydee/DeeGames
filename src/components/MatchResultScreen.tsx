@@ -32,7 +32,8 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
   
   // Use the rank from rankings or the isWinner flag if provided
   const isWinner = myRanking?.rank === 1 || myRanking?.isWinner === true;
-  const isTie = result.rankings?.filter((r: any) => r.rank === 1).length > 1;
+  const isTie = result.rankings?.filter((r: any) => r.rank === 1).length > 1 || result.is_draw;
+  const isDraw = result.is_draw === true;
   const profitKobo = myRanking ? (myRanking.payoutKobo - myRanking.wagerKobo) : 0;
 
   return (
@@ -48,36 +49,37 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
             isWinner ? 'bg-yellow-500/10' : 'bg-red-500/5'
           }`}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/5 to-transparent opacity-20" />
-
+            
             <motion.div
               initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
               animate={{ scale: 1, opacity: 1, rotate: isWinner ? 12 : -6 }}
               transition={{ type: 'spring', damping: 10, stiffness: 100 }}
               className={`relative z-10 w-24 h-24 sm:w-32 sm:h-32 rounded-2xl sm:rounded-[2rem] flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-2xl transition-all duration-700 ${
-                isWinner
-                  ? 'bg-gradient-to-br from-yellow-300 via-yellow-500 to-amber-700 shadow-[0_0_50px_rgba(234,179,8,0.4)]'
+                isWinner 
+                  ? 'bg-gradient-to-br from-yellow-300 via-yellow-500 to-amber-700 shadow-[0_0_50px_rgba(234,179,8,0.4)]' 
                   : 'bg-gradient-to-br from-gray-700 to-gray-900 shadow-xl grayscale'
               }`}
             >
               <Trophy className={`w-10 h-10 sm:w-16 sm:h-16 ${isWinner ? 'text-black' : 'text-white/20'}`} />
               {isWinner && (
-                <motion.div
+                <motion.div 
                   animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.6, 0.3] }}
                   transition={{ duration: 3, repeat: Infinity }}
-                  className="absolute inset-0 bg-yellow-400 rounded-2xl sm:rounded-[2rem] filter blur-3xl -z-10"
+                  className="absolute inset-0 bg-yellow-400 rounded-2xl sm:rounded-[2rem] filter blur-3xl -z-10" 
                 />
               )}
             </motion.div>
-
+            
             <div className="relative z-10">
-              <motion.h1
+              <motion.h1 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={`text-4xl sm:text-6xl font-black uppercase italic tracking-tighter mb-2 leading-none ${
+                  isDraw ? 'text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]' :
                   isWinner ? 'text-yellow-400 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]' : 'text-white/80'
                 }`}
               >
-                {isWinner ? (isTie ? 'Tie!' : 'Winner') : 'Defeat'}
+                {isDraw ? 'Draw' : (isWinner ? (isTie ? 'Tie!' : 'Winner') : 'Defeat')}
               </motion.h1>
               <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-3">
                 <span className="text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] bg-white/5 px-2 sm:px-3 py-1 rounded-full border border-white/10">
@@ -95,13 +97,13 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
 
           <div className="flex-1 overflow-y-auto p-4 sm:p-10 pt-4 sm:pt-6 space-y-8 sm:space-y-12 custom-scrollbar">
             {/* Earnings Summary */}
-            <motion.div
+            <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
               className={`p-6 sm:p-10 rounded-3xl sm:rounded-[2.5rem] border-2 flex items-center justify-between shadow-2xl relative overflow-hidden group ${
-                profitKobo >= 0
-                  ? 'bg-[#0f1715] border-emerald-500/30'
+                profitKobo >= 0 
+                  ? 'bg-[#0f1715] border-emerald-500/30' 
                   : 'bg-[#1a1111] border-red-500/20'
               }`}
             >
@@ -203,16 +205,16 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.5 + (index * 0.05) }}
                     className={`p-6 rounded-3xl border transition-all hover:scale-[1.02] duration-300 ${
-                      p.rank === 1
-                        ? 'bg-emerald-500/10 border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.1)]'
+                      p.rank === 1 
+                        ? 'bg-emerald-500/10 border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.1)]' 
                         : 'bg-white/5 border-white/10 opacity-90'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-5">
                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl ${
-                          p.rank === 1
-                            ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black shadow-lg'
+                          p.rank === 1 
+                            ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black shadow-lg' 
                             : 'bg-white/5 text-gray-400'
                         }`}>
                           {p.rank === 1 ? <Award className="w-8 h-8" /> : p.rank}

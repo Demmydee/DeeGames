@@ -213,5 +213,21 @@ export const gameApi = {
   leave: async (matchId: string) => {
     const response = await apiClient.post(`${API_BASE}/game/${matchId}/leave`);
     return response.data;
+  },
+  processMove: async (matchId: string, moveData: any) => {
+    const response = await apiClient.post(`${API_BASE}/game/${matchId}/move`, moveData);
+    return response.data;
+  },
+  createDrawOffer: async (matchId: string) => {
+    const response = await apiClient.post(`${API_BASE}/game/${matchId}/draw-offer`);
+    return response.data;
+  },
+  acceptDrawOffer: async (matchId: string) => {
+    const response = await apiClient.post(`${API_BASE}/game/${matchId}/draw-offer/accept`);
+    return response.data;
+  },
+  declineDrawOffer: async (matchId: string) => {
+    const response = await apiClient.post(`${API_BASE}/game/${matchId}/draw-offer/decline`);
+    return response.data;
   }
 };

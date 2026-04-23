@@ -22,8 +22,8 @@ CREATE TABLE IF NOT EXISTS public.users (
 );
 
 -- Migration: Ensure KYC columns exist if table was created in an older version
-DO $$
-BEGIN
+DO $$ 
+BEGIN 
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='kyc_status') THEN
         ALTER TABLE public.users ADD COLUMN kyc_status TEXT DEFAULT 'pending';
     END IF;
@@ -187,6 +187,20 @@ CREATE TABLE IF NOT EXISTS public.matches (
     finished_at TIMESTAMPTZ
 );
 
+-- Migration: Ensure missing columns exist in matches
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='matches' AND column_name='started_at') THEN
+        ALTER TABLE public.matches ADD COLUMN started_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='matches' AND column_name='ended_at') THEN
+        ALTER TABLE public.matches ADD COLUMN ended_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='matches' AND column_name='finished_at') THEN
+        ALTER TABLE public.matches ADD COLUMN finished_at TIMESTAMPTZ;
+    END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS public.match_participants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     match_id UUID NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
@@ -196,10 +210,32 @@ CREATE TABLE IF NOT EXISTS public.match_participants (
     joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     left_at TIMESTAMPTZ,
     reconnected_at TIMESTAMPTZ,
-    countdown_expires_at TIMESTAMPTZ,
+    countdown_expires_at TIMESTAMPTZ, 
     disconnect_detected_at TIMESTAMPTZ,
+    is_away BOOLEAN DEFAULT FALSE,
+    away_since TIMESTAMPTZ,
     UNIQUE(match_id, user_id)
 );
+
+-- Migration: Ensure missing columns exist in match_participants
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='match_participants' AND column_name='is_away') THEN
+        ALTER TABLE public.match_participants ADD COLUMN is_away BOOLEAN DEFAULT FALSE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='match_participants' AND column_name='away_since') THEN
+        ALTER TABLE public.match_participants ADD COLUMN away_since TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='match_participants' AND column_name='reconnected_at') THEN
+        ALTER TABLE public.match_participants ADD COLUMN reconnected_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='match_participants' AND column_name='countdown_expires_at') THEN
+        ALTER TABLE public.match_participants ADD COLUMN countdown_expires_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='match_participants' AND column_name='disconnect_detected_at') THEN
+        ALTER TABLE public.match_participants ADD COLUMN disconnect_detected_at TIMESTAMPTZ;
+    END IF;
+END $$;
 
 -- 5. Game Gameplay Models
 CREATE TABLE IF NOT EXISTS public.game_states (
@@ -245,8 +281,8 @@ CREATE TABLE IF NOT EXISTS public.match_results (
 );
 
 -- Migration: Ensure missing columns exist in match_results
-DO $$
-BEGIN
+DO $$ 
+BEGIN 
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='match_results' AND column_name='history') THEN
         ALTER TABLE public.match_results ADD COLUMN history JSONB DEFAULT '[]'::jsonb;
     END IF;
@@ -333,7 +369,7 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
     -- 1. Sync to public.users
-    -- Using internal BEGIN/EXCEPTION to ensure Auth registration doesn't fail
+    -- Using internal BEGIN/EXCEPTION to ensure Auth registration doesn't fail 
     -- if there's a constraint violation in public.users (e.g. duplicate username from deleted account)
     BEGIN
         INSERT INTO public.users (id, username, email, phone, full_name, avatar_url)
@@ -358,7 +394,7 @@ BEGIN
 
     -- 2. Create Wallet
     BEGIN
-        INSERT INTO public.wallets (user_id)
+        INSERT INTO public.wallets (user_id) 
         VALUES (NEW.id)
         ON CONFLICT (user_id) DO NOTHING;
     EXCEPTION WHEN OTHERS THEN
@@ -416,11 +452,11 @@ BEGIN
     SELECT EXISTS (SELECT 1 FROM public.users WHERE LOWER(username) = LOWER(p_username)) INTO v_username_exists;
     SELECT EXISTS (SELECT 1 FROM public.users WHERE LOWER(email) = LOWER(p_email)) INTO v_email_exists_public;
     SELECT EXISTS (SELECT 1 FROM public.users WHERE phone = p_phone) INTO v_phone_exists;
-
+    
     -- Also check auth.users directly to catch users who exist but whose sync failed
     -- This helps prevent the "Database error" by failing early with a clean message
     SELECT EXISTS (SELECT 1 FROM auth.users WHERE LOWER(email) = LOWER(p_email)) INTO v_email_exists_auth;
-
+    
     RETURN jsonb_build_object(
         'username_exists', v_username_exists,
         'email_exists', v_email_exists_public OR v_email_exists_auth,
@@ -453,7 +489,7 @@ DECLARE
     v_final_status text;
 BEGIN
     INSERT INTO public.match_results (
-        match_id, pay_mode, total_pool_kobo, house_cut_kobo, net_pool_kobo,
+        match_id, pay_mode, total_pool_kobo, house_cut_kobo, net_pool_kobo, 
         winners_count, losers_count, rankings, history, settlement_status, settled_at
     ) VALUES (
         p_match_id, p_pay_mode, p_total_pool_kobo, p_house_cut_kobo, p_net_pool_kobo,
@@ -466,14 +502,14 @@ BEGIN
     END IF;
 
     FOR v_p_rec IN SELECT * FROM jsonb_to_recordset(p_payouts) AS x(
-        "userId" uuid, "rank" integer, "wagerKobo" bigint, "payoutKobo" bigint,
+        "userId" uuid, "rank" integer, "wagerKobo" bigint, "payoutKobo" bigint, 
         "isWinner" boolean, "weight" integer, "defeatReason" text
     ) LOOP
         -- Lock and select the wallet ID
         SELECT id INTO v_target_w_id FROM public.wallets WHERE user_id = v_p_rec."userId" FOR UPDATE;
 
         -- Update Wallet Balances
-        UPDATE public.wallets
+        UPDATE public.wallets 
         SET locked_balance = locked_balance - (v_p_rec."wagerKobo"::numeric / 100.0),
             updated_at = now()
         WHERE id = v_target_w_id;
@@ -482,13 +518,13 @@ BEGIN
             INSERT INTO public.wallet_transactions (
                 wallet_id, user_id, transaction_type, direction, amount, status, reference, description
             ) VALUES (
-                v_target_w_id, v_p_rec."userId", 'wager_loss', 'debit', (v_p_rec."wagerKobo"::numeric / 100.0),
+                v_target_w_id, v_p_rec."userId", 'wager_loss', 'debit', (v_p_rec."wagerKobo"::numeric / 100.0), 
                 'completed', 'MATCH_LOSS_' || p_match_id::text, 'Wager loss for match ' || p_match_id::text
             ) RETURNING id INTO v_t_id;
-
+            
             v_final_status := 'defeated';
         ELSE
-            UPDATE public.wallets
+            UPDATE public.wallets 
             SET available_balance = available_balance + (v_p_rec."payoutKobo"::numeric / 100.0),
                 updated_at = now()
             WHERE id = v_target_w_id;
@@ -496,29 +532,29 @@ BEGIN
             INSERT INTO public.wallet_transactions (
                 wallet_id, user_id, transaction_type, direction, amount, status, reference, description
             ) VALUES (
-                v_target_w_id, v_p_rec."userId", 'wager_payout', 'credit', (v_p_rec."payoutKobo"::numeric / 100.0),
+                v_target_w_id, v_p_rec."userId", 'wager_payout', 'credit', (v_p_rec."payoutKobo"::numeric / 100.0), 
                 'completed', 'MATCH_PAYOUT_' || p_match_id::text, 'Wager payout for match ' || p_match_id::text
             ) RETURNING id INTO v_t_id;
-
+            
             v_final_status := 'winner';
         END IF;
-
+        
         -- Override status if they left early (but still managed to rank/win?)
         IF v_p_rec."defeatReason" = 'left' THEN
             v_final_status := 'left';
         END IF;
 
         -- Update match_participants status ATOMICALLY
-        UPDATE public.match_participants
-        SET status = v_final_status
+        UPDATE public.match_participants 
+        SET status = v_final_status 
         WHERE match_id = p_match_id AND user_id = v_p_rec."userId";
 
         -- Record individual payout
         INSERT INTO public.match_payouts (
-            match_result_id, match_id, user_id, rank, wager_kobo, weight, payout_kobo,
+            match_result_id, match_id, user_id, rank, wager_kobo, weight, payout_kobo, 
             is_winner, defeat_reason, wallet_transaction_id
         ) VALUES (
-            v_res_id, p_match_id, v_p_rec."userId", v_p_rec."rank", v_p_rec."wagerKobo",
+            v_res_id, p_match_id, v_p_rec."userId", v_p_rec."rank", v_p_rec."wagerKobo", 
             v_p_rec."weight", v_p_rec."payoutKobo", v_p_rec."isWinner", v_p_rec."defeatReason", v_t_id
         );
     END LOOP;
@@ -542,7 +578,7 @@ BEGIN
     FOR v_part IN SELECT user_id FROM public.match_participants WHERE match_id = p_match_id LOOP
         SELECT id INTO v_target_w_id FROM public.wallets WHERE user_id = v_part.user_id FOR UPDATE;
 
-        UPDATE public.wallets
+        UPDATE public.wallets 
         SET locked_balance = locked_balance - (p_wager_kobo::numeric / 100.0),
             available_balance = available_balance + (p_wager_kobo::numeric / 100.0),
             updated_at = now()
@@ -551,13 +587,13 @@ BEGIN
         INSERT INTO public.wallet_transactions (
             wallet_id, user_id, transaction_type, direction, amount, status, reference, description
         ) VALUES (
-            v_target_w_id, v_part.user_id, 'wager_release', 'credit', (p_wager_kobo::numeric / 100.0),
+            v_target_w_id, v_part.user_id, 'wager_release', 'credit', (p_wager_kobo::numeric / 100.0), 
             'completed', 'MATCH_REFUND_' || p_match_id::text, 'Wager refund for match ' || p_match_id::text
         );
     END LOOP;
 
     UPDATE public.matches SET status = 'cancelled', finished_at = now() WHERE id = p_match_id;
-
+    
     INSERT INTO public.match_results (
         match_id, pay_mode, settlement_status, settled_at
     ) VALUES (
@@ -582,19 +618,19 @@ DECLARE
     v_target_w_id UUID;
 BEGIN
     SELECT * INTO v_req FROM public.game_requests WHERE id = p_request_id FOR UPDATE;
-
+    
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Game request not found';
     END IF;
-
+    
     IF v_req.status != 'awaiting_opponents' AND v_req.status != 'ready_to_start' THEN
         RAISE EXCEPTION 'Game request is not in a startable state: %', v_req.status;
     END IF;
-
+    
     IF v_req.requester_user_id != p_started_by_user_id THEN
         RAISE EXCEPTION 'Only the requester can start the game';
     END IF;
-
+    
     INSERT INTO public.matches (
         game_request_id,
         room_category_id,
@@ -616,7 +652,7 @@ BEGIN
         'in_progress',
         NOW()
     ) RETURNING id INTO v_match_id;
-
+    
     FOR v_part IN (SELECT * FROM public.game_request_participants WHERE game_request_id = p_request_id AND status = 'joined' ORDER BY joined_at ASC) LOOP
         INSERT INTO public.match_participants (
             match_id,
@@ -629,20 +665,20 @@ BEGIN
             (SELECT count(*) + 1 FROM public.match_participants WHERE match_id = v_match_id),
             'active'
         );
-
+        
         IF v_req.amount > 0 THEN
             SELECT id INTO v_target_w_id FROM public.wallets WHERE user_id = v_part.user_id FOR UPDATE;
-
+            
             IF (SELECT available_balance FROM public.wallets WHERE id = v_target_w_id) < v_req.amount THEN
                 RAISE EXCEPTION 'User % has insufficient balance', v_part.user_id;
             END IF;
-
+            
             UPDATE public.wallets SET
                 available_balance = available_balance - v_req.amount,
                 locked_balance = locked_balance + v_req.amount,
                 updated_at = NOW()
             WHERE id = v_target_w_id;
-
+            
             INSERT INTO public.wallet_transactions (
                 wallet_id,
                 user_id,
@@ -665,12 +701,12 @@ BEGIN
                 jsonb_build_object('match_id', v_match_id, 'request_id', p_request_id)
             );
         END IF;
-
+        
         UPDATE public.game_request_participants SET status = 'locked_in' WHERE id = v_part.id;
     END LOOP;
-
+    
     UPDATE public.game_requests SET status = 'started', started_at = NOW() WHERE id = p_request_id;
-
+    
     RETURN jsonb_build_object('success', true, 'match_id', v_match_id);
 END;
 $$;
@@ -686,25 +722,25 @@ DECLARE
     v_req RECORD;
 BEGIN
     SELECT * INTO v_req FROM public.game_requests WHERE id = p_request_id FOR UPDATE;
-
+    
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Game request not found';
     END IF;
-
+    
     IF v_req.requester_user_id != p_user_id THEN
         RAISE EXCEPTION 'Only the requester can cancel the request';
     END IF;
-
+    
     IF v_req.status = 'started' THEN
         RAISE EXCEPTION 'Cannot cancel a game that has already started';
     END IF;
-
-    UPDATE public.game_requests SET
-        status = 'cancelled',
+    
+    UPDATE public.game_requests SET 
+        status = 'cancelled', 
         cancelled_at = NOW(),
         updated_at = NOW()
     WHERE id = p_request_id;
-
+    
     RETURN jsonb_build_object('success', true);
 EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'Failed to cancel game request: %', SQLERRM;
@@ -721,25 +757,25 @@ RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
     v_part RECORD;
 BEGIN
-    SELECT * INTO v_part FROM public.game_request_participants
+    SELECT * INTO v_part FROM public.game_request_participants 
     WHERE game_request_id = p_request_id AND user_id = p_user_id FOR UPDATE;
-
+    
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Participation not found';
     END IF;
-
+    
     IF v_part.role = 'requester' THEN
         RAISE EXCEPTION 'Requester should cancel the request instead of leaving';
     END IF;
-
+    
     DELETE FROM public.game_request_participants WHERE id = v_part.id;
-
+    
     -- Update request status back to awaiting_opponents if it was ready_to_start
-    UPDATE public.game_requests SET
+    UPDATE public.game_requests SET 
         status = 'awaiting_opponents',
         updated_at = NOW()
     WHERE id = p_request_id AND status = 'ready_to_start';
-
+    
     RETURN jsonb_build_object('success', true);
 EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'Failed to leave game request: %', SQLERRM;
@@ -758,15 +794,15 @@ BEGIN
     SELECT grp.game_request_id INTO v_a_request_id
     FROM public.game_request_participants grp
     JOIN public.game_requests gr ON gr.id = grp.game_request_id
-    WHERE grp.user_id = p_user_id
+    WHERE grp.user_id = p_user_id 
     AND grp.status = 'joined'
     AND gr.status IN ('awaiting_opponents', 'ready_to_start')
     LIMIT 1;
-
+    
     IF v_a_request_id IS NOT NULL THEN
         RETURN jsonb_build_object('active', true, 'type', 'request', 'id', v_a_request_id);
     END IF;
-
+    
     -- Check for active match
     SELECT mp.match_id INTO v_a_match_id
     FROM public.match_participants mp
@@ -775,11 +811,11 @@ BEGIN
     AND mp.status = 'active'
     AND m.status IN ('waiting', 'in_progress')
     LIMIT 1;
-
+    
     IF v_a_match_id IS NOT NULL THEN
         RETURN jsonb_build_object('active', true, 'type', 'match', 'id', v_a_match_id);
     END IF;
-
+    
     RETURN jsonb_build_object('active', false);
 END;
 $$;

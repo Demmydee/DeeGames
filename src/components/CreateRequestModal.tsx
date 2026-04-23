@@ -35,7 +35,7 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
     pay_mode: 'knockout' as 'knockout' | 'split',
     amount: room.min_wager,
     required_players: 2,
-    game_variant: 'sudden_drop' as 'sudden_drop' | 'marathon'
+    game_variant: 'sudden_drop' as string
   });
 
   useEffect(() => {
@@ -92,14 +92,23 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
 
   // Enforce rules when category or game type changes
   useEffect(() => {
-    if (formData.category === 'duel') {
+    if (selectedGame?.name.toLowerCase().includes('chess')) {
+      setFormData(prev => ({ 
+        ...prev, 
+        category: 'duel',
+        pay_mode: 'knockout', 
+        required_players: 2,
+        game_variant: (prev.game_variant === 'blitz' || prev.game_variant === 'rapid') ? prev.game_variant : 'blitz'
+      }));
+    } else if (formData.category === 'duel') {
       setFormData(prev => ({ 
         ...prev, 
         pay_mode: 'knockout', 
-        required_players: 2 
+        required_players: 2,
+        game_variant: (prev.game_variant === 'sudden_drop' || prev.game_variant === 'marathon') ? prev.game_variant : 'sudden_drop'
       }));
     }
-  }, [formData.category]);
+  }, [formData.category, selectedGame]);
 
   useEffect(() => {
     if (selectedGame) {
@@ -232,6 +241,42 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
               </div>
             )}
 
+            {/* Variant Selection (Only for Chess) */}
+            {selectedGame?.name.toLowerCase().includes('chess') && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                  <Trophy className="w-3 h-3" />
+                  Time Control
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, game_variant: 'blitz' })}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      formData.game_variant === 'blitz' 
+                        ? 'border-emerald-500 bg-emerald-500/10 text-white' 
+                        : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
+                    }`}
+                  >
+                    <div className="font-bold text-xs">Blitz</div>
+                    <div className="text-[8px] opacity-60 uppercase tracking-wider">10m + 5s inc</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, game_variant: 'rapid' })}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      formData.game_variant === 'rapid' 
+                        ? 'border-emerald-500 bg-emerald-500/10 text-white' 
+                        : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
+                    }`}
+                  >
+                    <div className="font-bold text-xs">Rapid</div>
+                    <div className="text-[8px] opacity-60 uppercase tracking-wider">15m + 10s inc</div>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Players & Category */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -263,8 +308,9 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
                 </label>
                 <select
                   value={formData.category}
+                  disabled={selectedGame?.name.toLowerCase().includes('chess')}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
-                  className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+                  className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
                 >
                   <option value="duel" className="bg-[#0a0a0a]">Duel (1v1)</option>
                   <option value="arena" className="bg-[#0a0a0a]">Arena (Multiplayer)</option>

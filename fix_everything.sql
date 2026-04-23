@@ -19,13 +19,13 @@ CREATE POLICY "Anyone can view matches" ON public.matches FOR SELECT USING (TRUE
 -- 2. Schema Hardening for Phase 5A
 -- Ensure critical columns added in Phase 5A migrations are present in case the previous migration failed partially.
 
-ALTER TABLE public.match_participants
+ALTER TABLE public.match_participants 
 ADD COLUMN IF NOT EXISTS defeat_reason TEXT,
 ADD COLUMN IF NOT EXISTS countdown_expires_at TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS disconnect_detected_at TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS reconnected_at TIMESTAMPTZ;
 
-ALTER TABLE public.game_requests
+ALTER TABLE public.game_requests 
 ADD COLUMN IF NOT EXISTS game_variant TEXT;
 
 -- Use integer types for monetary columns to ensure precision consistency
@@ -40,7 +40,7 @@ ALTER TABLE public.house_revenue ALTER COLUMN amount_kobo TYPE bigint;
 
 -- 3. Presence Support
 -- Ensure presence columns exist on match_participants
-ALTER TABLE public.match_participants
+ALTER TABLE public.match_participants 
 ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ DEFAULT NOW(),
 ADD COLUMN IF NOT EXISTS is_away BOOLEAN DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS away_since TIMESTAMPTZ;
@@ -52,8 +52,8 @@ CREATE OR REPLACE FUNCTION public.update_match_presence(
 )
 RETURNS VOID AS $$
 BEGIN
-    UPDATE public.match_participants
-    SET
+    UPDATE public.match_participants 
+    SET 
         last_seen_at = NOW(),
         is_away = FALSE,
         away_since = NULL

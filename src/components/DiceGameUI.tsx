@@ -155,15 +155,15 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
           {gameState.participants.map((p: any) => {
             const presence = matchParticipants?.find(mp => mp.user_id === p.userId);
             const isCurrentTurn = gameState.currentTurnPlayerId === p.userId;
-
+            
             return (
-              <div
+              <div 
                 key={p.userId}
                 className={`p-4 rounded-2xl border transition-all flex flex-col gap-3 ${
                   isCurrentTurn
                     ? 'bg-emerald-500/10 border-emerald-500/40 ring-1 ring-emerald-500/20 shadow-lg shadow-emerald-500/5'
-                    : p.status === 'active'
-                      ? 'bg-white/5 border-white/10'
+                    : p.status === 'active' 
+                      ? 'bg-white/5 border-white/10' 
                       : 'bg-red-500/5 border-red-500/20 opacity-60'
                 }`}
               >
@@ -214,8 +214,8 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                     if (playerRoll === undefined) return null;
                     const isElimRound = round.eliminatedPlayerId === p.userId;
                     return (
-                      <div
-                        key={rIdx}
+                      <div 
+                        key={rIdx} 
                         className={`min-w-[22px] h-[22px] rounded flex items-center justify-center text-[9px] font-mono font-bold transition-colors ${
                           isElimRound ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-white/5 text-gray-400 border border-white/10'
                         }`}
@@ -227,7 +227,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                   })}
                   {/* Current Round Pending Roll */}
                   {gameState.rolls[p.userId] !== undefined && (
-                    <motion.div
+                    <motion.div 
                       initial={{ scale: 0.8, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       className="min-w-[22px] h-[22px] rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-[9px] font-mono font-bold"
@@ -254,7 +254,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
           {/* Dice Display */}
           <div className="aspect-video bg-black/40 border border-white/5 rounded-3xl flex items-center justify-center relative overflow-hidden">
             <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
-
+            
             <AnimatePresence mode="wait">
               {hasDisplayRoll ? (
                 <motion.div
@@ -310,8 +310,8 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
             onClick={handleRoll}
             disabled={!canRoll || rolling}
             className={`w-full py-6 rounded-2xl font-black uppercase italic tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 ${
-              canRoll
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/20'
+              canRoll 
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/20' 
                 : 'bg-white/5 text-gray-600 cursor-not-allowed border border-white/5'
             }`}
           >
@@ -340,7 +340,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                 const p = gameState.participants.find((p: any) => p.userId === id);
                 const rolled = gameState.rolls[id] !== undefined && gameState.rolls[id] !== null;
                 return (
-                  <div
+                  <div 
                     key={id}
                     className={`px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${
                       rolled ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/5 border-white/10 text-gray-500'

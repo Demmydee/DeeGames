@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { GameStateService } from '../services/gameStateService';
 import { HeartbeatService } from '../services/heartbeatService';
+import { ChessService } from '../services/chessService';
 
 export const getGameState = async (req: Request, res: Response) => {
   try {
@@ -77,5 +78,38 @@ export const getMatchResult = async (req: Request, res: Response) => {
     res.json(result);
   } catch (error: any) {
     res.status(404).json({ error: error.message });
+  }
+};
+
+export const createDrawOffer = async (req: Request, res: Response) => {
+  try {
+    const { matchId } = req.params;
+    const userId = (req as any).user.id;
+    const result = await ChessService.createDrawOffer(matchId, userId);
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+export const acceptDrawOffer = async (req: Request, res: Response) => {
+  try {
+    const { matchId } = req.params;
+    const userId = (req as any).user.id;
+    const result = await ChessService.acceptDrawOffer(matchId, userId);
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+export const declineDrawOffer = async (req: Request, res: Response) => {
+  try {
+    const { matchId } = req.params;
+    const userId = (req as any).user.id;
+    const result = await ChessService.declineDrawOffer(matchId, userId);
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 };

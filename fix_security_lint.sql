@@ -62,7 +62,7 @@ CREATE POLICY "Participants can view match payouts" ON public.match_payouts
         )
     );
 
--- Match Heartbeats:
+-- Match Heartbeats: 
 -- Read: Participants can see who is active
 DROP POLICY IF EXISTS "Participants can view match heartbeats" ON public.match_heartbeats;
 CREATE POLICY "Participants can view match heartbeats" ON public.match_heartbeats

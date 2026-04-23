@@ -1,27 +1,21 @@
 import { Match, MatchParticipant } from '../../src/types/multiplayer';
 
 export interface GameConfig {
-  variant: 'sudden_drop' | 'marathon';
-  diceCount: number; // 1 or 2
-  rounds?: number; // for marathon
+  variant: string;
+  [key: string]: any;
 }
 
 export interface GameState {
-  variant: 'sudden_drop' | 'marathon';
+  variant: string;
   status: 'active' | 'completed' | 'abandoned';
-  currentRound: number;
-  totalRounds: number;
+  currentRound?: number;
+  totalRounds?: number;
   activePlayerIds: string[];
   participants: RankedParticipant[];
-  rolls: Record<string, number | null>; // current round rolls
-  lastRoundResults?: Record<string, number | null>; // rolls from recently resolved round
   currentTurnPlayerId: string | null;
-  history: RoundResult[];
+  history: any[];
   config: GameConfig;
-  tieBreaker?: {
-    playerIds: string[];
-    rolls: Record<string, number | null>;
-  };
+  [key: string]: any;
 }
 
 export interface RankedParticipant {
@@ -29,9 +23,9 @@ export interface RankedParticipant {
   username: string;
   rank?: number;
   score: number; // cumulative score for marathon
-  status: 'active' | 'eliminated' | 'left' | 'disconnected';
+  status: 'active' | 'eliminated' | 'left' | 'disconnected' | 'defeated';
   eliminatedRound?: number;
-  defeatReason?: 'left' | 'disconnected' | 'eliminated' | 'loss';
+  defeatReason?: 'left' | 'disconnected' | 'eliminated' | 'loss' | 'time_forfeit';
 }
 
 export interface RoundResult {
@@ -44,7 +38,7 @@ export interface RoundResult {
 }
 
 export interface MoveData {
-  type: 'roll' | 'tie_reroll' | 'sudden_death_roll';
+  type: string;
   [key: string]: any;
 }
 
@@ -59,7 +53,10 @@ export interface GameEvent {
 }
 
 export interface EndConditionResult {
+  isOver: boolean;
   winnerId: string | null;
+  isDraw?: boolean;
+  drawReason?: string;
   rankings: RankedParticipant[];
 }
 
@@ -79,7 +76,7 @@ export interface GameEngine {
   handlePlayerDefeat(
     currentState: GameState,
     userId: string,
-    reason: 'left' | 'disconnected'
+    reason: 'left' | 'disconnected' | 'time_forfeit'
   ): GameStateUpdateResult;
 
   detectEndCondition(
