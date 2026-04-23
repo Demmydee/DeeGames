@@ -26,6 +26,9 @@ export class ChessEngine implements GameEngine {
       : parseInt(process.env.CHESS_RAPID_INCREMENT_MS || '10000');
 
     // Randomly assign white and black
+    if (participants.length < 2) {
+      throw new Error('Chess requires at least 2 participants');
+    }
     const shuffled = [...participants].sort(() => Math.random() - 0.5);
     const whiteUserId = shuffled[0].user_id;
     const blackUserId = shuffled[1].user_id;
@@ -83,8 +86,8 @@ export class ChessEngine implements GameEngine {
     const elapsed = now - turnStartedAt;
 
     const isWhite = userId === currentState.white_user_id;
-    const currentRemaining = isWhite 
-      ? currentState.white_time_remaining_ms 
+    const currentRemaining = isWhite
+      ? currentState.white_time_remaining_ms
       : currentState.black_time_remaining_ms;
 
     // 1. Check for time forfeit
@@ -163,7 +166,7 @@ export class ChessEngine implements GameEngine {
     reason: 'left' | 'disconnected' | 'time_forfeit'
   ): GameStateUpdateResult {
     const winnerId = currentState.participants.find(p => p.userId !== userId)?.userId || null;
-    
+
     const rankings: RankedParticipant[] = currentState.participants.map(p => ({
       ...p,
       rank: p.userId === winnerId ? 1 : 2,
@@ -193,7 +196,7 @@ export class ChessEngine implements GameEngine {
 
   detectEndCondition(currentState: GameState): EndConditionResult | null {
     const chess = new Chess(currentState.fen);
-    
+
     if (chess.isGameOver()) {
       let isDraw = false;
       let drawReason = '';

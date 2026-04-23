@@ -34,15 +34,26 @@ export class GameStateService {
     const initialState = engine.initializeState(match, match.participants!, config);
 
     try {
+      // Check if game state already exists for this match to prevent unique constraint error
+      const { data: existingState } = await supabase
+        .from('game_states')
+        .select('id, status')
+        .eq('match_id', matchId)
+        .maybeSingle();
+
+      if (existingState) {
+        return existingState;
+      }
+
       const { data, error } = await supabase
         .from('game_states')
         .insert([{
           match_id: matchId,
-          game_type: match.game_type!.name.toLowerCase(),
+          game_type: match.game_type?.name?.toLowerCase() || gameTypeName,
           game_variant: config.variant,
           state: initialState,
-          current_round: initialState.currentRound,
-          total_rounds: initialState.totalRounds,
+          current_round: initialState.currentRound || 1,
+          total_rounds: initialState.totalRounds || 1,
           status: 'active'
         }])
         .select()

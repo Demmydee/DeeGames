@@ -17,6 +17,9 @@ export class DiceGameEngine implements GameEngine {
     participants: MatchParticipant[],
     config: GameConfig
   ): GameState {
+    if (!participants || participants.length === 0) {
+      throw new Error('Game requires at least 1 participant');
+    }
     const activePlayerIds = participants.map(p => p.user_id);
     const totalRounds = config.variant === 'sudden_drop' 
       ? activePlayerIds.length - 1 
