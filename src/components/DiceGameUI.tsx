@@ -138,7 +138,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
           <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 animate-pulse">
             <Zap className="w-4 h-4 text-emerald-500" />
             <span className="text-xs font-black uppercase italic text-emerald-400 tracking-tight">
-              {isMyTurn ? "IT'S YOUR TURN TO ROLL!" : `WAITING FOR ${currentTurnPlayer?.username?.toUpperCase()}`}
+              {isMyTurn ? "IT'S YOUR TURN TO ROLL!" : `WAITING FOR ${currentTurnPlayer?.username?.toUpperCase() || 'OTHER PLAYER'}`}
             </span>
           </div>
         )}
@@ -155,15 +155,15 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
           {gameState.participants.map((p: any) => {
             const presence = matchParticipants?.find(mp => mp.user_id === p.userId);
             const isCurrentTurn = gameState.currentTurnPlayerId === p.userId;
-            
+
             return (
-              <div 
+              <div
                 key={p.userId}
                 className={`p-4 rounded-2xl border transition-all flex flex-col gap-3 ${
                   isCurrentTurn
                     ? 'bg-emerald-500/10 border-emerald-500/40 ring-1 ring-emerald-500/20 shadow-lg shadow-emerald-500/5'
-                    : p.status === 'active' 
-                      ? 'bg-white/5 border-white/10' 
+                    : p.status === 'active'
+                      ? 'bg-white/5 border-white/10'
                       : 'bg-red-500/5 border-red-500/20 opacity-60'
                 }`}
               >
@@ -214,8 +214,8 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                     if (playerRoll === undefined) return null;
                     const isElimRound = round.eliminatedPlayerId === p.userId;
                     return (
-                      <div 
-                        key={rIdx} 
+                      <div
+                        key={rIdx}
                         className={`min-w-[22px] h-[22px] rounded flex items-center justify-center text-[9px] font-mono font-bold transition-colors ${
                           isElimRound ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-white/5 text-gray-400 border border-white/10'
                         }`}
@@ -227,7 +227,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                   })}
                   {/* Current Round Pending Roll */}
                   {gameState.rolls[p.userId] !== undefined && (
-                    <motion.div 
+                    <motion.div
                       initial={{ scale: 0.8, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       className="min-w-[22px] h-[22px] rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-[9px] font-mono font-bold"
@@ -254,7 +254,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
           {/* Dice Display */}
           <div className="aspect-video bg-black/40 border border-white/5 rounded-3xl flex items-center justify-center relative overflow-hidden">
             <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
-            
+
             <AnimatePresence mode="wait">
               {hasDisplayRoll ? (
                 <motion.div
@@ -281,7 +281,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                 >
                   <Dices className={`w-20 h-20 mx-auto mb-4 text-white/20 ${canRoll ? 'animate-bounce' : ''}`} />
                   <p className="text-gray-500 text-sm font-bold uppercase tracking-widest">
-                    {canRoll ? 'Your Turn to Roll' : isMyTurn ? 'Rolling...' : `Waiting for ${currentTurnPlayer?.username}`}
+                    {canRoll ? 'Your Turn to Roll' : isMyTurn ? 'Rolling...' : `Waiting for ${currentTurnPlayer?.username || 'Opponent'}`}
                   </p>
                 </motion.div>
               )}

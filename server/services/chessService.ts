@@ -11,7 +11,7 @@ export class ChessService {
       .select('*')
       .eq('match_id', matchId)
       .eq('status', 'pending')
-      .single();
+      .maybeSingle();
 
     if (existing) {
       throw new Error('A draw offer is already pending for this match');
@@ -26,7 +26,7 @@ export class ChessService {
         status: 'pending'
       }])
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     return data;
@@ -38,7 +38,7 @@ export class ChessService {
       .select('*')
       .eq('match_id', matchId)
       .eq('status', 'pending')
-      .single();
+      .maybeSingle();
 
     if (offerError || !offer) {
       throw new Error('No pending draw offer found');
@@ -90,7 +90,7 @@ export class ChessService {
       .select('*')
       .eq('match_id', matchId)
       .eq('status', 'pending')
-      .single();
+      .maybeSingle();
 
     if (offerError || !offer) {
       throw new Error('No pending draw offer found');

@@ -247,7 +247,8 @@ export class DiceGameEngine implements GameEngine {
         playerIds: lowestRollers.map(r => r.id),
         rolls: {}
       };
-      
+      state.rolls = {}; // Clear round rolls to avoid interference
+
       state.history.push({
         round: state.currentRound,
         isTieBreakerInitial: true,
@@ -260,7 +261,7 @@ export class DiceGameEngine implements GameEngine {
       // Single lowest roller eliminated
       const eliminatedId = lowestRollers[0].id;
       state.lastRoundResults = { ...state.rolls };
-      
+
       state.history.push({
         round: state.currentRound,
         eliminatedPlayerId: eliminatedId,
@@ -268,7 +269,7 @@ export class DiceGameEngine implements GameEngine {
       });
 
       this.eliminatePlayer(state, eliminatedId, events);
-      
+
       // Advance round if not finished
       if (state.activePlayerIds.length > 1) {
         state.currentRound++;
@@ -293,7 +294,7 @@ export class DiceGameEngine implements GameEngine {
     const rolls = state.tieBreaker.playerIds
       .filter(id => state.tieBreaker!.rolls[id] !== undefined && state.tieBreaker!.rolls[id] !== null)
       .map(id => ({ id, roll: state.tieBreaker!.rolls[id]! }));
-    
+
     if (rolls.length < state.tieBreaker.playerIds.length) {
       // Not everyone has rolled yet (can happen if someone just left)
       return;
@@ -313,7 +314,7 @@ export class DiceGameEngine implements GameEngine {
       // Tie broken
       const eliminatedId = lowestRollers[0].id;
       state.lastRoundResults = { ...state.tieBreaker.rolls };
-      
+
       state.history.push({
         round: state.currentRound,
         isTieBreakerResolved: true,
@@ -341,7 +342,7 @@ export class DiceGameEngine implements GameEngine {
       participant.status = 'eliminated';
       participant.defeatReason = 'eliminated';
       participant.eliminatedRound = state.currentRound;
-      
+
       state.activePlayerIds = state.activePlayerIds.filter(id => id !== userId);
       events.push({ type: 'player_eliminated', payload: { userId } });
     }
@@ -349,7 +350,7 @@ export class DiceGameEngine implements GameEngine {
 
   private resolveMarathonRound(state: GameState, events: any[]) {
     // Scores are already updated in processMove for Marathon
-    
+
     state.history.push({
       round: state.currentRound,
       rolls: { ...state.rolls } as Record<string, number>
@@ -382,6 +383,7 @@ export class DiceGameEngine implements GameEngine {
         playerIds: topScorers.map(p => p.userId),
         rolls: {}
       };
+      state.rolls = {}; // Clear marathon rolls
       this.rotateTurn(state);
       events.push({ type: 'sudden_death_started', payload: { playerIds: state.tieBreaker.playerIds } });
     } else {

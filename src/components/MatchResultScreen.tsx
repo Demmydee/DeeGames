@@ -132,7 +132,7 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
             </motion.div>
 
             {/* Match History Table */}
-            {result.history && result.history.length > 0 && (
+            {result.history && result.history.length > 0 && result.game_type?.toString().toLowerCase().includes('chess') === false && (
               <section>
                 <div className="flex items-center gap-3 mb-8">
                   <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center">
@@ -146,7 +146,7 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
                       <tr className="border-b border-white/10">
                         <th className="p-4 px-6 text-[10px] font-black text-gray-500 uppercase tracking-widest">Round</th>
                         {result.rankings.map((p: any) => (
-                          <th key={p.userId} className="p-4 text-center">
+                          <th key={p.userId || p.id} className="p-4 text-center">
                             <div className="flex flex-col items-center">
                               <span className="text-[10px] font-black text-white uppercase tracking-tight">{p.username}</span>
                               <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest leading-none mt-1">Final: {p.score}</span>
@@ -160,17 +160,18 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
                         <tr key={idx} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                           <td className="p-4 px-6">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-black text-emerald-500 italic">#{round.round}</span>
+                              <span className="text-xs font-black text-emerald-500 italic">#{round.round || idx + 1}</span>
                               {(round.isTieBreakerInitial || round.isTieBreakerContinued || round.isTieBreakerResolved) && (
                                 <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" title="Tie Breaker" />
                               )}
                             </div>
                           </td>
                           {result.rankings.map((p: any) => {
-                            const roll = round.rolls[p.userId];
-                            const isEliminated = round.eliminatedPlayerId === p.userId;
+                            const pid = p.userId || p.id;
+                            const roll = round.rolls ? round.rolls[pid] : undefined;
+                            const isEliminated = round.eliminatedPlayerId === pid;
                             return (
-                              <td key={p.userId} className="p-4 text-center">
+                              <td key={pid} className="p-4 text-center">
                                 {roll !== undefined ? (
                                   <span className={`text-sm font-black ${isEliminated ? 'text-red-500' : 'text-white'}`}>
                                     {roll}
@@ -185,6 +186,26 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </section>
+            )}
+
+            {/* Chess History Summary */}
+            {result.history && result.history.length > 0 && result.game_type?.toString().toLowerCase().includes('chess') === true && (
+              <section>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center">
+                    <History className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-widest leading-none">Move History</h3>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/5 p-4 rounded-[2rem] border border-white/10 max-h-64 overflow-y-auto custom-scrollbar">
+                   {result.history.map((move: any, idx: number) => (
+                     <div key={idx} className="flex justify-between p-2 bg-black/20 rounded-xl border border-white/5 text-[10px]">
+                       <span className="text-gray-500">{Math.floor(idx/2) + 1}{move.player === 'white' ? 'w' : 'b'}.</span>
+                       <span className="font-bold text-emerald-400 tracking-wider uppercase italic">{move.move}</span>
+                     </div>
+                   ))}
                 </div>
               </section>
             )}
