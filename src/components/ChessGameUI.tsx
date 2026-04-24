@@ -71,7 +71,14 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   }, [fetchGameState]);
 
   const onDrop = async (sourceSquare: string, targetSquare: string, piece: string) => {
-    if (gameState.status !== 'active' || gameState.currentTurnPlayerId !== user?.id) return false;
+    if (gameState.status !== 'active' || gameState.currentTurnPlayerId !== user?.id) {
+      return false;
+    }
+
+    // Only allow moving own pieces
+    const isPlayerWhite = gameState.white_user_id === user?.id;
+    if (isPlayerWhite && piece[0] !== 'w') return false;
+    if (!isPlayerWhite && piece[0] !== 'b') return false;
 
     // Check for promotion
     const chess = new Chess(gameState.fen);
@@ -85,16 +92,34 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     }
 
     try {
+      // Validate move locally with chess.js
+      const move = chess.move({
+        from: sourceSquare,
+        to: targetSquare
+      });
+
+      if (move === null) return false;
+
+      // Optimistic update
+      const newFen = chess.fen();
+      setGameState((prev: any) => ({ ...prev, fen: newFen }));
       setMoveLoading(true);
+
       await gameApi.processMove(matchId, {
         from: sourceSquare,
         to: targetSquare,
         type: 'move'
       });
-      fetchGameState();
+
+      // We don't call fetchGameState here because we already did an optimistic update
+      // and the interval will pick up the server state eventually.
+      // But actually, manual fetch is safer to get the accurate time/clocks.
+      setTimeout(fetchGameState, 500);
       return true;
     } catch (err: any) {
       setError(err.message);
+      // Revert on error
+      fetchGameState();
       return false;
     } finally {
       setMoveLoading(false);
@@ -158,7 +183,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       const elapsed = now - turnStartedAt;
 
       const isWhiteTurn = gameState.currentTurnPlayerId === gameState.white_user_id;
-      
+
       setClocks({
         white: isWhiteTurn ? Math.max(0, gameState.white_time_remaining_ms - elapsed) : gameState.white_time_remaining_ms,
         black: !isWhiteTurn ? Math.max(0, gameState.black_time_remaining_ms - elapsed) : gameState.black_time_remaining_ms
@@ -234,16 +259,15 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
 
         {/* Board Container */}
         <div className="relative aspect-square w-full max-w-[600px] mx-auto bg-zinc-900 rounded-xl overflow-hidden shadow-2xl border-4 border-zinc-800">
-          {/* @ts-ignore */}
           <Chessboard
-            {...{
-              position: gameState?.fen || 'start',
-              onPieceDrop: onDrop,
-              boardOrientation: boardOrientation,
-              customDarkSquareStyle: { backgroundColor: '#1a1a1a' },
-              customLightSquareStyle: { backgroundColor: '#2a2a2a' },
-              animationDuration: 200
-            } as any}
+            id="main-chess-board"
+            position={gameState?.fen || 'start'}
+            onPieceDrop={onDrop}
+            boardOrientation={boardOrientation}
+            customDarkSquareStyle={{ backgroundColor: '#1a1a1a' }}
+            customLightSquareStyle={{ backgroundColor: '#2a2a2a' }}
+            animationDuration={200}
+            arePiecesDraggable={gameState?.status === 'active' && gameState?.currentTurnPlayerId === user?.id}
           />
 
           {/* Promotion Overlay */}

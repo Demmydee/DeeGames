@@ -102,7 +102,7 @@ export class HeartbeatService {
     const { data: activeChessGames, error } = await supabase
       .from('game_states')
       .select('*')
-      .eq('game_type', 'chess')
+      .ilike('game_type', '%chess%')
       .eq('status', 'active');
 
     if (error || !activeChessGames) return;

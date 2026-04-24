@@ -12,11 +12,17 @@ export class GameStateService {
     'chess': new ChessEngine()
   };
 
+  private static getEngine(gameType: string): GameEngine {
+    const normalized = (gameType || 'dice').trim().toLowerCase();
+    if (normalized.includes('chess')) return this.engines['chess'];
+    return this.engines['dice'];
+  }
+
   static async initializeGame(matchId: string) {
     const match = await getMatchById(matchId);
-    const gameTypeName = match.game_type?.name.toLowerCase() || 'dice';
-    const engine = this.engines[gameTypeName] || this.engines['dice'];
-    
+    const gameTypeName = (match.game_type?.name || 'dice').trim().toLowerCase();
+    const engine = this.getEngine(gameTypeName);
+
     // Config logic
     let config: GameConfig;
     if (gameTypeName.includes('chess')) {
@@ -49,7 +55,7 @@ export class GameStateService {
         .from('game_states')
         .insert([{
           match_id: matchId,
-          game_type: match.game_type?.name?.toLowerCase() || gameTypeName,
+          game_type: gameTypeName,
           game_variant: config.variant,
           state: initialState,
           current_round: initialState.currentRound || 1,
@@ -85,8 +91,8 @@ export class GameStateService {
 
   static async processMove(matchId: string, userId: string, moveData: MoveData) {
     const gameStateRecord = await this.getGameState(matchId);
-    const engine = this.engines[gameStateRecord.game_type] || this.engines['dice'];
-    
+    const engine = this.getEngine(gameStateRecord.game_type);
+
     const { newState, events } = engine.processMove(gameStateRecord.state, userId, moveData);
 
     // Save move
@@ -96,7 +102,7 @@ export class GameStateService {
       user_id: userId,
       move_type: moveData.type,
       move_data: moveData,
-      result_data: { 
+      result_data: {
         roll: newState.rolls?.[userId],
         move: newState.last_move
       },
@@ -105,7 +111,7 @@ export class GameStateService {
     }]);
 
     // Handle Draw Offer Expiry for Chess
-    if (gameStateRecord.game_type === 'chess') {
+    if ((gameStateRecord.game_type || '').toLowerCase().includes('chess')) {
       const { ChessService } = await import('./chessService');
       await ChessService.expireDrawOffer(matchId);
     }
@@ -137,8 +143,7 @@ export class GameStateService {
     const gameStateRecord = await this.getGameState(matchId);
     if (gameStateRecord.status !== 'active') return;
 
-    const engineName = gameStateRecord.game_type || 'dice';
-    const engine = this.engines[engineName] || this.engines['dice'];
+    const engine = this.getEngine(gameStateRecord.game_type);
     const { newState, events } = engine.handlePlayerDefeat(gameStateRecord.state, userId, reason);
 
     // Update state
@@ -157,11 +162,11 @@ export class GameStateService {
 
     // Update participant status in DB
     const participantStatus = (reason === 'left' || reason === 'disconnected' || reason === 'time_forfeit') ? 'defeated' : 'eliminated';
-    
+
     await supabase
       .from('match_participants')
-      .update({ 
-        status: participantStatus, 
+      .update({
+        status: participantStatus,
         defeat_reason: reason,
         left_at: reason === 'left' ? new Date().toISOString() : null
       })
@@ -178,8 +183,8 @@ export class GameStateService {
 
   private static async handleGameEnd(matchId: string, state: GameState) {
     const match = await getMatchById(matchId);
-    const engineName = (match.game_type?.name.toLowerCase() || 'dice');
-    const engine = this.engines[engineName] || this.engines['dice'];
+    const gameTypeName = (match.game_type?.name || 'dice').trim().toLowerCase();
+    const engine = this.getEngine(gameTypeName);
     const endResult = engine.detectEndCondition(state);
 
     if (endResult) {
