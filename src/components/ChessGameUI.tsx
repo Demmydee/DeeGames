@@ -147,11 +147,13 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   };
 
   const handleDrawOffer = async () => {
+    if (!matchId) return;
     try {
       await gameApi.createDrawOffer(matchId);
       setDrawOfferStatus('sent');
     } catch (err: any) {
-      setError(err.message);
+      console.error('Draw offer error:', err);
+      setError(err.response?.data?.error || err.message);
     }
   };
 
@@ -164,7 +166,8 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       }
       fetchGameState();
     } catch (err: any) {
-      setError(err.message);
+      console.error('Draw response error:', err);
+      setError(err.response?.data?.error || err.message);
     }
   };
 
@@ -258,7 +261,10 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
         </div>
 
         {/* Board Container */}
-        <div className="relative aspect-square w-full max-w-[600px] mx-auto bg-zinc-900 rounded-xl overflow-hidden shadow-2xl border-4 border-zinc-800">
+        <div
+          className="relative aspect-square w-full max-w-[600px] mx-auto bg-zinc-900 rounded-xl overflow-hidden shadow-2xl border-4 border-zinc-800"
+          style={{ touchAction: 'none' }}
+        >
           <Chessboard
             id="main-chess-board"
             position={gameState?.fen || 'start'}
@@ -266,6 +272,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
             boardOrientation={boardOrientation}
             customDarkSquareStyle={{ backgroundColor: '#1a1a1a' }}
             customLightSquareStyle={{ backgroundColor: '#2a2a2a' }}
+            customBoardStyle={{ touchAction: 'none' }}
             animationDuration={200}
             arePiecesDraggable={gameState?.status === 'active' && gameState?.currentTurnPlayerId === user?.id}
           />

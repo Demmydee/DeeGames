@@ -54,7 +54,12 @@ async function startServer() {
   app.use("/api/support", supportRoutes);
   app.use("/api/presence", presenceRoutes);
   app.use("/api/social", socialRoutes);
-  app.use("/api/game", gameRoutes);
+
+  // Debug log for game routes
+  app.use("/api/game", (req, res, next) => {
+    console.log(`Game Route Request: ${req.method} ${req.url}`);
+    next();
+  }, gameRoutes);
 
   // Periodic Heartbeat & Countdown Checks
   setInterval(() => {

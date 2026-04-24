@@ -219,14 +219,17 @@ export const gameApi = {
     return response.data;
   },
   createDrawOffer: async (matchId: string) => {
+    if (!matchId) throw new Error('Match ID is required');
     const response = await apiClient.post(`${API_BASE}/game/${matchId}/draw-offer`);
     return response.data;
   },
   acceptDrawOffer: async (matchId: string) => {
+    if (!matchId) throw new Error('Match ID is required');
     const response = await apiClient.post(`${API_BASE}/game/${matchId}/draw-offer/accept`);
     return response.data;
   },
   declineDrawOffer: async (matchId: string) => {
+    if (!matchId) throw new Error('Match ID is required');
     const response = await apiClient.post(`${API_BASE}/game/${matchId}/draw-offer/decline`);
     return response.data;
   }
