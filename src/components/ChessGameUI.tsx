@@ -33,6 +33,26 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   const gameStateRef = useRef<any>(null); // ✅ FIX 4: ref for use inside callbacks
   const onGameEndRef = useRef(onGameEnd);
 
+
+  /* Prevent touch scroll interference with chess board dragging */
+  #main-chess-board,
+  #main-chess-board * {
+    touch-action: none !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+  }
+
+  /* Fix for react-chessboard piece dragging on touch devices */
+  [data-piece] {
+    touch-action: none !important;
+    cursor: grab !important;
+  }
+
+  [data-piece]:active {
+    cursor: grabbing !important;
+  }
+
+
   // Keep onGameEndRef current without causing re-renders
   useEffect(() => {
     onGameEndRef.current = onGameEnd;
@@ -477,7 +497,14 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
         {/* Board */}
         <div
           className="relative aspect-square w-full max-w-[600px] mx-auto bg-zinc-900 rounded-xl overflow-hidden shadow-2xl border-4 border-zinc-800"
-          style={{ touchAction: 'none' }}
+          style={{
+            touchAction: 'none',  // This MUST be on the container
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+          }}
+          // Prevent ALL touch scroll propagation from this element
+          onTouchStart={(e) => { e.stopPropagation(); }}
+          onTouchMove={(e) => { e.stopPropagation(); }}
         >
           <Chessboard
             id="main-chess-board"
@@ -486,7 +513,10 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
             boardOrientation={boardOrientation}
             customDarkSquareStyle={{ backgroundColor: '#1a1a1a' }}
             customLightSquareStyle={{ backgroundColor: '#2a2a2a' }}
-            customBoardStyle={{ touchAction: 'none' }}
+            customBoardStyle={{
+              touchAction: 'none',   // Also on the board itself
+              userSelect: 'none',
+            }}
             animationDuration={200}
             arePiecesDraggable={
               !moveLoading &&
