@@ -71,6 +71,11 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     try {
       const response = await gameApi.getState(matchId);
 
+      // 🔍 LOG THE RAW RESPONSE STRUCTURE
+      console.log('📥 Raw API response:', response);
+      console.log('📥 response.state:', response.state);
+      console.log('📥 response.status:', response.status);
+
       // Check AGAIN after the async call completes
       if (skipPollRef.current) {
         console.log('CHESS: Discarding poll result (optimistic update in progress)');
@@ -78,6 +83,15 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       }
 
       const newState = response.state;
+          // 🔍 LOG KEY FIELDS
+      console.log('📥 State fields:', {
+        status: newState?.status,
+        currentTurnPlayerId: newState?.currentTurnPlayerId,
+        white_user_id: newState?.white_user_id,
+        black_user_id: newState?.black_user_id,
+        fen: newState?.fen?.substring(0, 30) + '...',
+        myUserId: user?.id,
+      });
       setGameStateAndRef(newState);
 
       if (response.status === 'completed' && newState.game_over) {
@@ -119,91 +133,160 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   }, []);
 
   const onDrop = useCallback((sourceSquare: string, targetSquare: string, piece: string): boolean => {
+    console.group('🎯 CHESS onDrop');
+    console.log('Source:', sourceSquare, '| Target:', targetSquare, '| Piece:', piece);
+
     const gs = gameStateRef.current;
-    if (!gs) return false;
 
-    console.log('CHESS: onDrop triggered', { sourceSquare, targetSquare, piece });
+    // ── CHECK 1: Game state exists ──
+    if (!gs) {
+      console.error('❌ FAIL: gameStateRef.current is NULL');
+      console.groupEnd();
+      return false;
+    }
+    console.log('✅ Game state exists:', gs);
 
+    // ── CHECK 2: Status ──
+    console.log('Status check:', gs.status, '=== "active"?', gs.status === 'active');
     if (gs.status !== 'active') {
-      console.warn('CHESS: Move rejected - game not active', gs.status);
+      console.error('❌ FAIL: Game not active. Status =', gs.status);
+      console.groupEnd();
       return false;
     }
 
+    // ── CHECK 3: Turn ──
+    console.log('Turn check:', {
+      currentTurnPlayerId: gs.currentTurnPlayerId,
+      myUserId: user?.id,
+      match: gs.currentTurnPlayerId === user?.id,
+      typeOfTurnId: typeof gs.currentTurnPlayerId,
+      typeOfUserId: typeof user?.id,
+    });
     if (gs.currentTurnPlayerId !== user?.id) {
-      console.warn('CHESS: Move rejected - not your turn', { turn: gs.currentTurnPlayerId, user: user?.id });
+      console.error('❌ FAIL: Not your turn');
+      console.groupEnd();
       return false;
     }
 
+    // ── CHECK 4: Piece color ──
     const isPlayerWhite = gs.white_user_id === user?.id;
-    if (isPlayerWhite && piece[0] !== 'w') return false;
-    if (!isPlayerWhite && piece[0] !== 'b') return false;
+    console.log('Piece color check:', {
+      isPlayerWhite,
+      pieceColor: piece[0],
+      white_user_id: gs.white_user_id,
+      black_user_id: gs.black_user_id,
+      myId: user?.id,
+    });
+    if (isPlayerWhite && piece[0] !== 'w') {
+      console.error('❌ FAIL: White player tried to move black piece');
+      console.groupEnd();
+      return false;
+    }
+    if (!isPlayerWhite && piece[0] !== 'b') {
+      console.error('❌ FAIL: Black player tried to move white piece');
+      console.groupEnd();
+      return false;
+    }
 
-    if (!gs.fen) return false;
+    // ── CHECK 5: FEN ──
+    console.log('FEN:', gs.fen);
+    if (!gs.fen) {
+      console.error('❌ FAIL: No FEN in game state');
+      console.groupEnd();
+      return false;
+    }
 
+    // ── CHECK 6: Chess.js validation ──
     let chess: Chess;
     try {
       chess = new Chess(gs.fen);
+      console.log('✅ Chess instance created from FEN');
     } catch (err) {
-      console.error('CHESS: Invalid FEN', gs.fen, err);
+      console.error('❌ FAIL: Invalid FEN', err);
+      console.groupEnd();
       return false;
     }
 
-    const moves = chess.moves({ verbose: true });
-    const isPromotion = moves.some(m => m.from === sourceSquare && m.to === targetSquare && m.flags.includes('p'));
+    const allMoves = chess.moves({ verbose: true });
+    console.log('All legal moves from', sourceSquare, ':',
+      allMoves.filter(m => m.from === sourceSquare).map(m => m.to)
+    );
+
+    const isPromotion = allMoves.some(
+      m => m.from === sourceSquare && m.to === targetSquare && m.flags.includes('p')
+    );
 
     if (isPromotion) {
-      console.log('CHESS: Promotion detected');
+      console.log('♟️ Promotion detected — showing dialog');
       setPromotionMove({ from: sourceSquare, to: targetSquare });
       setPromotionSquare(targetSquare);
+      console.groupEnd();
       return true;
     }
 
     let moveResult;
     try {
       moveResult = chess.move({ from: sourceSquare, to: targetSquare });
+      console.log('Chess.js move result:', moveResult);
     } catch (err) {
-      console.error('CHESS: Local moves validation error', err);
+      console.error('❌ FAIL: chess.move() threw', err);
+      console.groupEnd();
       return false;
     }
 
     if (moveResult === null) {
-      console.warn('CHESS: Move rejected by chess.js', { fen: gs.fen, from: sourceSquare, to: targetSquare });
+      console.error('❌ FAIL: chess.js returned null (illegal move)');
+      console.groupEnd();
       return false;
     }
 
-    console.log('CHESS: Move validated locally', moveResult.san);
+    console.log('✅ Move valid locally:', moveResult.san);
 
     const previousFen = gs.fen;
     const newFen = chess.fen();
+    console.log('New FEN after move:', newFen);
 
     // Optimistic update
-    setGameStateAndRef((prev: any) => ({
-      ...prev,
-      fen: newFen,
-      currentTurnPlayerId: prev.currentTurnPlayerId === prev.white_user_id ? prev.black_user_id : prev.white_user_id
-    }));
+    setGameStateAndRef((prev: any) => {
+      const updated = {
+        ...prev,
+        fen: newFen,
+        currentTurnPlayerId:
+          prev.currentTurnPlayerId === prev.white_user_id
+            ? prev.black_user_id
+            : prev.white_user_id,
+      };
+      console.log('✅ Optimistic state update applied:', updated.fen);
+      return updated;
+    });
 
     doSkipPoll(3000);
 
     (async () => {
       try {
         setMoveLoading(true);
-        console.log('CHESS: Sending move to server...');
-        await gameApi.processMove(matchId, {
+        console.log('📡 Sending to server:', { from: sourceSquare, to: targetSquare });
+
+        const serverResponse = await gameApi.processMove(matchId, {
           from: sourceSquare,
           to: targetSquare,
-          type: 'move'
+          type: 'move',
         });
-        console.log('CHESS: Move accepted by server');
 
+        console.log('✅ Server response:', serverResponse);
         skipPollRef.current = false;
         await fetchGameState();
       } catch (err: any) {
-        console.error('CHESS: Server rejected move - rolling back', err);
+        console.error('❌ Server rejected move:', {
+          message: err.message,
+          responseData: err.response?.data,
+          status: err.response?.status,
+          fullError: err,
+        });
         setGameStateAndRef((prev: any) => ({
           ...prev,
           fen: previousFen,
-          currentTurnPlayerId: gs.currentTurnPlayerId
+          currentTurnPlayerId: gs.currentTurnPlayerId,
         }));
         setError(err.response?.data?.error || err.message);
         skipPollRef.current = false;
@@ -213,6 +296,8 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       }
     })();
 
+    console.log('✅ Returning TRUE from onDrop');
+    console.groupEnd();
     return true;
   }, [user?.id, matchId, fetchGameState, setGameStateAndRef, doSkipPoll]);
 
