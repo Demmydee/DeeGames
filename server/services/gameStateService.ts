@@ -79,14 +79,31 @@ export class GameStateService {
   }
 
   static async getGameState(matchId: string) {
-    const { data, error } = await supabase
+    const { data: gameState, error } = await supabase
       .from('game_states')
       .select('*')
       .eq('match_id', matchId)
       .single();
 
     if (error) throw error;
-    return data;
+
+    // Check for pending draw offers if it's chess
+    if ((gameState.game_type || '').toLowerCase().includes('chess')) {
+      const { data: drawOffer } = await supabase
+        .from('draw_offers')
+        .select('offered_by_user_id')
+        .eq('match_id', matchId)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      if (drawOffer) {
+        gameState.state.draw_offer_by = drawOffer.offered_by_user_id;
+      } else {
+        gameState.state.draw_offer_by = null;
+      }
+    }
+
+    return gameState;
   }
 
   static async processMove(matchId: string, userId: string, moveData: MoveData) {
@@ -173,19 +190,27 @@ export class GameStateService {
       .eq('match_id', matchId)
       .eq('user_id', userId);
 
-    // Check end condition
+    // Check end condition - pass the newState which already has the rankings and status
     if (newState.status === 'completed') {
-      await this.handleGameEnd(matchId, newState);
+      const endResult = {
+        isOver: true,
+        isDraw: newState.result === 'draw',
+        winnerId: newState.winner_id,
+        rankings: newState.participants as any
+      };
+      await this.handleGameEnd(matchId, newState, endResult);
     }
 
     return { state: updatedRecord, events };
   }
 
-  private static async handleGameEnd(matchId: string, state: GameState) {
+  private static async handleGameEnd(matchId: string, state: GameState, forcedResult?: any) {
     const match = await getMatchById(matchId);
     const gameTypeName = (match.game_type?.name || 'dice').trim().toLowerCase();
     const engine = this.getEngine(gameTypeName);
-    const endResult = engine.detectEndCondition(state);
+
+    // If a result was forced (e.g. by defeat/forfeit), use it. Otherwise detect it.
+    const endResult = forcedResult || engine.detectEndCondition(state);
 
     if (endResult) {
       await SettlementService.settleMatch(match, endResult.rankings, state.history, endResult);
