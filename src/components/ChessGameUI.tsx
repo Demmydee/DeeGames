@@ -75,14 +75,30 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   const skipPollRef = React.useRef(false);
 
   const onDrop = (sourceSquare: string, targetSquare: string, piece: string) => {
-    if (gameState.status !== 'active' || gameState.currentTurnPlayerId !== user?.id) {
+    console.log('CHESS: onDrop triggered', { sourceSquare, targetSquare, piece });
+
+    if (gameState.status !== 'active') {
+      console.warn('CHESS: Move rejected - game not active', gameState.status);
+      return false;
+    }
+
+    if (gameState.currentTurnPlayerId !== user?.id) {
+      console.warn('CHESS: Move rejected - not your turn', { turn: gameState.currentTurnPlayerId, user: user?.id });
       return false;
     }
 
     // Only allow moving own pieces
     const isPlayerWhite = gameState.white_user_id === user?.id;
-    if (isPlayerWhite && piece[0] !== 'w') return false;
-    if (!isPlayerWhite && piece[0] !== 'b') return false;
+    console.log('CHESS: Player perspective', { isPlayerWhite, userId: user?.id, whiteId: gameState.white_user_id });
+
+    if (isPlayerWhite && piece[0] !== 'w') {
+      console.warn('CHESS: Move rejected - tried to move black piece as white player');
+      return false;
+    }
+    if (!isPlayerWhite && piece[0] !== 'b') {
+      console.warn('CHESS: Move rejected - tried to move white piece as black player');
+      return false;
+    }
 
     // Check for promotion
     const chess = new Chess(gameState.fen);
@@ -90,6 +106,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     const isPromotion = moves.some(m => m.from === sourceSquare && m.to === targetSquare && m.flags.includes('p'));
 
     if (isPromotion) {
+      console.log('CHESS: Promotion detected');
       setPromotionMove({ from: sourceSquare, to: targetSquare });
       setPromotionSquare(targetSquare);
       return true;
@@ -102,7 +119,16 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
         to: targetSquare
       });
 
-      if (move === null) return false;
+      if (move === null) {
+        console.warn('CHESS: Move rejected by chess.js (invalid move or FEN mismatch)', {
+          fen: gameState.fen,
+          from: sourceSquare,
+          to: targetSquare
+        });
+        return false;
+      }
+
+      console.log('CHESS: Move validated locally', move.san);
 
       // Optimistic update
       const newFen = chess.fen();
@@ -115,11 +141,13 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       (async () => {
         try {
           setMoveLoading(true);
+          console.log('CHESS: Sending move to server...');
           await gameApi.processMove(matchId, {
             from: sourceSquare,
             to: targetSquare,
             type: 'move'
           });
+          console.log('CHESS: Move accepted by server');
 
           // Allow poll again after a small delay to ensure server has updated
           setTimeout(() => {
@@ -127,6 +155,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
             fetchGameState();
           }, 1000);
         } catch (err: any) {
+          console.error('CHESS: Server rejected move', err);
           setError(err.message);
           skipPollRef.current = false;
           fetchGameState(); // Revert
@@ -137,6 +166,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
 
       return true;
     } catch (err) {
+      console.error('CHESS: Error during local validation', err);
       return false;
     }
   };
@@ -145,6 +175,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     if (!promotionMove) return;
     try {
       setMoveLoading(true);
+      console.log('CHESS: Sending promotion move to server...', pieceType);
       await gameApi.processMove(matchId, {
         from: promotionMove.from,
         to: promotionMove.to,
@@ -155,6 +186,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       setPromotionSquare(null);
       fetchGameState();
     } catch (err: any) {
+      console.error('CHESS: Server rejected promotion move', err);
       setError(err.message);
     } finally {
       setMoveLoading(false);
@@ -164,10 +196,16 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   const handleDrawOffer = async () => {
     if (!matchId) return;
     try {
+      console.log('CHESS: Offering draw via API...');
       await gameApi.createDrawOffer(matchId);
+      console.log('CHESS: Draw offer successfully created');
       setDrawOfferStatus('sent');
     } catch (err: any) {
-      console.error('Draw offer error:', err);
+      console.error('CHESS: Draw offer error detail:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
       setError(err.response?.data?.error || err.message);
     }
   };

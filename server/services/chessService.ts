@@ -5,7 +5,7 @@ import { getMatchById } from './matchService';
 
 export class ChessService {
   static async createDrawOffer(matchId: string, userId: string) {
-    console.log(`VOICE: createDrawOffer matchId=${matchId} userId=${userId}`);
+    console.log(`CHESS_SERVICE: createDrawOffer matchId=${matchId} userId=${userId}`);
     // 1. Verify existence of pending draw offer
     const { data: existing, error: fetchError } = await supabase
       .from('draw_offers')
@@ -15,16 +15,17 @@ export class ChessService {
       .maybeSingle();
 
     if (fetchError) {
-      console.error('VOICE: Error fetching existing draw offer:', fetchError);
+      console.error('CHESS_SERVICE: Error fetching existing draw offer:', fetchError);
       throw new Error(`Database error: ${fetchError.message}`);
     }
 
     if (existing) {
+      console.warn('CHESS_SERVICE: Draw offer already exists', existing);
       throw new Error('A draw offer is already pending for this match');
     }
 
     // 2. Create new offer
-    console.log('VOICE: Inserting new draw offer...');
+    console.log('CHESS_SERVICE: Inserting new draw offer into DB...');
     const { data, error } = await supabase
       .from('draw_offers')
       .insert([{
@@ -36,10 +37,10 @@ export class ChessService {
       .maybeSingle();
 
     if (error) {
-      console.error('VOICE: Error inserting draw offer:', error);
+      console.error('CHESS_SERVICE: Error inserting draw offer:', error);
       throw error;
     }
-    console.log('VOICE: Draw offer created successfully:', data);
+    console.log('CHESS_SERVICE: Draw offer created successfully:', data);
     return data;
   }
 
