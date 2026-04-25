@@ -289,6 +289,12 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='match_results' AND column_name='rank_mode') THEN
         ALTER TABLE public.match_results ADD COLUMN rank_mode TEXT;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='match_results' AND column_name='is_draw') THEN
+        ALTER TABLE public.match_results ADD COLUMN is_draw BOOLEAN DEFAULT FALSE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='match_results' AND column_name='draw_reason') THEN
+        ALTER TABLE public.match_results ADD COLUMN draw_reason TEXT;
+    END IF;
 END $$;
 
 CREATE TABLE IF NOT EXISTS public.match_payouts (
@@ -303,6 +309,7 @@ CREATE TABLE IF NOT EXISTS public.match_payouts (
     is_winner BOOLEAN NOT NULL DEFAULT FALSE,
     defeat_reason TEXT,
     wallet_transaction_id UUID,
+    payout_type TEXT, -- win, loss, draw_refund
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -322,13 +329,59 @@ CREATE TABLE IF NOT EXISTS public.match_heartbeats (
     PRIMARY KEY (match_id, user_id)
 );
 
--- 6. Social & Communication
+-- 15. Social & Communication
 CREATE TABLE IF NOT EXISTS public.chat_rooms (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     match_id UUID REFERENCES public.matches(id) ON DELETE CASCADE,
     name TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Voice Rooms
+CREATE TABLE IF NOT EXISTS public.match_voice_rooms (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    match_id UUID NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
+    daily_room_name TEXT NOT NULL,
+    daily_room_url TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(match_id)
+);
+
+-- Draw Offers
+CREATE TABLE IF NOT EXISTS public.draw_offers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    match_id UUID NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
+    offered_by_user_id UUID NOT NULL REFERENCES public.users(id),
+    status TEXT NOT NULL DEFAULT 'pending', -- pending, accepted, declined, expired
+    offered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    responded_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_draw_offer_per_match
+ON public.draw_offers (match_id)
+WHERE status = 'pending';
+
+-- Continue RLS
+ALTER TABLE public.match_voice_rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.draw_offers ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Voice rooms are visible to participants" ON public.match_voice_rooms;
+CREATE POLICY "Voice rooms are visible to participants" ON public.match_voice_rooms
+    FOR SELECT USING (EXISTS (SELECT 1 FROM public.match_participants WHERE match_id = match_voice_rooms.match_id AND user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Draw offers are visible to participants" ON public.draw_offers;
+CREATE POLICY "Draw offers are visible to participants" ON public.draw_offers
+    FOR SELECT USING (EXISTS (SELECT 1 FROM public.match_participants WHERE match_id = draw_offers.match_id AND user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Participants can create draw offers" ON public.draw_offers;
+CREATE POLICY "Participants can create draw offers" ON public.draw_offers
+    FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM public.match_participants WHERE match_id = draw_offers.match_id AND user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Participants can update draw offers" ON public.draw_offers;
+CREATE POLICY "Participants can update draw offers" ON public.draw_offers
+    FOR UPDATE USING (EXISTS (SELECT 1 FROM public.match_participants WHERE match_id = draw_offers.match_id AND user_id = auth.uid()));
 
 CREATE TABLE IF NOT EXISTS public.chat_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

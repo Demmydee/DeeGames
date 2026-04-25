@@ -38,6 +38,7 @@ WHERE status = 'pending';
 ALTER TABLE public.draw_offers ENABLE ROW LEVEL SECURITY;
 
 -- Draw offers visible to match participants
+DROP POLICY IF EXISTS "Draw offers are visible to match participants" ON public.draw_offers;
 CREATE POLICY "Draw offers are visible to match participants" ON public.draw_offers
     FOR SELECT USING (
         EXISTS (
@@ -47,6 +48,7 @@ CREATE POLICY "Draw offers are visible to match participants" ON public.draw_off
     );
 
 -- Participants can create draw offers
+DROP POLICY IF EXISTS "Participants can create draw offers" ON public.draw_offers;
 CREATE POLICY "Participants can create draw offers" ON public.draw_offers
     FOR INSERT WITH CHECK (
         EXISTS (
@@ -56,6 +58,7 @@ CREATE POLICY "Participants can create draw offers" ON public.draw_offers
     );
 
 -- Participants can update their own or received draw offers (to accept/decline)
+DROP POLICY IF EXISTS "Participants can update draw offers" ON public.draw_offers;
 CREATE POLICY "Participants can update draw offers" ON public.draw_offers
     FOR UPDATE USING (
         EXISTS (

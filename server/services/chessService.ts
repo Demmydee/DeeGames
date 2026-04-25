@@ -5,19 +5,26 @@ import { getMatchById } from './matchService';
 
 export class ChessService {
   static async createDrawOffer(matchId: string, userId: string) {
+    console.log(`VOICE: createDrawOffer matchId=${matchId} userId=${userId}`);
     // 1. Verify existence of pending draw offer
-    const { data: existing } = await supabase
+    const { data: existing, error: fetchError } = await supabase
       .from('draw_offers')
       .select('*')
       .eq('match_id', matchId)
       .eq('status', 'pending')
       .maybeSingle();
 
+    if (fetchError) {
+      console.error('VOICE: Error fetching existing draw offer:', fetchError);
+      throw new Error(`Database error: ${fetchError.message}`);
+    }
+
     if (existing) {
       throw new Error('A draw offer is already pending for this match');
     }
 
     // 2. Create new offer
+    console.log('VOICE: Inserting new draw offer...');
     const { data, error } = await supabase
       .from('draw_offers')
       .insert([{
@@ -28,7 +35,11 @@ export class ChessService {
       .select()
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+      console.error('VOICE: Error inserting draw offer:', error);
+      throw error;
+    }
+    console.log('VOICE: Draw offer created successfully:', data);
     return data;
   }
 

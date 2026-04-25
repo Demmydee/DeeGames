@@ -36,10 +36,12 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   const [drawOfferStatus, setDrawOfferStatus] = useState<'none' | 'offering' | 'received' | 'sent'>('none');
 
   const fetchGameState = useCallback(async () => {
+    if (skipPollRef.current) return;
     try {
       const state = await gameApi.getState(matchId);
+      if (skipPollRef.current) return; // Re-check after async
       setGameState(state.state);
-      
+
       if (state.status === 'completed' && state.state.game_over) {
         const result = await gameApi.getResult(matchId);
         onGameEnd(result);
@@ -70,7 +72,9 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     return () => clearInterval(interval);
   }, [fetchGameState]);
 
-  const onDrop = async (sourceSquare: string, targetSquare: string, piece: string) => {
+  const skipPollRef = React.useRef(false);
+
+  const onDrop = (sourceSquare: string, targetSquare: string, piece: string) => {
     if (gameState.status !== 'active' || gameState.currentTurnPlayerId !== user?.id) {
       return false;
     }
@@ -91,8 +95,8 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       return true;
     }
 
+    // Validate move locally with chess.js
     try {
-      // Validate move locally with chess.js
       const move = chess.move({
         from: sourceSquare,
         to: targetSquare
@@ -103,26 +107,37 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       // Optimistic update
       const newFen = chess.fen();
       setGameState((prev: any) => ({ ...prev, fen: newFen }));
-      setMoveLoading(true);
 
-      await gameApi.processMove(matchId, {
-        from: sourceSquare,
-        to: targetSquare,
-        type: 'move'
-      });
+      // Prevent polling from overwriting our optimistic state for a bit
+      skipPollRef.current = true;
 
-      // We don't call fetchGameState here because we already did an optimistic update
-      // and the interval will pick up the server state eventually.
-      // But actually, manual fetch is safer to get the accurate time/clocks.
-      setTimeout(fetchGameState, 500);
+      // Process move in background
+      (async () => {
+        try {
+          setMoveLoading(true);
+          await gameApi.processMove(matchId, {
+            from: sourceSquare,
+            to: targetSquare,
+            type: 'move'
+          });
+
+          // Allow poll again after a small delay to ensure server has updated
+          setTimeout(() => {
+            skipPollRef.current = false;
+            fetchGameState();
+          }, 1000);
+        } catch (err: any) {
+          setError(err.message);
+          skipPollRef.current = false;
+          fetchGameState(); // Revert
+        } finally {
+          setMoveLoading(false);
+        }
+      })();
+
       return true;
-    } catch (err: any) {
-      setError(err.message);
-      // Revert on error
-      fetchGameState();
+    } catch (err) {
       return false;
-    } finally {
-      setMoveLoading(false);
     }
   };
 
