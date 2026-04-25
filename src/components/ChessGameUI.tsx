@@ -28,36 +28,12 @@ interface Props {
 const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) => {
   const { user } = useAuth();
 
-  // ✅ FIX 1: ALL refs declared at top, before any useEffect or callbacks
+  // Refs for stable logic inside callbacks
   const skipPollRef = useRef(false);
-  const gameStateRef = useRef<any>(null); // ✅ FIX 4: ref for use inside callbacks
+  const gameStateRef = useRef<any>(null);
   const onGameEndRef = useRef(onGameEnd);
 
-
-  useEffect(() => {
-    // Override react-chessboard's touch handling to use pointer events
-    const boardEl = document.getElementById('main-chess-board');
-    if (!boardEl) return;
-
-    const preventScroll = (e: TouchEvent) => {
-      // Only prevent if a piece is being dragged
-      if ((e.target as HTMLElement).closest('[data-piece]')) {
-        e.preventDefault();
-      }
-    };
-
-    // Must use { passive: false } to allow preventDefault
-    boardEl.addEventListener('touchstart', preventScroll, { passive: false });
-    boardEl.addEventListener('touchmove', preventScroll, { passive: false });
-
-    return () => {
-      boardEl.removeEventListener('touchstart', preventScroll);
-      boardEl.removeEventListener('touchmove', preventScroll);
-    };
-  }, [gameState]); // Re-attach when board re-renders
-
-
-  // Keep onGameEndRef current without causing re-renders
+  // Keep onGameEndRef current
   useEffect(() => {
     onGameEndRef.current = onGameEnd;
   }, [onGameEnd]);
@@ -68,12 +44,10 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   const [moveLoading, setMoveLoading] = useState(false);
   const [promotionSquare, setPromotionSquare] = useState<string | null>(null);
   const [promotionMove, setPromotionMove] = useState<{ from: string, to: string } | null>(null);
-  const [drawOfferStatus, setDrawOfferStatus] = useState<
-    'none' | 'offering' | 'received' | 'sent'
-  >('none');
+  const [drawOfferStatus, setDrawOfferStatus] = useState<'none' | 'offering' | 'received' | 'sent'>('none');
   const [clocks, setClocks] = useState({ white: 0, black: 0 });
 
-  // ✅ FIX 2: Setter that also keeps ref in sync
+  // Setter that also keeps ref in sync
   const setGameStateAndRef = useCallback((stateOrUpdater: any) => {
     if (typeof stateOrUpdater === 'function') {
       setGameState((prev: any) => {
@@ -87,10 +61,8 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     }
   }, []);
 
-  // ✅ FIX 3: fetchGameState uses ref to check skip,
-  //           and does NOT overwrite state while we're in optimistic mode
   const fetchGameState = useCallback(async () => {
-    // Check BEFORE the async call to avoid race conditions
+    // Check BEFORE the async call
     if (skipPollRef.current) {
       console.log('CHESS: Skipping poll (optimistic update in progress)');
       return;
@@ -108,16 +80,6 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       const newState = response.state;
       setGameStateAndRef(newState);
 
-      // Handle draw offer state
-      if (newState.draw_offer_by) {
-        setDrawOfferStatus(
-          newState.draw_offer_by === user?.id ? 'sent' : 'received'
-        );
-      } else {
-        setDrawOfferStatus('none');
-      }
-
-      // Handle game completion
       if (response.status === 'completed' && newState.game_over) {
         try {
           const result = await gameApi.getResult(matchId);
@@ -126,8 +88,14 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
           console.error('CHESS: Failed to fetch result', err);
         }
       }
+
+      if (newState.draw_offer_by) {
+        setDrawOfferStatus(newState.draw_offer_by === user?.id ? 'sent' : 'received');
+      } else {
+        setDrawOfferStatus('none');
+      }
+
     } catch (err: any) {
-      // Don't show error during normal polling — only on initial load
       if (!gameStateRef.current) {
         setError(err.message || 'Failed to fetch game state');
       }
@@ -137,14 +105,12 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     }
   }, [matchId, user?.id, setGameStateAndRef]);
 
-  // ✅ Single polling effect
   useEffect(() => {
     fetchGameState();
     const interval = setInterval(fetchGameState, 2000);
     return () => clearInterval(interval);
   }, [fetchGameState]);
 
-  // ✅ FIX 5: Reliable optimistic skip with cleanup
   const doSkipPoll = useCallback((durationMs: number) => {
     skipPollRef.current = true;
     setTimeout(() => {
@@ -152,19 +118,11 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     }, durationMs);
   }, []);
 
-  // ✅ FIX 4: onDrop uses gameStateRef to avoid stale closure
-  const onDrop = useCallback((
-    sourceSquare: string,
-    targetSquare: string,
-    piece: string
-  ): boolean => {
-    // Read from ref — always has the latest value
+  const onDrop = useCallback((sourceSquare: string, targetSquare: string, piece: string): boolean => {
     const gs = gameStateRef.current;
+    if (!gs) return false;
 
-    if (!gs) {
-      console.warn('CHESS: No game state available');
-      return false;
-    }
+    console.log('CHESS: onDrop triggered', { sourceSquare, targetSquare, piece });
 
     if (gs.status !== 'active') {
       console.warn('CHESS: Move rejected - game not active', gs.status);
@@ -172,29 +130,15 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     }
 
     if (gs.currentTurnPlayerId !== user?.id) {
-      console.warn('CHESS: Move rejected - not your turn', {
-        turn: gs.currentTurnPlayerId,
-        user: user?.id
-      });
+      console.warn('CHESS: Move rejected - not your turn', { turn: gs.currentTurnPlayerId, user: user?.id });
       return false;
     }
 
-    // Validate own piece
     const isPlayerWhite = gs.white_user_id === user?.id;
-    if (isPlayerWhite && piece[0] !== 'w') {
-      console.warn('CHESS: Tried to move black piece as white');
-      return false;
-    }
-    if (!isPlayerWhite && piece[0] !== 'b') {
-      console.warn('CHESS: Tried to move white piece as black');
-      return false;
-    }
+    if (isPlayerWhite && piece[0] !== 'w') return false;
+    if (!isPlayerWhite && piece[0] !== 'b') return false;
 
-    // Validate FEN before creating Chess instance
-    if (!gs.fen) {
-      console.warn('CHESS: No FEN in game state');
-      return false;
-    }
+    if (!gs.fen) return false;
 
     let chess: Chess;
     try {
@@ -204,95 +148,64 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       return false;
     }
 
-    // Check for promotion
     const moves = chess.moves({ verbose: true });
-    const isPromotion = moves.some(
-      (m) =>
-        m.from === sourceSquare &&
-        m.to === targetSquare &&
-        m.flags.includes('p')
-    );
+    const isPromotion = moves.some(m => m.from === sourceSquare && m.to === targetSquare && m.flags.includes('p'));
 
     if (isPromotion) {
-      console.log('CHESS: Promotion detected - showing dialog');
+      console.log('CHESS: Promotion detected');
       setPromotionMove({ from: sourceSquare, to: targetSquare });
       setPromotionSquare(targetSquare);
-      // ✅ Return true so piece stays on target square visually
-      // The actual server call happens after user picks promotion piece
       return true;
     }
 
-    // Validate move locally
     let moveResult;
     try {
       moveResult = chess.move({ from: sourceSquare, to: targetSquare });
     } catch (err) {
-      console.error('CHESS: chess.js threw during move validation', err);
+      console.error('CHESS: Local moves validation error', err);
       return false;
     }
 
     if (moveResult === null) {
-      console.warn('CHESS: Invalid move rejected by chess.js', {
-        fen: gs.fen,
-        from: sourceSquare,
-        to: targetSquare,
-      });
+      console.warn('CHESS: Move rejected by chess.js', { fen: gs.fen, from: sourceSquare, to: targetSquare });
       return false;
     }
 
-    console.log('CHESS: Move validated locally:', moveResult.san);
+    console.log('CHESS: Move validated locally', moveResult.san);
 
-    // ✅ Snapshot the FEN before optimistic update (for rollback)
     const previousFen = gs.fen;
     const newFen = chess.fen();
 
-    // ✅ Optimistic update
+    // Optimistic update
     setGameStateAndRef((prev: any) => ({
       ...prev,
       fen: newFen,
-      // Optimistically flip the turn so UI is responsive
-      currentTurnPlayerId:
-        prev.currentTurnPlayerId === prev.white_user_id
-          ? prev.black_user_id
-          : prev.white_user_id,
+      currentTurnPlayerId: prev.currentTurnPlayerId === prev.white_user_id ? prev.black_user_id : prev.white_user_id
     }));
 
-    // ✅ Block polling for 3 seconds (covers server round-trip + 1s buffer)
     doSkipPoll(3000);
 
-    // Send to server asynchronously
     (async () => {
       try {
         setMoveLoading(true);
         console.log('CHESS: Sending move to server...');
-
         await gameApi.processMove(matchId, {
           from: sourceSquare,
           to: targetSquare,
-          type: 'move',
+          type: 'move'
         });
+        console.log('CHESS: Move accepted by server');
 
-        console.log('CHESS: Server accepted move');
-
-        // Re-enable polling and fetch fresh state
         skipPollRef.current = false;
         await fetchGameState();
       } catch (err: any) {
         console.error('CHESS: Server rejected move - rolling back', err);
-
-        // ✅ Rollback optimistic update
         setGameStateAndRef((prev: any) => ({
           ...prev,
           fen: previousFen,
-          currentTurnPlayerId: gs.currentTurnPlayerId,
+          currentTurnPlayerId: gs.currentTurnPlayerId
         }));
-
-        setError(
-          err.response?.data?.error ||
-          err.message ||
-          'Move rejected by server'
-        );
-
+        setError(err.response?.data?.error || err.message);
         skipPollRef.current = false;
         await fetchGameState();
       } finally {
@@ -300,62 +213,33 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       }
     })();
 
-    // ✅ Return true synchronously — piece stays where dropped
     return true;
-  }, [
-    user?.id,
-    matchId,
-    fetchGameState,
-    setGameStateAndRef,
-    doSkipPoll,
-  ]);
+  }, [user?.id, matchId, fetchGameState, setGameStateAndRef, doSkipPoll]);
 
   const handlePromotion = useCallback(async (pieceType: string) => {
     if (!promotionMove) return;
-
     const gs = gameStateRef.current;
     const previousFen = gs?.fen;
 
     try {
       setMoveLoading(true);
-      console.log('CHESS: Sending promotion to server:', pieceType);
-
-      // Optimistically apply promotion locally
-      if (gs?.fen) {
-        try {
-          const chess = new Chess(gs.fen);
-          chess.move({
-            from: promotionMove.from,
-            to: promotionMove.to,
-            promotion: pieceType,
-          });
-          setGameStateAndRef((prev: any) => ({
-            ...prev,
-            fen: chess.fen(),
-          }));
-        } catch (e) {
-          // If local validation fails, server will handle it
-        }
-      }
+      console.log('CHESS: Sending promotion move to server...', pieceType);
 
       setPromotionMove(null);
       setPromotionSquare(null);
-
       doSkipPoll(3000);
 
       await gameApi.processMove(matchId, {
         from: promotionMove.from,
         to: promotionMove.to,
         promotion: pieceType,
-        type: 'move',
+        type: 'move'
       });
 
       skipPollRef.current = false;
       await fetchGameState();
     } catch (err: any) {
-      console.error('CHESS: Promotion rejected', err);
-
-      // Rollback
+      console.error('CHESS: Server rejected promotion move', err);
       if (previousFen) {
         setGameStateAndRef((prev: any) => ({ ...prev, fen: previousFen }));
       }
@@ -368,10 +252,14 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   }, [promotionMove, matchId, fetchGameState, setGameStateAndRef, doSkipPoll]);
 
   const handleDrawOffer = useCallback(async () => {
+    if (!matchId) return;
     try {
+      console.log('CHESS: Offering draw via API...');
       await gameApi.createDrawOffer(matchId);
+      console.log('CHESS: Draw offer successfully created');
       setDrawOfferStatus('sent');
     } catch (err: any) {
+      console.error('CHESS: Draw offer error', err);
       setError(err.response?.data?.error || err.message);
     }
   }, [matchId]);
@@ -385,6 +273,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       }
       fetchGameState();
     } catch (err: any) {
+      console.error('CHESS: Draw response error', err);
       setError(err.response?.data?.error || err.message);
     }
   }, [matchId, fetchGameState]);
@@ -400,12 +289,8 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       const isWhiteTurn = gameState.currentTurnPlayerId === gameState.white_user_id;
 
       setClocks({
-        white: isWhiteTurn
-          ? Math.max(0, gameState.white_time_remaining_ms - elapsed)
-          : gameState.white_time_remaining_ms,
-        black: !isWhiteTurn
-          ? Math.max(0, gameState.black_time_remaining_ms - elapsed)
-          : gameState.black_time_remaining_ms,
+        white: isWhiteTurn ? Math.max(0, gameState.white_time_remaining_ms - elapsed) : gameState.white_time_remaining_ms,
+        black: !isWhiteTurn ? Math.max(0, gameState.black_time_remaining_ms - elapsed) : gameState.black_time_remaining_ms
       });
     }, 100);
 
@@ -429,17 +314,8 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   const boardOrientation = isWhite ? 'white' : 'black';
 
   const opponent = useMemo(() => {
-    return matchParticipants?.find((p) => p.user_id !== user?.id);
+    return matchParticipants?.find(p => p.user_id !== user?.id);
   }, [matchParticipants, user?.id]);
-
-  const whitePlayer = matchParticipants?.find(
-    (p) => p.user_id === gameState?.white_user_id
-  );
-  const blackPlayer = matchParticipants?.find(
-    (p) => p.user_id === gameState?.black_user_id
-  );
-
-  // ─── Loading / Error states ───────────────────────────────────────────────
 
   if (loading && !gameState) {
     return (
@@ -466,34 +342,22 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     );
   }
 
-  // ─── Main Render ──────────────────────────────────────────────────────────
-
   return (
     <div className="w-full h-full flex flex-col md:flex-row items-stretch gap-6 px-6 max-w-7xl mx-auto overflow-y-auto pb-8">
-
       {/* Left Column */}
       <div className="flex-[2] flex flex-col gap-4">
-
         {/* Opponent Info */}
         <div className="flex items-center justify-between p-4 bg-white/[0.03] border border-white/5 rounded-2xl">
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${
-              boardOrientation === 'white' ? 'bg-zinc-800 text-white' : 'bg-white text-black'
-            }`}>
+            <div className={`p-2 rounded-lg ${boardOrientation === 'white' ? 'bg-zinc-800 text-white' : 'bg-white text-black'}`}>
               <User className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-xs font-bold text-gray-500 uppercase tracking-widest leading-none mb-1">
-                Opponent
-              </div>
-              <div className="text-sm font-black text-white uppercase italic">
-                {opponent?.users?.username || 'Opponent'}
-              </div>
+              <div className="text-xs font-bold text-gray-500 uppercase tracking-widest leading-none mb-1">Opponent</div>
+              <div className="text-sm font-black text-white uppercase italic">{opponent?.users?.username || 'Opponent'}</div>
             </div>
           </div>
-          <div className={`px-4 py-2 rounded-xl border border-white/10 font-mono font-bold text-xl ${
-            getClockColor(boardOrientation === 'white' ? clocks.black : clocks.white)
-          }`}>
+          <div className={`px-4 py-2 rounded-xl border border-white/10 font-mono font-bold text-xl ${getClockColor(boardOrientation === 'white' ? clocks.black : clocks.white)}`}>
             {formatTime(boardOrientation === 'white' ? clocks.black : clocks.white)}
           </div>
         </div>
@@ -501,14 +365,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
         {/* Board */}
         <div
           className="relative aspect-square w-full max-w-[600px] mx-auto bg-zinc-900 rounded-xl overflow-hidden shadow-2xl border-4 border-zinc-800"
-          style={{
-            touchAction: 'none',  // This MUST be on the container
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-          }}
-          // Prevent ALL touch scroll propagation from this element
-          onTouchStart={(e) => { e.stopPropagation(); }}
-          onTouchMove={(e) => { e.stopPropagation(); }}
+          style={{ touchAction: 'none' }}
         >
           <Chessboard
             id="main-chess-board"
@@ -517,16 +374,9 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
             boardOrientation={boardOrientation}
             customDarkSquareStyle={{ backgroundColor: '#1a1a1a' }}
             customLightSquareStyle={{ backgroundColor: '#2a2a2a' }}
-            customBoardStyle={{
-              touchAction: 'none',   // Also on the board itself
-              userSelect: 'none',
-            }}
+            customBoardStyle={{ touchAction: 'none' }}
             animationDuration={200}
-            arePiecesDraggable={
-              !moveLoading &&
-              gameState?.status === 'active' &&
-              gameState?.currentTurnPlayerId === user?.id
-            }
+            arePiecesDraggable={!moveLoading && gameState?.status === 'active' && gameState?.currentTurnPlayerId === user?.id}
           />
 
           {/* Promotion Overlay */}
@@ -538,9 +388,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
                   animate={{ scale: 1, opacity: 1 }}
                   className="bg-zinc-900 border border-white/10 p-6 rounded-3xl shadow-2xl text-center max-w-sm w-full"
                 >
-                  <h3 className="text-lg font-black text-white uppercase italic mb-6">
-                    Promote Pawn
-                  </h3>
+                  <h3 className="text-lg font-black text-white uppercase italic mb-6">Promote Pawn</h3>
                   <div className="grid grid-cols-4 gap-3">
                     {['q', 'r', 'b', 'n'].map((p) => (
                       <button
@@ -548,19 +396,16 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
                         onClick={() => handlePromotion(p)}
                         className="aspect-square flex items-center justify-center bg-white/5 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/50 rounded-2xl transition-all"
                       >
-                        <img
-                          src={`https://chessboardjs.com/img/chesspieces/wikipedia/${boardOrientation[0]}${p.toUpperCase()}.png`}
-                          alt={p}
-                          className="w-12 h-12"
-                        />
+                         <img
+                           src={`https://chessboardjs.com/img/chesspieces/wikipedia/${boardOrientation[0]}${p.toUpperCase()}.png`}
+                           alt={p}
+                           className="w-12 h-12"
+                         />
                       </button>
                     ))}
                   </div>
                   <button
-                    onClick={() => {
-                      setPromotionSquare(null);
-                      setPromotionMove(null);
-                    }}
+                    onClick={() => { setPromotionSquare(null); setPromotionMove(null); }}
                     className="mt-6 text-xs text-gray-500 hover:text-white uppercase font-bold tracking-widest"
                   >
                     Cancel
@@ -599,23 +444,15 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
         {/* Self Info */}
         <div className="flex items-center justify-between p-4 bg-white/[0.03] border border-white/5 rounded-2xl">
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${
-              boardOrientation === 'white' ? 'bg-white text-black' : 'bg-zinc-800 text-white'
-            }`}>
+            <div className={`p-2 rounded-lg ${boardOrientation === 'white' ? 'bg-white text-black' : 'bg-zinc-800 text-white'}`}>
               <User className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-xs font-bold text-gray-500 uppercase tracking-widest leading-none mb-1">
-                You ({boardOrientation})
-              </div>
-              <div className="text-sm font-black text-white uppercase italic">
-                {user?.username}
-              </div>
+              <div className="text-xs font-bold text-gray-500 uppercase tracking-widest leading-none mb-1">You ({boardOrientation})</div>
+              <div className="text-sm font-black text-white uppercase italic">{user?.username}</div>
             </div>
           </div>
-          <div className={`px-4 py-2 rounded-xl border border-white/10 font-mono font-bold text-xl ${
-            getClockColor(boardOrientation === 'white' ? clocks.white : clocks.black)
-          }`}>
+          <div className={`px-4 py-2 rounded-xl border border-white/10 font-mono font-bold text-xl ${getClockColor(boardOrientation === 'white' ? clocks.white : clocks.black)}`}>
             {formatTime(boardOrientation === 'white' ? clocks.white : clocks.black)}
           </div>
         </div>
@@ -639,9 +476,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
             </div>
             <div className="flex justify-between items-center py-3 border-b border-white/5">
               <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Moves</span>
-              <span className="text-xs text-white font-black">
-                {Math.ceil((gameState?.move_count || 0) / 2)}
-              </span>
+              <span className="text-xs text-white font-black">{Math.ceil((gameState?.move_count || 0) / 2)}</span>
             </div>
             <div className="flex justify-between items-center py-3 border-b border-white/5">
               <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Last Move</span>
@@ -652,46 +487,44 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
           </div>
 
           <div className="mt-8 grid grid-cols-1 gap-3">
-            {drawOfferStatus === 'received' ? (
-              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center">
-                <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mb-3">
-                  Draw Offer Received
+             {drawOfferStatus === 'received' ? (
+                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                  <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mb-3">Draw Offer Received</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleDrawResponse(true)}
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => handleDrawResponse(false)}
+                      className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
+                    >
+                      Decline
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleDrawResponse(true)}
-                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
-                  >
-                    Accept
-                  </button>
-                  <button
-                    onClick={() => handleDrawResponse(false)}
-                    className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
-                  >
-                    Decline
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={handleDrawOffer}
-                disabled={drawOfferStatus === 'sent' || gameState?.status !== 'active'}
-                className="flex items-center justify-center gap-2 p-4 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold text-gray-400 hover:text-white uppercase tracking-widest transition-all border border-white/10 disabled:opacity-50"
-              >
-                <Hand className="w-4 h-4" />
-                {drawOfferStatus === 'sent' ? 'Draw Offered...' : 'Offer Draw'}
-              </button>
-            )}
+             ) : (
+                <button
+                  onClick={handleDrawOffer}
+                  disabled={drawOfferStatus === 'sent' || gameState?.status !== 'active'}
+                  className="flex items-center justify-center gap-2 p-4 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold text-gray-400 hover:text-white uppercase tracking-widest transition-all border border-white/10 disabled:opacity-50"
+                >
+                  <Hand className="w-4 h-4" />
+                  {drawOfferStatus === 'sent' ? 'Draw Offered...' : 'Offer Draw'}
+                </button>
+             )}
           </div>
         </div>
 
         {/* Move History */}
         <div className="flex-1 bg-black/40 border border-white/5 rounded-3xl overflow-hidden flex flex-col">
           <div className="p-4 border-b border-white/5 bg-white/[0.02]">
-            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60 flex items-center gap-2">
-              <ChevronRight className="w-3 h-3" />
-              Move History
-            </span>
+             <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60 flex items-center gap-2">
+               <ChevronRight className="w-3 h-3" />
+               Move History
+             </span>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono scrollbar-hide">
             {gameState?.history?.length > 0 ? (
@@ -701,14 +534,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
                   <span className={`flex-1 ${h.player === 'white' ? 'text-white' : 'text-gray-400'}`}>
                     {h.move}
                   </span>
-                  <span className="text-[8px] text-gray-700">
-                    {new Date(h.timestamp).toLocaleTimeString([], {
-                      hour12: false,
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      second: '2-digit',
-                    })}
-                  </span>
+                  <span className="text-[8px] text-gray-700">{new Date(h.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                 </div>
               ))
             ) : (
