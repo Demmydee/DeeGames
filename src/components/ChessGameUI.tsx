@@ -34,23 +34,27 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   const onGameEndRef = useRef(onGameEnd);
 
 
-  /* Prevent touch scroll interference with chess board dragging */
-  #main-chess-board,
-  #main-chess-board * {
-    touch-action: none !important;
-    user-select: none !important;
-    -webkit-user-select: none !important;
-  }
+  useEffect(() => {
+    // Override react-chessboard's touch handling to use pointer events
+    const boardEl = document.getElementById('main-chess-board');
+    if (!boardEl) return;
 
-  /* Fix for react-chessboard piece dragging on touch devices */
-  [data-piece] {
-    touch-action: none !important;
-    cursor: grab !important;
-  }
+    const preventScroll = (e: TouchEvent) => {
+      // Only prevent if a piece is being dragged
+      if ((e.target as HTMLElement).closest('[data-piece]')) {
+        e.preventDefault();
+      }
+    };
 
-  [data-piece]:active {
-    cursor: grabbing !important;
-  }
+    // Must use { passive: false } to allow preventDefault
+    boardEl.addEventListener('touchstart', preventScroll, { passive: false });
+    boardEl.addEventListener('touchmove', preventScroll, { passive: false });
+
+    return () => {
+      boardEl.removeEventListener('touchstart', preventScroll);
+      boardEl.removeEventListener('touchmove', preventScroll);
+    };
+  }, [gameState]); // Re-attach when board re-renders
 
 
   // Keep onGameEndRef current without causing re-renders
