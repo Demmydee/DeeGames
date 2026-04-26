@@ -39,6 +39,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   }, [onGameEnd]);
 
   const [gameState, setGameState] = useState<any>(null);
+  const [boardPosition, setBoardPosition] = useState<string>('start');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [moveLoading, setMoveLoading] = useState(false);
@@ -53,13 +54,31 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       setGameState((prev: any) => {
         const next = stateOrUpdater(prev);
         gameStateRef.current = next;
+        // If not skipping poll, sync board position
+        if (!skipPollRef.current && next?.fen) {
+          setBoardPosition(next.fen);
+        }
         return next;
       });
     } else {
       gameStateRef.current = stateOrUpdater;
       setGameState(stateOrUpdater);
+      if (!skipPollRef.current && stateOrUpdater?.fen) {
+        setBoardPosition(stateOrUpdater.fen);
+      }
     }
   }, []);
+
+  // Use effect for derived draw offer status
+  useEffect(() => {
+    if (!gameState) return;
+    const drawOfferBy = gameState.draw_offer_by;
+    if (drawOfferBy) {
+      setDrawOfferStatus(drawOfferBy === user?.id ? 'sent' : 'received');
+    } else {
+      setDrawOfferStatus('none');
+    }
+  }, [gameState, user?.id]);
 
   const fetchGameState = useCallback(async () => {
     // Check BEFORE the async call
@@ -81,20 +100,24 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       setGameStateAndRef(newState);
 
       if (response.status === 'completed' && newState.game_over) {
-        try {
-          const result = await gameApi.getResult(matchId);
-          onGameEndRef.current(result);
-        } catch (err) {
-          console.error('CHESS: Failed to fetch result', err);
-        }
+        // Retry logic for result fetching
+        let retries = 3;
+        const fetchResult = async () => {
+          try {
+            const result = await gameApi.getResult(matchId);
+            onGameEndRef.current(result);
+          } catch (err) {
+            if (retries > 0) {
+              console.warn(`CHESS: Failed to fetch result, retrying in 2s... (${retries} left)`);
+              retries--;
+              setTimeout(fetchResult, 2000);
+            } else {
+              console.error('CHESS: Failed to fetch result after retries', err);
+            }
+          }
+        };
+        fetchResult();
       }
-
-      if (newState.draw_offer_by) {
-        setDrawOfferStatus(newState.draw_offer_by === user?.id ? 'sent' : 'received');
-      } else {
-        setDrawOfferStatus('none');
-      }
-
     } catch (err: any) {
       if (!gameStateRef.current) {
         setError(err.message || 'Failed to fetch game state');
@@ -174,10 +197,13 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     const previousTurn = gs.currentTurnPlayerId;
     const newFen = chess.fen();
 
-    // Block polling for a significant duration to allow server update
-    doSkipPoll(5000);
+    // Block polling significantly
+    doSkipPoll(6000);
 
-    // Optimistic update
+    // Optimistic update board IMMEDIATELY
+    setBoardPosition(newFen);
+
+    // Update state optimistically too
     setGameStateAndRef((prev: any) => ({
       ...prev,
       fen: newFen,
@@ -194,10 +220,12 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
           to: targetSquare,
           type: 'move'
         });
+
         console.log('CHESS: Move accepted by server', response.state.fen);
 
-        // Use server result immediately
+        // Use server result
         setGameStateAndRef(response.state);
+        setBoardPosition(response.state.fen); // Hard sync
 
         // Re-enable polling
         skipPollRef.current = false;
@@ -208,6 +236,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
           fen: previousFen,
           currentTurnPlayerId: previousTurn
         }));
+        setBoardPosition(previousFen || 'start');
         setError(err.response?.data?.error || err.message);
         skipPollRef.current = false;
         await fetchGameState();
@@ -380,7 +409,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
         >
           <Chessboard
             id="main-chess-board"
-            position={gameState?.fen || 'start'}
+            position={boardPosition}
             onPieceDrop={onDrop}
             boardOrientation={boardOrientation}
             customDarkSquareStyle={{ backgroundColor: '#1a1a1a' }}

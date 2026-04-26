@@ -1,30 +1,53 @@
 import { supabase } from '../config/supabase';
 
 export const getOrCreateChatRoom = async (contextType: 'room' | 'match', contextId: string) => {
-  const { data: existing, error: findError } = await supabase
-    .from('chat_rooms')
-    .select('*')
-    .eq('context_type', contextType)
-    .eq('context_id', contextId)
-    .maybeSingle();
+  // Try newer schema first (context_type, context_id)
+  try {
+    const { data: existing, error: findError } = await supabase
+      .from('chat_rooms')
+      .select('*')
+      .eq('context_type', contextType)
+      .eq('context_id', contextId)
+      .maybeSingle();
 
-  if (findError) {
-    console.error('getOrCreateChatRoom Find Error:', JSON.stringify(findError));
-    throw new Error(`Failed to find chat room: ${findError.message}`);
+    if (!findError && existing) return existing;
+
+    // If not found and no error, create it
+    if (!findError) {
+      const { data: created, error: createError } = await supabase
+        .from('chat_rooms')
+        .insert([{ context_type: contextType, context_id: contextId }])
+        .select()
+        .single();
+
+      if (!createError) return created;
+    }
+  } catch (err) {
+    console.warn('Chat schema context_id lookup failed, trying fallback...');
   }
-  if (existing) return existing;
 
-  const { data: created, error: createError } = await supabase
-    .from('chat_rooms')
-    .insert([{ context_type: contextType, context_id: contextId }])
-    .select()
-    .single();
+  // Fallback to legacy or specific match_id column if it exists
+  if (contextType === 'match') {
+    const { data: existingLegacy, error: legacyError } = await supabase
+      .from('chat_rooms')
+      .select('*')
+      .eq('match_id', contextId)
+      .maybeSingle();
 
-  if (createError) {
-    console.error('getOrCreateChatRoom Create Error:', JSON.stringify(createError));
-    throw new Error(`Failed to create chat room: ${createError.message}`);
+    if (!legacyError && existingLegacy) return existingLegacy;
+
+    if (!legacyError) {
+      const { data: createdLegacy, error: createLegacyError } = await supabase
+        .from('chat_rooms')
+        .insert([{ match_id: contextId }])
+        .select()
+        .single();
+
+      if (!createLegacyError) return createdLegacy;
+    }
   }
-  return created;
+
+  throw new Error(`Failed to get or create chat room for ${contextType} ${contextId}`);
 };
 
 export const getChatMessages = async (chatRoomId: string, limit = 50) => {

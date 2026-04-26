@@ -1,18 +1,1 @@
 @import "tailwindcss";
-/* Prevent touch scroll interference with chess board dragging */
-#main-chess-board,
-#main-chess-board * {
-  touch-action: none !important;
-  user-select: none !important;
-  -webkit-user-select: none !important;
-}
-
-/* Fix for react-chessboard piece dragging on touch devices */
-[data-piece] {
-  touch-action: none !important;
-  cursor: grab !important;
-}
-
-[data-piece]:active {
-  cursor: grabbing !important;
-}

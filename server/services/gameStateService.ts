@@ -153,7 +153,8 @@ export class GameStateService {
       await this.handleGameEnd(matchId, newState);
     }
 
-    return { state: updatedRecord, events };
+    // Always get enriched state at the end
+    return { state: await this.getGameState(matchId), events };
   }
 
   static async handlePlayerDefeat(matchId: string, userId: string, reason: 'left' | 'disconnected' | 'time_forfeit') {
@@ -190,7 +191,7 @@ export class GameStateService {
       .eq('match_id', matchId)
       .eq('user_id', userId);
 
-    // Check end condition - pass the newState which already has the rankings and status
+    // Check end condition - MARK COMPLETE ONLY AFTER SETTLEMENT if possible
     if (newState.status === 'completed') {
       const endResult = {
         isOver: true,
@@ -201,7 +202,8 @@ export class GameStateService {
       await this.handleGameEnd(matchId, newState, endResult);
     }
 
-    return { state: updatedRecord, events };
+    // Always get enriched state at the end
+    return { state: await this.getGameState(matchId), events };
   }
 
   private static async handleGameEnd(matchId: string, state: GameState, forcedResult?: any) {
