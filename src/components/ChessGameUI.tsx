@@ -160,7 +160,20 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   const onDrop = useCallback((sourceSquare: string, targetSquare: string, piece: string): boolean => {
     // Read from ref directly to avoid stale closures in the drop handler
     const gs = gameStateRef.current;
-    console.log('DIAG: onDrop started', { sourceSquare, targetSquare, piece, gsStatus: gs?.status, gsTurn: gs?.currentTurnPlayerId, userId: user?.id });
+    console.log('DIAG: onDrop started', {
+      sourceSquare,
+      targetSquare,
+      piece,
+      gsStatus: gs?.status,
+      gsTurn: gs?.currentTurnPlayerId,
+      userId: user?.id,
+      moveLoading
+    });
+
+    if (!sourceSquare || !targetSquare) {
+      console.warn('DIAG: onDrop rejected - missing square info');
+      return false;
+    }
 
     if (!gs) {
       console.warn('DIAG: onDrop rejected - no game state');
@@ -177,13 +190,13 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       return false;
     }
 
-    const isPlayerWhite = gs.white_user_id === user?.id;
-    console.log('DIAG: isPlayerWhite?', isPlayerWhite, 'piece:', piece);
-    if (isPlayerWhite && piece[0] !== 'w') {
+    const isWhite = gs.white_user_id === user?.id;
+    console.log('DIAG: moving piece info', { isWhite, piece });
+    if (isWhite && piece[0] !== 'w') {
       console.warn('DIAG: onDrop rejected - cannot move black pieces as white');
       return false;
     }
-    if (!isPlayerWhite && piece[0] !== 'b') {
+    if (!isWhite && piece[0] !== 'b') {
       console.warn('DIAG: onDrop rejected - cannot move white pieces as black');
       return false;
     }
@@ -445,22 +458,42 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
           </div>
         </div>
 
+        {(() => {
+          const isMyTurn = gameState?.currentTurnPlayerId === user?.id;
+          const isDraggable = !moveLoading && gameState?.status === 'active' && isMyTurn;
+          return (
+            <div className="mb-4 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700 font-mono text-xs space-y-1">
+              <div className="flex justify-between">
+                <span>Status: <span className={gameState?.status === 'active' ? 'text-green-400' : 'text-yellow-400'}>{gameState?.status}</span></span>
+                <span>Turn: <span className={isMyTurn ? 'text-blue-400 font-bold' : 'text-zinc-400'}>{isMyTurn ? 'YOURS' : 'OPPONENT'}</span></span>
+              </div>
+              <div className="flex justify-between text-[10px] text-zinc-500">
+                <span>Draggable: {String(isDraggable)}</span>
+                <span>Source: {lastFenSource}</span>
+              </div>
+              <div className="truncate text-[10px] text-zinc-600">FEN: {boardPosition.substring(0, 40)}...</div>
+            </div>
+          );
+        })()}
+
         {/* Board */}
-          <div className="relative aspect-square w-full max-w-[600px] mx-auto bg-zinc-900 rounded-xl overflow-hidden shadow-2xl border-4 border-zinc-800"
-               style={{ touchAction: 'none' }}
-               onTouchMove={(e) => {
-                 if ((e.target as HTMLElement).closest('[data-piece]')) {
-                   e.preventDefault();
-                 }
-               }}>
+          <div className="relative aspect-square w-full max-w-[600px] mx-auto bg-zinc-900 rounded-xl overflow-hidden shadow-2xl border-4 border-zinc-800">
             {(() => {
+              const isMyTurn = gameState?.currentTurnPlayerId === user?.id;
+              const isDraggable = !moveLoading && gameState?.status === 'active' && isMyTurn;
               if (lastFenSource !== 'poll') {
-                console.log('DIAG: Rendering Chessboard with position:', boardPosition.substring(0, 30), 'Source:', lastFenSource);
+                console.log('DIAG: Rendering Chessboard Box', {
+                  pos: boardPosition.substring(0, 20),
+                  isDraggable,
+                  isMyTurn,
+                  gsStatus: gameState?.status,
+                  source: lastFenSource
+                });
               }
               return null;
             })()}
             <Chessboard
-              id="main-chess-board"
+              id="MainChessboard"
               animationDuration={200}
               position={boardPosition}
               onPieceDrop={onDrop}
@@ -468,7 +501,8 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
               arePiecesDraggable={!moveLoading && gameState?.status === 'active' && gameState?.currentTurnPlayerId === user?.id}
               customDarkSquareStyle={{ backgroundColor: '#1a1a1a' }}
               customLightSquareStyle={{ backgroundColor: '#2a2a2a' }}
-              customBoardStyle={{ touchAction: 'none', borderRadius: '8px', overflow: 'hidden' }}
+              onPieceDragBegin={(piece, sourceSquare) => console.log('DIAG: onPieceDragBegin', { piece, sourceSquare })}
+              onPieceDragEnd={(piece, sourceSquare) => console.log('DIAG: onPieceDragEnd', { piece, sourceSquare })}
             />
 
           {/* Promotion Overlay */}
