@@ -154,26 +154,44 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   const onDrop = useCallback((sourceSquare: string, targetSquare: string, piece: string): boolean => {
     // Read from ref directly to avoid stale closures in the drop handler
     const gs = gameStateRef.current;
-    if (!gs || gs.status !== 'active') return false;
+    console.log('DIAG: onDrop started', { sourceSquare, targetSquare, piece, gsStatus: gs?.status, gsTurn: gs?.currentTurnPlayerId, userId: user?.id });
 
-    console.log('DIAG: onDrop triggered', { sourceSquare, targetSquare, piece });
+    if (!gs) {
+      console.warn('DIAG: onDrop rejected - no game state');
+      return false;
+    }
+
+    if (gs.status !== 'active') {
+      console.warn('DIAG: onDrop rejected - game not active', gs.status);
+      return false;
+    }
 
     if (gs.currentTurnPlayerId !== user?.id) {
-      console.warn('DIAG: Move rejected - not your turn', { turn: gs.currentTurnPlayerId, user: user?.id });
+      console.warn('DIAG: onDrop rejected - not your turn', { turn: gs.currentTurnPlayerId, user: user?.id });
       return false;
     }
 
     const isPlayerWhite = gs.white_user_id === user?.id;
-    if (isPlayerWhite && piece[0] !== 'w') return false;
-    if (!isPlayerWhite && piece[0] !== 'b') return false;
+    console.log('DIAG: isPlayerWhite?', isPlayerWhite, 'piece:', piece);
+    if (isPlayerWhite && piece[0] !== 'w') {
+      console.warn('DIAG: onDrop rejected - cannot move black pieces as white');
+      return false;
+    }
+    if (!isPlayerWhite && piece[0] !== 'b') {
+      console.warn('DIAG: onDrop rejected - cannot move white pieces as black');
+      return false;
+    }
 
-    if (!gs.fen) return false;
+    if (!gs.fen) {
+      console.warn('DIAG: onDrop rejected - no FEN in state');
+      return false;
+    }
 
     let chess: Chess;
     try {
       chess = new Chess(gs.fen);
     } catch (err) {
-      console.error('CHESS: Invalid FEN', gs.fen, err);
+      console.error('DIAG: Invalid FEN', gs.fen, err);
       return false;
     }
 
@@ -181,27 +199,26 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     const isPromotion = moves.some(m => m.from === sourceSquare && m.to === targetSquare && m.flags.includes('p'));
 
     if (isPromotion) {
-      console.log('CHESS: Promotion detected');
+      console.log('DIAG: Promotion move detected');
       setPromotionMove({ from: sourceSquare, to: targetSquare });
       setPromotionSquare(targetSquare);
-      // Return true to keep piece on board while dialog is open
       return true;
     }
 
     let moveResult;
     try {
-      moveResult = chess.move({ from: sourceSquare, to: targetSquare });
+      moveResult = chess.move({ from: sourceSquare as any, to: targetSquare as any });
     } catch (err) {
-      console.error('CHESS: Local moves validation error', err);
+      console.error('DIAG: Local moves validation exception', err);
       return false;
     }
 
     if (moveResult === null) {
-      console.warn('CHESS: Move rejected by chess.js', { fen: gs.fen, from: sourceSquare, to: targetSquare });
+      console.warn('DIAG: Move rejected by chess.js validation', { fen: gs.fen, from: sourceSquare, to: targetSquare });
       return false;
     }
 
-    console.log('CHESS: Move validated locally', moveResult.san);
+    console.log('DIAG: Move validated locally. SAN:', moveResult.san, 'New FEN:', chess.fen().substring(0, 30));
 
     const previousFen = gs.fen;
     const previousTurn = gs.currentTurnPlayerId;
@@ -434,15 +451,15 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
             })()}
             <Chessboard
               id="main-chess-board"
+              animationDuration={200}
               position={boardPosition}
-            onPieceDrop={onDrop}
-            boardOrientation={boardOrientation}
-            customDarkSquareStyle={{ backgroundColor: '#1a1a1a' }}
-            customLightSquareStyle={{ backgroundColor: '#2a2a2a' }}
-            customBoardStyle={{ touchAction: 'none' }}
-            animationDuration={200}
-            arePiecesDraggable={!moveLoading && gameState?.status === 'active' && gameState?.currentTurnPlayerId === user?.id}
-          />
+              onPieceDrop={onDrop}
+              boardOrientation={boardOrientation}
+              arePiecesDraggable={!moveLoading && gameState?.status === 'active' && gameState?.currentTurnPlayerId === user?.id}
+              customDarkSquareStyle={{ backgroundColor: '#1a1a1a' }}
+              customLightSquareStyle={{ backgroundColor: '#2a2a2a' }}
+              customBoardStyle={{ touchAction: 'none', borderRadius: '8px', overflow: 'hidden' }}
+            />
 
           {/* Promotion Overlay */}
           <AnimatePresence>
