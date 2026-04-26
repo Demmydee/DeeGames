@@ -40,6 +40,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
 
   const [gameState, setGameState] = useState<any>(null);
   const [boardPosition, setBoardPosition] = useState<string>('start');
+  const [lastFenSource, setLastFenSource] = useState<string>('initial');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [moveLoading, setMoveLoading] = useState(false);
@@ -49,14 +50,18 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   const [clocks, setClocks] = useState({ white: 0, black: 0 });
 
   // Setter that also keeps ref in sync
-  const setGameStateAndRef = useCallback((stateOrUpdater: any) => {
+  const setGameStateAndRef = useCallback((stateOrUpdater: any, source: string = 'unknown') => {
     if (typeof stateOrUpdater === 'function') {
       setGameState((prev: any) => {
         const next = stateOrUpdater(prev);
         gameStateRef.current = next;
         // If not skipping poll, sync board position
         if (!skipPollRef.current && next?.fen) {
+          console.log(`DIAG: setGameStateAndRef updating board from ${source}. FEN: ${next.fen.substring(0, 30)}...`);
           setBoardPosition(next.fen);
+          setLastFenSource(source);
+        } else if (skipPollRef.current) {
+          console.log(`DIAG: setGameStateAndRef SKIPPING board sync from ${source} (poll skipped)`);
         }
         return next;
       });
@@ -64,7 +69,11 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       gameStateRef.current = stateOrUpdater;
       setGameState(stateOrUpdater);
       if (!skipPollRef.current && stateOrUpdater?.fen) {
+        console.log(`DIAG: setGameStateAndRef updating board from ${source}. FEN: ${stateOrUpdater.fen.substring(0, 30)}...`);
         setBoardPosition(stateOrUpdater.fen);
+        setLastFenSource(source);
+      } else if (skipPollRef.current) {
+        console.log(`DIAG: setGameStateAndRef SKIPPING board sync from ${source} (poll skipped)`);
       }
     }
   }, []);
@@ -97,7 +106,8 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       }
 
       const newState = response.state;
-      setGameStateAndRef(newState);
+      console.log('DIAG: fetchGameState received state. FEN:', newState.fen.substring(0, 30));
+      setGameStateAndRef(newState, 'poll');
 
       if (response.status === 'completed' && newState.game_over) {
         // Retry logic for result fetching
@@ -146,10 +156,10 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     const gs = gameStateRef.current;
     if (!gs || gs.status !== 'active') return false;
 
-    console.log('CHESS: onDrop triggered', { sourceSquare, targetSquare, piece });
+    console.log('DIAG: onDrop triggered', { sourceSquare, targetSquare, piece });
 
     if (gs.currentTurnPlayerId !== user?.id) {
-      console.warn('CHESS: Move rejected - not your turn', { turn: gs.currentTurnPlayerId, user: user?.id });
+      console.warn('DIAG: Move rejected - not your turn', { turn: gs.currentTurnPlayerId, user: user?.id });
       return false;
     }
 
@@ -197,18 +207,21 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     const previousTurn = gs.currentTurnPlayerId;
     const newFen = chess.fen();
 
+    console.log('DIAG: Performing optimistic update. New FEN:', newFen.substring(0, 30));
+
     // Block polling significantly
     doSkipPoll(6000);
 
     // Optimistic update board IMMEDIATELY
     setBoardPosition(newFen);
+    setLastFenSource('optimistic');
 
     // Update state optimistically too
     setGameStateAndRef((prev: any) => ({
       ...prev,
       fen: newFen,
       currentTurnPlayerId: prev.currentTurnPlayerId === prev.white_user_id ? prev.black_user_id : prev.white_user_id
-    }));
+    }), 'optimistic');
 
     // Process on server
     (async () => {
@@ -221,22 +234,24 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
           type: 'move'
         });
 
-        console.log('CHESS: Move accepted by server', response.state.fen);
+        console.log('DIAG: Move accepted by server. Final FEN:', response.state.fen.substring(0, 30));
 
         // Use server result
-        setGameStateAndRef(response.state);
+        setGameStateAndRef(response.state, 'server_ack');
         setBoardPosition(response.state.fen); // Hard sync
+        setLastFenSource('server_ack');
 
         // Re-enable polling
         skipPollRef.current = false;
       } catch (err: any) {
-        console.error('CHESS: Server rejected move - rolling back', err);
+        console.error('DIAG: Server rejected move - rolling back', err);
         setGameStateAndRef((prev: any) => ({
           ...prev,
           fen: previousFen,
           currentTurnPlayerId: previousTurn
-        }));
+        }), 'rollback');
         setBoardPosition(previousFen || 'start');
+        setLastFenSource('rollback');
         setError(err.response?.data?.error || err.message);
         skipPollRef.current = false;
         await fetchGameState();
@@ -255,11 +270,11 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
 
     try {
       setMoveLoading(true);
-      console.log('CHESS: Sending promotion move to server...', pieceType);
+      console.log('DIAG: Sending promotion move to server...', pieceType);
 
       setPromotionMove(null);
       setPromotionSquare(null);
-      doSkipPoll(5000);
+      doSkipPoll(6000);
 
       const response = await gameApi.processMove(matchId, {
         from: promotionMove.from,
@@ -268,14 +283,18 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
         type: 'move'
       });
 
-      console.log('CHESS: Promotion accepted', response.state.fen);
-      setGameStateAndRef(response.state);
+      console.log('DIAG: Promotion accepted', response.state.fen.substring(0, 30));
+      setGameStateAndRef(response.state, 'server_ack_promotion');
+      setBoardPosition(response.state.fen);
+      setLastFenSource('server_ack_promotion');
 
       skipPollRef.current = false;
     } catch (err: any) {
-      console.error('CHESS: Server rejected promotion move', err);
+      console.error('DIAG: Server rejected promotion move', err);
       if (previousFen) {
-        setGameStateAndRef((prev: any) => ({ ...prev, fen: previousFen }));
+        setGameStateAndRef((prev: any) => ({ ...prev, fen: previousFen }), 'rollback_promotion');
+        setBoardPosition(previousFen);
+        setLastFenSource('rollback_promotion');
       }
       setError(err.response?.data?.error || err.message);
       skipPollRef.current = false;
@@ -284,6 +303,11 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       setMoveLoading(false);
     }
   }, [promotionMove, matchId, fetchGameState, setGameStateAndRef, doSkipPoll]);
+
+  // DIAGNOSTIC EFFECT
+  useEffect(() => {
+    console.log(`DIAG: boardPosition effectively changed to ${boardPosition.substring(0, 30)}... Source: ${lastFenSource}`);
+  }, [boardPosition, lastFenSource]);
 
   const handleDrawOffer = useCallback(async () => {
     if (!matchId) return;
@@ -397,19 +421,20 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
         </div>
 
         {/* Board */}
-        <div
-          className="relative aspect-square w-full max-w-[600px] mx-auto bg-zinc-900 rounded-xl overflow-hidden shadow-2xl border-4 border-zinc-800"
-          style={{ touchAction: 'none' }}
-          // Prevent scroll on touch devices when interacting with the board
-          onTouchMove={(e) => {
-            if ((e.target as HTMLElement).closest('[data-piece]')) {
-              e.preventDefault();
-            }
-          }}
-        >
-          <Chessboard
-            id="main-chess-board"
-            position={boardPosition}
+          <div className="relative aspect-square w-full max-w-[600px] mx-auto bg-zinc-900 rounded-xl overflow-hidden shadow-2xl border-4 border-zinc-800"
+               style={{ touchAction: 'none' }}
+               onTouchMove={(e) => {
+                 if ((e.target as HTMLElement).closest('[data-piece]')) {
+                   e.preventDefault();
+                 }
+               }}>
+            {(() => {
+              console.log('DIAG: Rendering Chessboard with position:', boardPosition.substring(0, 30), 'Source:', lastFenSource);
+              return null;
+            })()}
+            <Chessboard
+              id="main-chess-board"
+              position={boardPosition}
             onPieceDrop={onDrop}
             boardOrientation={boardOrientation}
             customDarkSquareStyle={{ backgroundColor: '#1a1a1a' }}
