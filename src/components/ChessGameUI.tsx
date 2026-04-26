@@ -57,7 +57,9 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
         gameStateRef.current = next;
         // If not skipping poll, sync board position
         if (!skipPollRef.current && next?.fen) {
-          console.log(`DIAG: setGameStateAndRef updating board from ${source}. FEN: ${next.fen.substring(0, 30)}...`);
+          if (source !== 'poll') {
+            console.log(`DIAG: setGameStateAndRef updating board from ${source}. FEN: ${next.fen.substring(0, 30)}...`);
+          }
           setBoardPosition(next.fen);
           setLastFenSource(source);
         } else if (skipPollRef.current) {
@@ -69,7 +71,9 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       gameStateRef.current = stateOrUpdater;
       setGameState(stateOrUpdater);
       if (!skipPollRef.current && stateOrUpdater?.fen) {
-        console.log(`DIAG: setGameStateAndRef updating board from ${source}. FEN: ${stateOrUpdater.fen.substring(0, 30)}...`);
+        if (source !== 'poll') {
+          console.log(`DIAG: setGameStateAndRef updating board from ${source}. FEN: ${stateOrUpdater.fen.substring(0, 30)}...`);
+        }
         setBoardPosition(stateOrUpdater.fen);
         setLastFenSource(source);
       } else if (skipPollRef.current) {
@@ -106,7 +110,9 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       }
 
       const newState = response.state;
-      console.log('DIAG: fetchGameState received state. FEN:', newState.fen.substring(0, 30));
+      if (skipPollRef.current) {
+        console.log('DIAG: fetchGameState received state BUT skipPoll is ACTIVE. FEN:', newState.fen.substring(0, 30));
+      }
       setGameStateAndRef(newState, 'poll');
 
       if (response.status === 'completed' && newState.game_over) {
@@ -323,7 +329,9 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
 
   // DIAGNOSTIC EFFECT
   useEffect(() => {
-    console.log(`DIAG: boardPosition effectively changed to ${boardPosition.substring(0, 30)}... Source: ${lastFenSource}`);
+    if (lastFenSource !== 'poll') {
+      console.log(`DIAG: boardPosition effectively changed to ${boardPosition.substring(0, 30)}... Source: ${lastFenSource}`);
+    }
   }, [boardPosition, lastFenSource]);
 
   const handleDrawOffer = useCallback(async () => {
@@ -446,7 +454,9 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
                  }
                }}>
             {(() => {
-              console.log('DIAG: Rendering Chessboard with position:', boardPosition.substring(0, 30), 'Source:', lastFenSource);
+              if (lastFenSource !== 'poll') {
+                console.log('DIAG: Rendering Chessboard with position:', boardPosition.substring(0, 30), 'Source:', lastFenSource);
+              }
               return null;
             })()}
             <Chessboard
