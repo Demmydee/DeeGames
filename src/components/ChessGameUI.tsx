@@ -48,6 +48,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   const [promotionMove, setPromotionMove] = useState<{ from: string, to: string } | null>(null);
   const [drawOfferStatus, setDrawOfferStatus] = useState<'none' | 'offering' | 'received' | 'sent'>('none');
   const [clocks, setClocks] = useState({ white: 0, black: 0 });
+  const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
 
   // Setter that also keeps ref in sync
   const setGameStateAndRef = useCallback((stateOrUpdater: any, source: string = 'unknown') => {
@@ -360,6 +361,53 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     }
   }, [matchId]);
 
+  const onSquareClick = useCallback((square: string) => {
+    const gs = gameStateRef.current;
+    if (!gs || gs.status !== 'active' || gs.currentTurnPlayerId !== user?.id) return;
+
+    if (selectedSquare) {
+      if (selectedSquare === square) {
+        setSelectedSquare(null);
+        return;
+      }
+
+      // Check if clicking another of my own pieces
+      const chess = new Chess(gs.fen);
+      const pieceOnSquare = chess.get(square as any);
+      const isWhite = gs.white_user_id === user?.id;
+      const isOwnPiece = pieceOnSquare && ((isWhite && pieceOnSquare.color === 'w') || (!isWhite && pieceOnSquare.color === 'b'));
+
+      if (isOwnPiece) {
+        console.log('DIAG: Re-selecting piece at', square);
+        setSelectedSquare(square);
+      } else {
+        // Attempt move
+        const pieceId = chess.get(selectedSquare as any);
+        const fullPieceCode = pieceId ? (pieceId.color + pieceId.type.toUpperCase()) : '';
+        console.log('DIAG: Attempting manual move via click', { from: selectedSquare, to: square, piece: fullPieceCode });
+        const success = onDrop(selectedSquare, square, fullPieceCode);
+        if (success) {
+          setSelectedSquare(null);
+        } else {
+          // If the move failed (e.g. invalid move), we might want to deselect or keep selection
+          // Deselecting is safer to avoid confusion
+          setSelectedSquare(null);
+        }
+      }
+    } else {
+      // First click
+      const chess = new Chess(gs.fen || 'start');
+      const piece = chess.get(square as any);
+      const isWhite = gs.white_user_id === user?.id;
+      const isCorrectColor = piece && ((isWhite && piece.color === 'w') || (!isWhite && piece.color === 'b'));
+
+      if (isCorrectColor) {
+        console.log('DIAG: Selecting piece at', square);
+        setSelectedSquare(square);
+      }
+    }
+  }, [selectedSquare, user, onDrop]);
+
   const handleDrawResponse = useCallback(async (accept: boolean) => {
     try {
       if (accept) {
@@ -497,10 +545,14 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
               animationDuration={200}
               position={boardPosition}
               onPieceDrop={onDrop}
+              onSquareClick={onSquareClick}
               boardOrientation={boardOrientation}
               arePiecesDraggable={!moveLoading && gameState?.status === 'active' && gameState?.currentTurnPlayerId === user?.id}
               customDarkSquareStyle={{ backgroundColor: '#1a1a1a' }}
               customLightSquareStyle={{ backgroundColor: '#2a2a2a' }}
+              customSquareStyles={{
+                ...(selectedSquare ? { [selectedSquare]: { backgroundColor: 'rgba(52, 211, 153, 0.4)' } } : {})
+              }}
               onPieceDragBegin={(piece, sourceSquare) => console.log('DIAG: onPieceDragBegin', { piece, sourceSquare })}
               onPieceDragEnd={(piece, sourceSquare) => console.log('DIAG: onPieceDragEnd', { piece, sourceSquare })}
             />
