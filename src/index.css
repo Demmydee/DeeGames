@@ -1,1 +1,9 @@
 @import "tailwindcss";
+
+/* Chess board — prevent browser scroll from stealing piece drag events */
+#MainChessboard,
+#MainChessboard * {
+  touch-action: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}

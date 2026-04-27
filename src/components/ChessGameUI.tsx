@@ -28,12 +28,10 @@ interface Props {
 const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) => {
   const { user } = useAuth();
 
-  // Refs for stable logic inside callbacks
   const skipPollRef = useRef(false);
   const gameStateRef = useRef<any>(null);
   const onGameEndRef = useRef(onGameEnd);
 
-  // Keep onGameEndRef current
   useEffect(() => {
     onGameEndRef.current = onGameEnd;
   }, [onGameEnd]);
@@ -50,13 +48,11 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   const [clocks, setClocks] = useState({ white: 0, black: 0 });
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
 
-  // Setter that also keeps ref in sync
   const setGameStateAndRef = useCallback((stateOrUpdater: any, source: string = 'unknown') => {
     if (typeof stateOrUpdater === 'function') {
       setGameState((prev: any) => {
         const next = stateOrUpdater(prev);
         gameStateRef.current = next;
-        // If not skipping poll, sync board position
         if (!skipPollRef.current && next?.fen) {
           if (source !== 'poll') {
             console.log(`DIAG: setGameStateAndRef updating board from ${source}. FEN: ${next.fen.substring(0, 30)}...`);
@@ -83,7 +79,6 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     }
   }, []);
 
-  // Use effect for derived draw offer status
   useEffect(() => {
     if (!gameState) return;
     const drawOfferBy = gameState.draw_offer_by;
@@ -95,7 +90,6 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   }, [gameState, user?.id]);
 
   const fetchGameState = useCallback(async () => {
-    // Check BEFORE the async call
     if (skipPollRef.current) {
       console.log('CHESS: Skipping poll (optimistic update in progress)');
       return;
@@ -104,7 +98,6 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     try {
       const response = await gameApi.getState(matchId);
 
-      // Check AGAIN after the async call completes
       if (skipPollRef.current) {
         console.log('CHESS: Discarding poll result (optimistic update in progress)');
         return;
@@ -117,7 +110,6 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       setGameStateAndRef(newState, 'poll');
 
       if (response.status === 'completed' && newState.game_over) {
-        // Retry logic for result fetching
         let retries = 3;
         const fetchResult = async () => {
           try {
@@ -159,7 +151,6 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   }, []);
 
   const onDrop = useCallback((sourceSquare: string, targetSquare: string, piece: string): boolean => {
-    // Read from ref directly to avoid stale closures in the drop handler
     const gs = gameStateRef.current;
     console.log('DIAG: onDrop started', {
       sourceSquare,
@@ -246,21 +237,17 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
 
     console.log('DIAG: Performing optimistic update. New FEN:', newFen.substring(0, 30));
 
-    // Block polling significantly
     doSkipPoll(6000);
 
-    // Optimistic update board IMMEDIATELY
     setBoardPosition(newFen);
     setLastFenSource('optimistic');
 
-    // Update state optimistically too
     setGameStateAndRef((prev: any) => ({
       ...prev,
       fen: newFen,
       currentTurnPlayerId: prev.currentTurnPlayerId === prev.white_user_id ? prev.black_user_id : prev.white_user_id
     }), 'optimistic');
 
-    // Process on server
     (async () => {
       try {
         setMoveLoading(true);
@@ -273,12 +260,10 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
 
         console.log('DIAG: Move accepted by server. Final FEN:', response.state.fen.substring(0, 30));
 
-        // Use server result
         setGameStateAndRef(response.state, 'server_ack');
-        setBoardPosition(response.state.fen); // Hard sync
+        setBoardPosition(response.state.fen);
         setLastFenSource('server_ack');
 
-        // Re-enable polling
         skipPollRef.current = false;
       } catch (err: any) {
         console.error('DIAG: Server rejected move - rolling back', err);
@@ -341,7 +326,6 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     }
   }, [promotionMove, matchId, fetchGameState, setGameStateAndRef, doSkipPoll]);
 
-  // DIAGNOSTIC EFFECT
   useEffect(() => {
     if (lastFenSource !== 'poll') {
       console.log(`DIAG: boardPosition effectively changed to ${boardPosition.substring(0, 30)}... Source: ${lastFenSource}`);
@@ -371,7 +355,6 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
         return;
       }
 
-      // Check if clicking another of my own pieces
       const chess = new Chess(gs.fen);
       const pieceOnSquare = chess.get(square as any);
       const isWhite = gs.white_user_id === user?.id;
@@ -381,7 +364,6 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
         console.log('DIAG: Re-selecting piece at', square);
         setSelectedSquare(square);
       } else {
-        // Attempt move
         const pieceId = chess.get(selectedSquare as any);
         const fullPieceCode = pieceId ? (pieceId.color + pieceId.type.toUpperCase()) : '';
         console.log('DIAG: Attempting manual move via click', { from: selectedSquare, to: square, piece: fullPieceCode });
@@ -389,13 +371,10 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
         if (success) {
           setSelectedSquare(null);
         } else {
-          // If the move failed (e.g. invalid move), we might want to deselect or keep selection
-          // Deselecting is safer to avoid confusion
           setSelectedSquare(null);
         }
       }
     } else {
-      // First click
       const chess = new Chess(gs.fen || 'start');
       const piece = chess.get(square as any);
       const isWhite = gs.white_user_id === user?.id;
@@ -422,7 +401,6 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
     }
   }, [matchId, fetchGameState]);
 
-  // Live clocks
   useEffect(() => {
     if (!gameState || gameState.status !== 'active') return;
 
@@ -487,9 +465,13 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   }
 
   return (
-    <div className="w-full h-full flex flex-col md:flex-row items-stretch gap-6 px-6 max-w-7xl mx-auto overflow-y-auto pb-8">
-      {/* Left Column */}
-      <div className="flex-[2] flex flex-col gap-4">
+    // ✅ FIX 2a: root div — overflow-y-auto → overflow-hidden, touchAction: none added
+    <div
+      className="w-full h-full flex flex-col md:flex-row items-stretch gap-6 px-6 max-w-7xl mx-auto overflow-hidden pb-8"
+      style={{ touchAction: 'none' }}
+    >
+      {/* ✅ FIX 2b: Left column — add overflow-y-auto so its own content scrolls */}
+      <div className="flex-[2] flex flex-col gap-4 overflow-y-auto">
         {/* Opponent Info */}
         <div className="flex items-center justify-between p-4 bg-white/[0.03] border border-white/5 rounded-2xl">
           <div className="flex items-center gap-3">
@@ -524,38 +506,42 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
           );
         })()}
 
-        {/* Board */}
-          <div className="relative aspect-square w-full max-w-[600px] mx-auto bg-zinc-900 rounded-xl overflow-hidden shadow-2xl border-4 border-zinc-800">
-            {(() => {
-              const isMyTurn = gameState?.currentTurnPlayerId === user?.id;
-              const isDraggable = !moveLoading && gameState?.status === 'active' && isMyTurn;
-              if (lastFenSource !== 'poll') {
-                console.log('DIAG: Rendering Chessboard Box', {
-                  pos: boardPosition.substring(0, 20),
-                  isDraggable,
-                  isMyTurn,
-                  gsStatus: gameState?.status,
-                  source: lastFenSource
-                });
-              }
-              return null;
-            })()}
-            <Chessboard
-              id="MainChessboard"
-              animationDuration={200}
-              position={boardPosition}
-              onPieceDrop={onDrop}
-              onSquareClick={onSquareClick}
-              boardOrientation={boardOrientation}
-              arePiecesDraggable={!moveLoading && gameState?.status === 'active' && gameState?.currentTurnPlayerId === user?.id}
-              customDarkSquareStyle={{ backgroundColor: '#1a1a1a' }}
-              customLightSquareStyle={{ backgroundColor: '#2a2a2a' }}
-              customSquareStyles={{
-                ...(selectedSquare ? { [selectedSquare]: { backgroundColor: 'rgba(52, 211, 153, 0.4)' } } : {})
-              }}
-              onPieceDragBegin={(piece, sourceSquare) => console.log('DIAG: onPieceDragBegin', { piece, sourceSquare })}
-              onPieceDragEnd={(piece, sourceSquare) => console.log('DIAG: onPieceDragEnd', { piece, sourceSquare })}
-            />
+        {/* ✅ FIX 2c: Board container — touchAction: none added */}
+        <div
+          className="relative aspect-square w-full max-w-[600px] mx-auto bg-zinc-900 rounded-xl overflow-hidden shadow-2xl border-4 border-zinc-800"
+          style={{ touchAction: 'none' }}
+        >
+          {(() => {
+            const isMyTurn = gameState?.currentTurnPlayerId === user?.id;
+            const isDraggable = !moveLoading && gameState?.status === 'active' && isMyTurn;
+            if (lastFenSource !== 'poll') {
+              console.log('DIAG: Rendering Chessboard Box', {
+                pos: boardPosition.substring(0, 20),
+                isDraggable,
+                isMyTurn,
+                gsStatus: gameState?.status,
+                source: lastFenSource
+              });
+            }
+            return null;
+          })()}
+          <Chessboard
+            id="MainChessboard"
+            animationDuration={200}
+            position={boardPosition}
+            onPieceDrop={onDrop}
+            onSquareClick={onSquareClick}
+            boardOrientation={boardOrientation}
+            arePiecesDraggable={!moveLoading && gameState?.status === 'active' && gameState?.currentTurnPlayerId === user?.id}
+            customDarkSquareStyle={{ backgroundColor: '#1a1a1a' }}
+            customLightSquareStyle={{ backgroundColor: '#2a2a2a' }}
+            customBoardStyle={{ touchAction: 'none' }}
+            customSquareStyles={{
+              ...(selectedSquare ? { [selectedSquare]: { backgroundColor: 'rgba(52, 211, 153, 0.4)' } } : {})
+            }}
+            onPieceDragBegin={(piece, sourceSquare) => console.log('DIAG: onPieceDragBegin', { piece, sourceSquare })}
+            onPieceDragEnd={(piece, sourceSquare) => console.log('DIAG: onPieceDragEnd', { piece, sourceSquare })}
+          />
 
           {/* Promotion Overlay */}
           <AnimatePresence>
@@ -574,11 +560,11 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
                         onClick={() => handlePromotion(p)}
                         className="aspect-square flex items-center justify-center bg-white/5 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/50 rounded-2xl transition-all"
                       >
-                         <img
-                           src={`https://chessboardjs.com/img/chesspieces/wikipedia/${boardOrientation[0]}${p.toUpperCase()}.png`}
-                           alt={p}
-                           className="w-12 h-12"
-                         />
+                        <img
+                          src={`https://chessboardjs.com/img/chesspieces/wikipedia/${boardOrientation[0]}${p.toUpperCase()}.png`}
+                          alt={p}
+                          className="w-12 h-12"
+                        />
                       </button>
                     ))}
                   </div>
@@ -636,8 +622,8 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
         </div>
       </div>
 
-      {/* Right Column */}
-      <div className="flex-1 flex flex-col gap-6">
+      {/* ✅ FIX 2d: Right column — add overflow-y-auto so it scrolls independently */}
+      <div className="flex-1 flex flex-col gap-6 overflow-y-auto">
         <div className="p-6 bg-gradient-to-br from-zinc-900 to-black border border-white/5 rounded-3xl shadow-xl">
           <div className="flex items-center gap-2 text-emerald-500 mb-6">
             <Shield className="w-4 h-4" />
@@ -665,44 +651,44 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
           </div>
 
           <div className="mt-8 grid grid-cols-1 gap-3">
-             {drawOfferStatus === 'received' ? (
-                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center">
-                  <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mb-3">Draw Offer Received</div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleDrawResponse(true)}
-                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
-                    >
-                      Accept
-                    </button>
-                    <button
-                      onClick={() => handleDrawResponse(false)}
-                      className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
-                    >
-                      Decline
-                    </button>
-                  </div>
+            {drawOfferStatus === 'received' ? (
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mb-3">Draw Offer Received</div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleDrawResponse(true)}
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    onClick={() => handleDrawResponse(false)}
+                    className="flex-1 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
+                  >
+                    Decline
+                  </button>
                 </div>
-             ) : (
-                <button
-                  onClick={handleDrawOffer}
-                  disabled={drawOfferStatus === 'sent' || gameState?.status !== 'active'}
-                  className="flex items-center justify-center gap-2 p-4 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold text-gray-400 hover:text-white uppercase tracking-widest transition-all border border-white/10 disabled:opacity-50"
-                >
-                  <Hand className="w-4 h-4" />
-                  {drawOfferStatus === 'sent' ? 'Draw Offered...' : 'Offer Draw'}
-                </button>
-             )}
+              </div>
+            ) : (
+              <button
+                onClick={handleDrawOffer}
+                disabled={drawOfferStatus === 'sent' || gameState?.status !== 'active'}
+                className="flex items-center justify-center gap-2 p-4 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold text-gray-400 hover:text-white uppercase tracking-widest transition-all border border-white/10 disabled:opacity-50"
+              >
+                <Hand className="w-4 h-4" />
+                {drawOfferStatus === 'sent' ? 'Draw Offered...' : 'Offer Draw'}
+              </button>
+            )}
           </div>
         </div>
 
         {/* Move History */}
         <div className="flex-1 bg-black/40 border border-white/5 rounded-3xl overflow-hidden flex flex-col">
           <div className="p-4 border-b border-white/5 bg-white/[0.02]">
-             <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60 flex items-center gap-2">
-               <ChevronRight className="w-3 h-3" />
-               Move History
-             </span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60 flex items-center gap-2">
+              <ChevronRight className="w-3 h-3" />
+              Move History
+            </span>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono scrollbar-hide">
             {gameState?.history?.length > 0 ? (

@@ -47,7 +47,6 @@ const GameRoomShell: React.FC = () => {
       const data = await matchApi.getById(id);
       setMatch(data);
       if (data.status === 'finished' || data.status === 'cancelled') {
-        // If finished, try to fetch result
         try {
           const result = await gameApi.getResult(id);
           setMatchResult(result);
@@ -65,8 +64,7 @@ const GameRoomShell: React.FC = () => {
   useEffect(() => {
     fetchMatch();
     const interval = setInterval(fetchMatch, 5000);
-    
-    // Heartbeat for presence
+
     const heartbeatInterval = setInterval(async () => {
       if (id) {
         try {
@@ -75,7 +73,7 @@ const GameRoomShell: React.FC = () => {
           console.error('Heartbeat failed');
         }
       }
-    }, 10000); // Every 10 seconds
+    }, 10000);
 
     return () => {
       clearInterval(interval);
@@ -110,7 +108,7 @@ const GameRoomShell: React.FC = () => {
         <AlertCircle className="w-16 h-16 text-red-500 mb-6" />
         <h2 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tight">Match Not Found</h2>
         <p className="text-gray-400 mb-8 max-w-md">{error || 'This match session is no longer active or you do not have access.'}</p>
-        <button 
+        <button
           onClick={() => navigate('/lobby')}
           className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20"
         >
@@ -123,6 +121,9 @@ const GameRoomShell: React.FC = () => {
   const totalParticipants = match.participants?.length || 0;
   const wagerAmount = match.game_request?.amount || 0;
   const totalPrizePool = totalParticipants * wagerAmount;
+
+  // ✅ CHANGE 1 OF 2: detect chess game type
+  const isChessGame = match.game_type?.name?.toLowerCase().includes('chess') ?? false;
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col">
@@ -163,7 +164,7 @@ const GameRoomShell: React.FC = () => {
           <button className="p-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors">
             <Settings className="w-5 h-5" />
           </button>
-          <button 
+          <button
             onClick={() => setShowLeaveConfirm(true)}
             disabled={leaving}
             className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-xs font-bold uppercase tracking-widest transition-all border border-red-500/20"
@@ -223,14 +224,19 @@ const GameRoomShell: React.FC = () => {
               <VoiceChat matchId={id!} />
             </div>
           </div>
-          
+
           {/* Game Engine UI */}
-          <div className="flex-1 w-full overflow-y-auto flex items-start justify-center pt-8">
+          {/* ✅ CHANGE 2 OF 2: disable scroll for chess so touch events reach the board */}
+          <div
+            className={`flex-1 w-full flex items-start justify-center pt-8 ${
+              isChessGame ? 'overflow-hidden' : 'overflow-y-auto'
+            }`}
+          >
             {match.game_type?.name.toLowerCase().includes('dice') ? (
-              <DiceGameUI 
-                matchId={id!} 
+              <DiceGameUI
+                matchId={id!}
                 matchParticipants={match.participants}
-                onGameEnd={(result) => setMatchResult(result)} 
+                onGameEnd={(result) => setMatchResult(result)}
               />
             ) : match.game_type?.name.toLowerCase().includes('chess') ? (
               <ChessGameUI
@@ -252,7 +258,7 @@ const GameRoomShell: React.FC = () => {
                     Game Engine Shell
                   </h1>
                   <p className="text-gray-400 text-lg leading-relaxed">
-                    The multiplayer orchestration is active. Wagers are locked. 
+                    The multiplayer orchestration is active. Wagers are locked.
                     The {match.game_type?.name} module will be plugged in here in the next phase.
                   </p>
                 </motion.div>
@@ -288,10 +294,10 @@ const GameRoomShell: React.FC = () => {
                 <span className="text-xs font-black uppercase tracking-widest text-white/60">Match Chat</span>
               </div>
             </div>
-            <Chat 
-              contextType="match" 
-              contextId={id!} 
-              className="flex-1 border-0 rounded-none bg-transparent" 
+            <Chat
+              contextType="match"
+              contextId={id!}
+              className="flex-1 border-0 rounded-none bg-transparent"
             />
           </div>
 
@@ -329,9 +335,9 @@ const GameRoomShell: React.FC = () => {
       {/* Match Result Overlay */}
       <AnimatePresence>
         {matchResult && (
-          <MatchResultScreen 
-            result={matchResult} 
-            onClose={() => setMatchResult(null)} 
+          <MatchResultScreen
+            result={matchResult}
+            onClose={() => setMatchResult(null)}
             onExit={handleLeave}
           />
         )}
