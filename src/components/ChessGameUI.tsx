@@ -31,6 +31,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
   const skipPollRef = useRef(false);
   const gameStateRef = useRef<any>(null);
   const onGameEndRef = useRef(onGameEnd);
+  const boardContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     onGameEndRef.current = onGameEnd;
@@ -149,6 +150,31 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
       skipPollRef.current = false;
     }, durationMs);
   }, []);
+
+  useEffect(() => {
+    const container = boardContainerRef.current;
+    if (!container) return;
+
+    const board = container.querySelector('#chessboard-board') as HTMLElement | null;
+    if (!board) {
+      console.warn('CHESS: #chessboard-board not found inside container');
+      return;
+    }
+
+    const stopTouchScroll = (e: TouchEvent) => {
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+    };
+
+    board.addEventListener('touchstart', stopTouchScroll, { passive: false, capture: true });
+    board.addEventListener('touchmove', stopTouchScroll, { passive: false, capture: true });
+
+    return () => {
+      board.removeEventListener('touchstart', stopTouchScroll, true);
+      board.removeEventListener('touchmove', stopTouchScroll, true);
+    };
+  }, [gameState]);
 
   const onDrop = useCallback((sourceSquare: string, targetSquare: string, piece: string): boolean => {
     const gs = gameStateRef.current;
@@ -508,6 +534,7 @@ const ChessGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd })
 
         {/* ✅ FIX 2c: Board container — touchAction: none added */}
         <div
+          ref={boardContainerRef}
           className="relative aspect-square w-full max-w-[600px] mx-auto bg-zinc-900 rounded-xl overflow-hidden shadow-2xl border-4 border-zinc-800"
           style={{ touchAction: 'none' }}
         >

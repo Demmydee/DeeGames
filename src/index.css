@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
-/* Chess board — prevent browser scroll from stealing piece drag events */
-#MainChessboard,
-#MainChessboard * {
+/* Chess board — target the ACTUAL react-chessboard DOM node */
+#chessboard-board,
+#chessboard-board * {
   touch-action: none !important;
   user-select: none !important;
   -webkit-user-select: none !important;
