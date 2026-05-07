@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabase';
 import { DiceGameEngine } from '../engines/DiceGameEngine';
 import { ChessEngine } from '../engines/ChessEngine';
+import { LudoEngine } from '../engines/LudoEngine';
 import { GameEngine, GameState, MoveData, GameConfig } from '../engines/types';
 import { SettlementService } from './settlementService';
 import { Match } from '../../src/types/multiplayer';
@@ -9,12 +10,14 @@ import { getMatchById } from './matchService';
 export class GameStateService {
   private static engines: Record<string, GameEngine> = {
     'dice': new DiceGameEngine(),
-    'chess': new ChessEngine()
+    'chess': new ChessEngine(),
+    'ludo': new LudoEngine()
   };
 
   private static getEngine(gameType: string): GameEngine {
     const normalized = (gameType || 'dice').trim().toLowerCase();
     if (normalized.includes('chess')) return this.engines['chess'];
+    if (normalized.includes('ludo')) return this.engines['ludo'];
     return this.engines['dice'];
   }
 
@@ -22,12 +25,16 @@ export class GameStateService {
     const match = await getMatchById(matchId);
     const gameTypeName = (match.game_type?.name || 'dice').trim().toLowerCase();
     const engine = this.getEngine(gameTypeName);
-
+    
     // Config logic
     let config: GameConfig;
     if (gameTypeName.includes('chess')) {
       config = {
         variant: match.game_request?.game_variant || 'blitz'
+      };
+    } else if (gameTypeName.includes('ludo')) {
+      config = {
+        variant: match.game_request?.game_variant || 'classic'
       };
     } else {
       config = {
@@ -95,7 +102,7 @@ export class GameStateService {
         .eq('match_id', matchId)
         .eq('status', 'pending')
         .maybeSingle();
-
+      
       if (drawOffer) {
         gameState.state.draw_offer_by = drawOffer.offered_by_user_id;
       } else {
@@ -109,7 +116,7 @@ export class GameStateService {
   static async processMove(matchId: string, userId: string, moveData: MoveData) {
     const gameStateRecord = await this.getGameState(matchId);
     const engine = this.getEngine(gameStateRecord.game_type);
-
+    
     const { newState, events } = engine.processMove(gameStateRecord.state, userId, moveData);
 
     // Save move
@@ -119,7 +126,7 @@ export class GameStateService {
       user_id: userId,
       move_type: moveData.type,
       move_data: moveData,
-      result_data: {
+      result_data: { 
         roll: newState.rolls?.[userId],
         move: newState.last_move
       },
@@ -180,11 +187,11 @@ export class GameStateService {
 
     // Update participant status in DB
     const participantStatus = (reason === 'left' || reason === 'disconnected' || reason === 'time_forfeit') ? 'defeated' : 'eliminated';
-
+    
     await supabase
       .from('match_participants')
-      .update({
-        status: participantStatus,
+      .update({ 
+        status: participantStatus, 
         defeat_reason: reason,
         left_at: reason === 'left' ? new Date().toISOString() : null
       })
@@ -210,7 +217,7 @@ export class GameStateService {
     const match = await getMatchById(matchId);
     const gameTypeName = (match.game_type?.name || 'dice').trim().toLowerCase();
     const engine = this.getEngine(gameTypeName);
-
+    
     // If a result was forced (e.g. by defeat/forfeit), use it. Otherwise detect it.
     const endResult = forcedResult || engine.detectEndCondition(state);
 

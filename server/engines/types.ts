@@ -26,6 +26,7 @@ export interface RankedParticipant {
   status: 'active' | 'eliminated' | 'left' | 'disconnected' | 'defeated';
   eliminatedRound?: number;
   defeatReason?: 'left' | 'disconnected' | 'eliminated' | 'loss' | 'time_forfeit';
+  [key: string]: any;
 }
 
 export interface RoundResult {

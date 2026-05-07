@@ -11,7 +11,7 @@ export const getOrCreateChatRoom = async (contextType: 'room' | 'match', context
       .maybeSingle();
 
     if (!findError && existing) return existing;
-
+    
     // If not found and no error, create it
     if (!findError) {
       const { data: created, error: createError } = await supabase
@@ -19,7 +19,7 @@ export const getOrCreateChatRoom = async (contextType: 'room' | 'match', context
         .insert([{ context_type: contextType, context_id: contextId }])
         .select()
         .single();
-
+      
       if (!createError) return created;
     }
   } catch (err) {
@@ -33,7 +33,7 @@ export const getOrCreateChatRoom = async (contextType: 'room' | 'match', context
       .select('*')
       .eq('match_id', contextId)
       .maybeSingle();
-
+    
     if (!legacyError && existingLegacy) return existingLegacy;
 
     if (!legacyError) {
@@ -42,7 +42,7 @@ export const getOrCreateChatRoom = async (contextType: 'room' | 'match', context
         .insert([{ match_id: contextId }])
         .select()
         .single();
-
+      
       if (!createLegacyError) return createdLegacy;
     }
   }

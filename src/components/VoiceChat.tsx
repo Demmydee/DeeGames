@@ -64,7 +64,13 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ matchId, className = "" }) => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       setStatus('initializing');
+      console.log('VOICE: Initializing session for match:', matchId);
       const session = await voiceApi.getMatchSession(matchId);
+      console.log('VOICE: Got session:', { 
+        room: session.daily_room_name,
+        hasToken: !!session.token,
+        url: session.daily_room_url 
+      });
       
       // Re-check after async call to prevent race conditions
       if (DailyIframe.getCallInstance()) {
@@ -85,9 +91,10 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ matchId, className = "" }) => {
       co.on('participant-left', () => setParticipants(Object.keys(co.participants() || {}).length));
       co.on('track-started', handleTrackStarted);
       co.on('track-stopped', handleTrackStopped);
+      co.on('camera-error', (e) => console.error('Daily Camera Error:', e));
       co.on('error', (e) => {
         console.error('Daily Error:', e);
-        setError('Voice connection failed');
+        setError('Voice connection failed: ' + (e.errorMsg || 'Unknown error'));
         setStatus('error');
       });
 
@@ -95,6 +102,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ matchId, className = "" }) => {
         url: session.daily_room_url,
         token: session.token,
       });
+
+      console.log('VOICE: Successfully joined room');
 
       setStatus('joined');
       setParticipants(Object.keys(co.participants() || {}).length);

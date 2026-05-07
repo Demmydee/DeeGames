@@ -1,9 +1,1 @@
 @import "tailwindcss";
-
-/* Chess board — target the ACTUAL react-chessboard DOM node */
-#chessboard-board,
-#chessboard-board * {
-  touch-action: none !important;
-  user-select: none !important;
-  -webkit-user-select: none !important;
-}

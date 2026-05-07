@@ -277,6 +277,30 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
               </div>
             )}
 
+            {/* Variant Selection (Only for Ludo) */}
+            {selectedGame?.name.toLowerCase().includes('ludo') && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                  <Trophy className="w-3 h-3" />
+                  Ludo Variant
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, game_variant: 'classic' })}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      formData.game_variant === 'classic' 
+                        ? 'border-emerald-500 bg-emerald-500/10 text-white' 
+                        : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
+                    }`}
+                  >
+                    <div className="font-bold text-xs">Classic</div>
+                    <div className="text-[8px] opacity-60 uppercase tracking-wider">Standard rules</div>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Players & Category */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

@@ -24,7 +24,7 @@ DECLARE
     v_final_status text;
 BEGIN
     INSERT INTO public.match_results (
-        match_id, pay_mode, total_pool_kobo, house_cut_kobo, net_pool_kobo,
+        match_id, pay_mode, total_pool_kobo, house_cut_kobo, net_pool_kobo, 
         winners_count, losers_count, rankings, history, settlement_status, settled_at,
         is_draw, draw_reason
     ) VALUES (
@@ -39,14 +39,14 @@ BEGIN
     END IF;
 
     FOR v_p_rec IN SELECT * FROM jsonb_to_recordset(p_payouts) AS x(
-        "userId" uuid, "rank" integer, "wagerKobo" bigint, "payoutKobo" bigint,
+        "userId" uuid, "rank" integer, "wagerKobo" bigint, "payoutKobo" bigint, 
         "isWinner" boolean, "weight" integer, "defeatReason" text
     ) LOOP
         -- Lock and select the wallet ID
         SELECT id INTO v_target_w_id FROM public.wallets WHERE user_id = v_p_rec."userId" FOR UPDATE;
 
         -- Update Wallet Balances
-        UPDATE public.wallets
+        UPDATE public.wallets 
         SET locked_balance = locked_balance - (v_p_rec."wagerKobo"::numeric / 100.0),
             updated_at = now()
         WHERE id = v_target_w_id;
@@ -55,14 +55,14 @@ BEGIN
             INSERT INTO public.wallet_transactions (
                 wallet_id, user_id, transaction_type, direction, amount, status, reference, description
             ) VALUES (
-                v_target_w_id, v_p_rec."userId", 'wager_loss', 'debit', (v_p_rec."wagerKobo"::numeric / 100.0),
+                v_target_w_id, v_p_rec."userId", 'wager_loss', 'debit', (v_p_rec."wagerKobo"::numeric / 100.0), 
                 'completed', 'MATCH_LOSS_' || p_match_id::text, 'Wager loss for match ' || p_match_id::text
             ) RETURNING id INTO v_t_id;
-
+            
             v_final_status := 'defeated';
         ELSE
             -- Payout (either win or draw refund)
-            UPDATE public.wallets
+            UPDATE public.wallets 
             SET available_balance = available_balance + (v_p_rec."payoutKobo"::numeric / 100.0),
                 updated_at = now()
             WHERE id = v_target_w_id;
@@ -70,14 +70,14 @@ BEGIN
             INSERT INTO public.wallet_transactions (
                 wallet_id, user_id, transaction_type, direction, amount, status, reference, description
             ) VALUES (
-                v_target_w_id, v_p_rec."userId", CASE WHEN p_is_draw THEN 'wager_refund_draw' ELSE 'wager_payout' END, 'credit', (v_p_rec."payoutKobo"::numeric / 100.0),
-                'completed', CASE WHEN p_is_draw THEN 'MATCH_DRAW_' ELSE 'MATCH_PAYOUT_' END || p_match_id::text,
+                v_target_w_id, v_p_rec."userId", CASE WHEN p_is_draw THEN 'wager_refund_draw' ELSE 'wager_payout' END, 'credit', (v_p_rec."payoutKobo"::numeric / 100.0), 
+                'completed', CASE WHEN p_is_draw THEN 'MATCH_DRAW_' ELSE 'MATCH_PAYOUT_' END || p_match_id::text, 
                 CASE WHEN p_is_draw THEN 'Draw refund' ELSE 'Match payout' END || ' for match ' || p_match_id::text
             ) RETURNING id INTO v_t_id;
-
+            
             v_final_status := CASE WHEN p_is_draw THEN 'draw' ELSE 'winner' END;
         END IF;
-
+        
         -- Override status if they left early (even if it's a draw)
         IF v_p_rec."defeatReason" = 'left' THEN
             v_final_status := 'left';
@@ -86,16 +86,16 @@ BEGIN
         END IF;
 
         -- Update match_participants status ATOMICALLY
-        UPDATE public.match_participants
-        SET status = v_final_status
+        UPDATE public.match_participants 
+        SET status = v_final_status 
         WHERE match_id = p_match_id AND user_id = v_p_rec."userId";
 
         -- Record individual payout
         INSERT INTO public.match_payouts (
-            match_result_id, match_id, user_id, rank, wager_kobo, weight, payout_kobo,
+            match_result_id, match_id, user_id, rank, wager_kobo, weight, payout_kobo, 
             is_winner, defeat_reason, wallet_transaction_id
         ) VALUES (
-            v_res_id, p_match_id, v_p_rec."userId", v_p_rec."rank", v_p_rec."wagerKobo",
+            v_res_id, p_match_id, v_p_rec."userId", v_p_rec."rank", v_p_rec."wagerKobo", 
             v_p_rec."weight", v_p_rec."payoutKobo", v_p_rec."isWinner", v_p_rec."defeatReason", v_t_id
         );
     END LOOP;
