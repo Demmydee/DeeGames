@@ -13,4 +13,10 @@ router.get('/:matchId/result', authenticateToken, gameController.getMatchResult)
 router.post('/:matchId/heartbeat', authenticateToken, gameController.recordHeartbeat);
 router.post('/:matchId/leave', authenticateToken, gameController.leaveMatch);
 
+// Debug 404s within game routes
+router.all('*', (req, res) => {
+  console.log(`404 Game Route: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({ error: `Not Found: ${req.method} ${req.originalUrl}` });
+});
+
 export default router;

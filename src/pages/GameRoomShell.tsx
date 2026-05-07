@@ -47,6 +47,7 @@ const GameRoomShell: React.FC = () => {
       const data = await matchApi.getById(id);
       setMatch(data);
       if (data.status === 'finished' || data.status === 'cancelled') {
+        // If finished, try to fetch result
         try {
           const result = await gameApi.getResult(id);
           setMatchResult(result);
@@ -65,6 +66,7 @@ const GameRoomShell: React.FC = () => {
     fetchMatch();
     const interval = setInterval(fetchMatch, 5000);
 
+    // Heartbeat for presence
     const heartbeatInterval = setInterval(async () => {
       if (id) {
         try {
@@ -73,7 +75,7 @@ const GameRoomShell: React.FC = () => {
           console.error('Heartbeat failed');
         }
       }
-    }, 10000);
+    }, 10000); // Every 10 seconds
 
     return () => {
       clearInterval(interval);
@@ -121,9 +123,6 @@ const GameRoomShell: React.FC = () => {
   const totalParticipants = match.participants?.length || 0;
   const wagerAmount = match.game_request?.amount || 0;
   const totalPrizePool = totalParticipants * wagerAmount;
-
-  // ✅ CHANGE 1 OF 2: detect chess game type
-  const isChessGame = match.game_type?.name?.toLowerCase().includes('chess') ?? false;
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col">
@@ -226,12 +225,7 @@ const GameRoomShell: React.FC = () => {
           </div>
 
           {/* Game Engine UI */}
-          {/* ✅ CHANGE 2 OF 2: disable scroll for chess so touch events reach the board */}
-          <div
-            className={`flex-1 w-full flex items-start justify-center pt-8 ${
-              isChessGame ? 'overflow-hidden' : 'overflow-y-auto'
-            }`}
-          >
+          <div className="flex-1 w-full flex items-start justify-center pt-8 overflow-hidden md:overflow-y-auto">
             {match.game_type?.name.toLowerCase().includes('dice') ? (
               <DiceGameUI
                 matchId={id!}

@@ -85,9 +85,11 @@ export const createDrawOffer = async (req: Request, res: Response) => {
   try {
     const { matchId } = req.params;
     const userId = (req as any).user.id;
+    console.log(`DRAW: Creating offer for match ${matchId} by user ${userId}`);
     const result = await ChessService.createDrawOffer(matchId, userId);
     res.json(result);
   } catch (error: any) {
+    console.error('DRAW: Error creating offer:', error);
     res.status(400).json({ error: error.message });
   }
 };
