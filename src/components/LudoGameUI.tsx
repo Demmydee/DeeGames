@@ -160,13 +160,13 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
 
   const renderCell = (r: number, c: number) => {
     // Determine cell type for styling
-    let cellStyle = "bg-zinc-800/10 border-[0.5px] border-zinc-700/50";
-    
+    let cellStyle = "bg-zinc-800/5 border-[1px] border-zinc-700/20";
+
     // Check if in home base area
-    if (r < 6 && c < 6) cellStyle = "bg-red-500/10 border-red-500/20";
-    if (r < 6 && c >= 9) cellStyle = "bg-green-500/10 border-green-500/20";
-    if (r >= 9 && c >= 9) cellStyle = "bg-yellow-500/10 border-yellow-500/20";
-    if (r >= 9 && c < 6) cellStyle = "bg-blue-500/10 border-blue-500/20";
+    if (r < 6 && c < 6) cellStyle = "bg-red-500/20 border-red-500/30";
+    if (r < 6 && c >= 9) cellStyle = "bg-green-500/20 border-green-500/30";
+    if (r >= 9 && c >= 9) cellStyle = "bg-yellow-500/20 border-yellow-500/30";
+    if (r >= 9 && c < 6) cellStyle = "bg-blue-500/20 border-blue-500/30";
 
     // Goal
     if (r >= 6 && r <= 8 && c >= 6 && c <= 8) cellStyle = "bg-zinc-900 border-none";
@@ -184,7 +184,7 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
     if (r === 13 && c === 6) cellStyle = "bg-blue-500 border-blue-400 border-2";
 
     return (
-      <div 
+      <div
         key={`${r}-${c}`}
         style={{ gridRow: r + 1, gridColumn: c + 1 }}
         className={`w-full aspect-square relative ${cellStyle}`}
@@ -208,7 +208,7 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
       // Home path
       return HOME_PATHS[color][pos - 51];
     }
-    
+
     // Common path
     // Need to find start square for each color to offset the common path index
     const starts: Record<string, number> = { red: 0, green: 13, yellow: 26, blue: 39 };
@@ -220,7 +220,7 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
     <div className="w-full flex flex-col items-center gap-8 py-8 animate-in fade-in duration-500">
       {/* Board and Side Info */}
       <div className="flex flex-col lg:flex-row gap-8 items-start w-full max-w-7xl justify-center">
-        
+
         {/* Left Info / Active Players */}
         <div className="flex flex-col gap-4 w-full lg:w-72 order-2 lg:order-1">
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-xl">
@@ -228,8 +228,8 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
             <div className="space-y-4">
               {gameState.participants.map((p: any, idx: number) => (
                 <div key={p.userId} className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
-                  gameState.currentTurnPlayerId === p.userId 
-                    ? 'bg-zinc-800/80 border-blue-500/30 ring-1 ring-blue-500/20' 
+                  gameState.currentTurnPlayerId === p.userId
+                    ? 'bg-zinc-800/80 border-blue-500/30 ring-1 ring-blue-500/20'
                     : 'bg-transparent border-transparent opacity-60'
                 }`}>
                   <div className="flex items-center gap-3">
@@ -254,7 +254,7 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                 <span className="text-zinc-400 text-sm font-medium">Your Turn</span>
                 <div className={`w-2 h-2 rounded-full ${isMyTurn ? 'bg-green-500 animate-pulse' : 'bg-zinc-700'}`} />
              </div>
-             
+
              {isMyTurn && !gameState.waitingForTokenMove && (
                <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -268,19 +268,22 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                </motion.button>
              )}
 
-             {gameState.dieValue && (
-               <div className="flex flex-col items-center py-4 bg-zinc-800/50 rounded-2xl">
-                 <span className="text-xs text-zinc-500 font-bold mb-2 uppercase tracking-tight">You rolled a</span>
-                 <motion.div 
-                   key={gameState.dieValue}
-                   initial={{ scale: 0.5, rotate: -45 }}
-                   animate={{ scale: 1.0, rotate: 0 }}
-                   className="text-4xl font-black text-white"
+             {gameState.lastRoll && (
+               <div className="flex flex-col items-center py-4 bg-zinc-800/50 rounded-2xl border border-zinc-700/30">
+                 <span className="text-[10px] text-zinc-500 font-bold mb-2 uppercase tracking-widest flex items-center gap-2">
+                   {gameState.lastRoll.userId === user?.id ? 'YOU' : gameState.participants.find((p: any) => p.userId === gameState.lastRoll.userId)?.username || 'Someone'} ROLLED
+                 </span>
+                 <motion.div
+                   key={`${gameState.lastRoll.userId}-${gameState.lastRoll.value}-${gameState.dieValue}`}
+                   initial={{ scale: 0.5, rotate: -45, opacity: 0 }}
+                   animate={{ scale: 1.0, rotate: 0, opacity: 1 }}
+                   className={`text-5xl font-black ${gameState.dieValue ? 'text-white' : 'text-zinc-500'} flex items-center gap-3`}
                  >
-                   {gameState.dieValue}
+                   <Dice6 className="w-8 h-8 opacity-40 shrink-0" />
+                   {gameState.lastRoll.value}
                  </motion.div>
                  {isMyTurn && gameState.waitingForTokenMove && (
-                   <span className="text-[10px] text-blue-400 mt-2 font-bold uppercase animate-pulse">Select a token to move</span>
+                   <span className="text-[10px] text-blue-400 mt-2 font-black uppercase animate-pulse letter-spacing-[0.1em]">Select a token</span>
                  )}
                </div>
              )}
@@ -288,11 +291,11 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
         </div>
 
         {/* Board */}
-        <div className="relative order-1 lg:order-2">
-          <div className="bg-zinc-900 p-4 rounded-[40px] shadow-2xl border border-zinc-800">
-            <div className="grid grid-cols-15 grid-rows-15 w-[320px] h-[320px] sm:w-[500px] sm:h-[500px] relative">
+        <div className="relative order-1 lg:order-2 w-full max-w-[600px]">
+          <div className="bg-zinc-900 p-2 sm:p-4 rounded-[32px] sm:rounded-[40px] shadow-2xl border border-zinc-800">
+            <div className="grid grid-cols-15 grid-rows-15 aspect-square w-full relative">
               {/* Render background cells */}
-              {Array.from({ length: 15 }).map((_, r) => 
+              {Array.from({ length: 15 }).map((_, r) =>
                 Array.from({ length: 15 }).map((_, c) => renderCell(r, c))
               )}
 
@@ -305,7 +308,7 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
               {gameState.participants.map((p: any, pIdx: number) => (
                 p.tokens.map((pos: number, tIdx: number) => {
                   const gridPos = getTokenPosition(pIdx, tIdx);
-                  
+
                   // Improved overlap: offset tokens slightly based on their index
                   const offsetX = (tIdx % 2 === 0 ? -4 : 4);
                   const offsetY = (tIdx < 2 ? -4 : 4);
@@ -315,15 +318,15 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                   const isSelectable = isMyTurn && gameState.waitingForTokenMove && p.userId === user?.id && pos < 56;
                   // Basic validation check (can move from base only on 6)
                   const canMove = p.userId === user?.id && (pos === -1 ? gameState.dieValue === 6 : (pos + gameState.dieValue <= 56));
-                  
+
                   return (
                     <motion.div
                       key={`${p.userId}-${tIdx}`}
                       layout
                       initial={false}
                       transition={{ type: 'spring', damping: 20, stiffness: 120 }}
-                      style={{ 
-                        gridRow: gridPos.r + 1, 
+                      style={{
+                        gridRow: gridPos.r + 1,
                         gridColumn: gridPos.c + 1,
                         transform: useOffset ? `translate(${offsetX}px, ${offsetY}px)` : 'none',
                         zIndex: isSelectable ? 40 : 20
@@ -336,11 +339,11 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                           if (isSelectable && canMove) handleMoveToken(tIdx);
                         }}
                         disabled={!isSelectable || !canMove}
-                        className={`w-[80%] h-[80%] rounded-full shadow-lg border-2 border-white/20 transition-all pointer-events-auto flex items-center justify-center ${COLOR_MAP[p.color]} ${
+                        className={`w-[65%] h-[65%] rounded-full shadow-lg border-2 border-white/20 transition-all pointer-events-auto flex items-center justify-center ${COLOR_MAP[p.color]} ${
                           isSelectable && canMove ? 'ring-4 ring-white animate-pulse scale-110 cursor-pointer' : ''
                         }`}
                       >
-                         <div className="w-[40%] h-[40%] rounded-full bg-white/30" />
+                         <div className="w-[30%] h-[30%] rounded-full bg-white/30" />
                       </button>
                     </motion.div>
                   );

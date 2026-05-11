@@ -52,6 +52,7 @@ export class LudoEngine implements GameEngine {
       participants: ludoParticipants as any,
       currentTurnPlayerId: activePlayerIds[0],
       dieValue: null,
+      lastRoll: null,
       waitingForTokenMove: false,
       extraTurn: false,
       history: [],
@@ -72,9 +73,10 @@ export class LudoEngine implements GameEngine {
 
     if (moveData.type === 'roll_die') {
       if (newState.waitingForTokenMove) throw new Error('Waiting for token move');
-      
+
       const roll = Math.floor(Math.random() * 6) + 1;
       newState.dieValue = roll;
+      newState.lastRoll = { userId, value: roll };
       
       // Check if player has any valid moves
       const playerIndex = newState.activePlayerIds.indexOf(userId);

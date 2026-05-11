@@ -114,7 +114,12 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
     if (selectedGame) {
       setFormData(prev => ({
         ...prev,
-        required_players: Math.max(selectedGame.min_players, Math.min(prev.required_players, selectedGame.max_players))
+        required_players: Math.max(selectedGame.min_players, Math.min(prev.required_players, selectedGame.max_players)),
+        game_variant: selectedGame.name.toLowerCase().includes('ludo')
+          ? 'classic'
+          : selectedGame.name.toLowerCase().includes('chess')
+            ? (prev.game_variant === 'blitz' || prev.game_variant === 'rapid' ? prev.game_variant : 'blitz')
+            : (prev.game_variant === 'sudden_drop' || prev.game_variant === 'marathon' ? prev.game_variant : 'sudden_drop')
       }));
     }
   }, [formData.game_type_id, selectedGame]);
