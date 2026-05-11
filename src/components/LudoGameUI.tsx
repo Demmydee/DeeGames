@@ -163,10 +163,10 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
     let cellStyle = "bg-zinc-800/5 border-[1px] border-zinc-700/20";
 
     // Check if in home base area
-    if (r < 6 && c < 6) cellStyle = "bg-red-500/20 border-red-500/30";
-    if (r < 6 && c >= 9) cellStyle = "bg-green-500/20 border-green-500/30";
-    if (r >= 9 && c >= 9) cellStyle = "bg-yellow-500/20 border-yellow-500/30";
-    if (r >= 9 && c < 6) cellStyle = "bg-blue-500/20 border-blue-500/30";
+    if (r < 6 && c < 6) cellStyle = "bg-red-500/30 border-red-500/40";
+    if (r < 6 && c >= 9) cellStyle = "bg-green-500/30 border-green-500/40";
+    if (r >= 9 && c >= 9) cellStyle = "bg-yellow-500/30 border-yellow-500/40";
+    if (r >= 9 && c < 6) cellStyle = "bg-blue-500/30 border-blue-500/40";
 
     // Goal
     if (r >= 6 && r <= 8 && c >= 6 && c <= 8) cellStyle = "bg-zinc-900 border-none";
@@ -215,6 +215,8 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
     const realIdx = (starts[color] + pos) % 52;
     return COMMON_PATH_MAP[realIdx];
   };
+
+  const currentRoller = gameState.lastRoll ? gameState.participants.find((p: any) => p.userId === gameState.lastRoll.userId) : null;
 
   return (
     <div className="w-full flex flex-col items-center gap-8 py-8 animate-in fade-in duration-500">
@@ -271,7 +273,7 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
              {gameState.lastRoll && (
                <div className="flex flex-col items-center py-4 bg-zinc-800/50 rounded-2xl border border-zinc-700/30">
                  <span className="text-[10px] text-zinc-500 font-bold mb-2 uppercase tracking-widest flex items-center gap-2">
-                   {gameState.lastRoll.userId === user?.id ? 'YOU' : gameState.participants.find((p: any) => p.userId === gameState.lastRoll.userId)?.username || 'Someone'} ROLLED
+                   {gameState.lastRoll.userId === user?.id ? 'YOU' : currentRoller?.username || 'Someone'} ROLLED
                  </span>
                  <motion.div
                    key={`${gameState.lastRoll.userId}-${gameState.lastRoll.value}-${gameState.dieValue}`}
@@ -331,7 +333,7 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                         transform: useOffset ? `translate(${offsetX}px, ${offsetY}px)` : 'none',
                         zIndex: isSelectable ? 40 : 20
                       }}
-                      className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                      className="flex items-center justify-center pointer-events-none"
                     >
                       <button
                         onClick={(e) => {
@@ -339,11 +341,11 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                           if (isSelectable && canMove) handleMoveToken(tIdx);
                         }}
                         disabled={!isSelectable || !canMove}
-                        className={`w-[65%] h-[65%] rounded-full shadow-lg border-2 border-white/20 transition-all pointer-events-auto flex items-center justify-center ${COLOR_MAP[p.color]} ${
+                        className={`w-[80%] h-[80%] rounded-full shadow-lg border-2 border-white/20 transition-all pointer-events-auto flex items-center justify-center ${COLOR_MAP[p.color]} ${
                           isSelectable && canMove ? 'ring-4 ring-white animate-pulse scale-110 cursor-pointer' : ''
                         }`}
                       >
-                         <div className="w-[30%] h-[30%] rounded-full bg-white/30" />
+                         <div className="w-[35%] h-[35%] rounded-full bg-white/30" />
                       </button>
                     </motion.div>
                   );
