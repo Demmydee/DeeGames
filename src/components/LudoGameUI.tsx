@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Trophy, 
+import {
+  Trophy,
   RotateCcw,
   AlertCircle,
   CheckCircle2,
@@ -70,13 +70,42 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
   const [moveLoading, setMoveLoading] = useState(false);
   const [selectedTokenIndex, setSelectedTokenIndex] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(30);
 
   const gameStateRef = useRef<any>(null);
   const onGameEndRef = useRef(onGameEnd);
 
+  // Turn Timer Effect
   useEffect(() => {
-    onGameEndRef.current = onGameEnd;
-  }, [onGameEnd]);
+    if (!gameState || gameState.status !== 'active') return;
+
+    const TURN_TIMEOUT = 30000; // 30 seconds
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - (gameState.turnStartedAt || Date.now());
+      const remaining = Math.max(0, Math.ceil((TURN_TIMEOUT - elapsed) / 1000));
+      setTimeLeft(remaining);
+
+      // Auto-skip turn if I'm the current player and time is out
+      if (remaining === 0 && gameState.currentTurnPlayerId === user?.id && !moveLoading) {
+        handleSkipTurn();
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [gameState, user?.id, moveLoading]);
+
+  const handleSkipTurn = async () => {
+    if (moveLoading) return;
+    setMoveLoading(true);
+    try {
+      await gameApi.processMove(matchId, { type: 'skip_turn' });
+      await fetchGameState();
+    } catch (err) {
+      console.error('LUDO: Skip turn failed', err);
+    } finally {
+      setMoveLoading(false);
+    }
+  };
 
   const fetchGameState = useCallback(async () => {
     try {
@@ -219,42 +248,29 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
   const currentRoller = gameState.lastRoll ? gameState.participants.find((p: any) => p.userId === gameState.lastRoll.userId) : null;
 
   return (
-    <div className="w-full flex flex-col items-center gap-8 py-8 animate-in fade-in duration-500">
+    <div className="w-full flex flex-col items-center gap-4 py-4 md:py-8 animate-in fade-in duration-500 overflow-x-hidden">
       {/* Board and Side Info */}
-      <div className="flex flex-col lg:flex-row gap-8 items-start w-full max-w-7xl justify-center">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-center lg:items-start w-full max-w-7xl justify-center px-4">
 
-        {/* Left Info / Active Players */}
-        <div className="flex flex-col gap-4 w-full lg:w-72 order-2 lg:order-1">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-xl">
-            <h3 className="text-zinc-500 text-xs font-bold uppercase tracking-wider mb-6">Participants</h3>
-            <div className="space-y-4">
-              {gameState.participants.map((p: any, idx: number) => (
-                <div key={p.userId} className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
-                  gameState.currentTurnPlayerId === p.userId
-                    ? 'bg-zinc-800/80 border-blue-500/30 ring-1 ring-blue-500/20'
-                    : 'bg-transparent border-transparent opacity-60'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${COLOR_MAP[p.color]}`} />
-                    <span className="text-sm font-medium text-white truncate max-w-[120px]">{p.username}</span>
-                  </div>
-                  {p.rank ? (
-                    <div className="flex items-center gap-1 text-yellow-500 font-bold italic text-sm">
-                      <Trophy className="w-3 h-3" /> #{p.rank}
-                    </div>
-                  ) : (
-                    <div className="text-xs font-mono text-zinc-500">{p.score}/4</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Left Column (Controls & Participants) */}
+        <div className="flex flex-col gap-4 w-full lg:w-72 order-1 lg:order-1">
 
-          {/* Controls */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-xl space-y-4">
+          {/* Controls - Moved above participants as requested */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-4 sm:p-6 shadow-xl space-y-4">
              <div className="flex items-center justify-between">
-                <span className="text-zinc-400 text-sm font-medium">Your Turn</span>
-                <div className={`w-2 h-2 rounded-full ${isMyTurn ? 'bg-green-500 animate-pulse' : 'bg-zinc-700'}`} />
+                <div className="flex flex-col">
+                  <span className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest">Turn Time</span>
+                  <span className={`text-lg font-black font-mono transition-colors ${timeLeft <= 5 ? 'text-red-500' : 'text-white'}`}>
+                    00:{timeLeft.toString().padStart(2, '0')}
+                  </span>
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest">Status</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-white">{isMyTurn ? 'Your Turn' : 'Waiting...'}</span>
+                    <div className={`w-2 h-2 rounded-full ${isMyTurn ? 'bg-green-500 animate-pulse' : 'bg-zinc-700'}`} />
+                  </div>
+                </div>
              </div>
 
              {isMyTurn && !gameState.waitingForTokenMove && (
@@ -263,38 +279,76 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
                 whileTap={{ scale: 0.98 }}
                 onClick={handleRollDie}
                 disabled={moveLoading}
-                className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 transition-colors"
+                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 transition-all uppercase tracking-widest text-xs"
                >
                  {moveLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Dice6 className="w-5 h-5" />}
                  Roll Die
                </motion.button>
              )}
 
-             {gameState.lastRoll && (
-               <div className="flex flex-col items-center py-4 bg-zinc-800/50 rounded-2xl border border-zinc-700/30">
-                 <span className="text-[10px] text-zinc-500 font-bold mb-2 uppercase tracking-widest flex items-center gap-2">
-                   {gameState.lastRoll.userId === user?.id ? 'YOU' : currentRoller?.username || 'Someone'} ROLLED
-                 </span>
-                 <motion.div
-                   key={`${gameState.lastRoll.userId}-${gameState.lastRoll.value}-${gameState.dieValue}`}
-                   initial={{ scale: 0.5, rotate: -45, opacity: 0 }}
-                   animate={{ scale: 1.0, rotate: 0, opacity: 1 }}
-                   className={`text-5xl font-black ${gameState.dieValue ? 'text-white' : 'text-zinc-500'} flex items-center gap-3`}
-                 >
-                   <Dice6 className="w-8 h-8 opacity-40 shrink-0" />
-                   {gameState.lastRoll.value}
-                 </motion.div>
+             {(gameState.lastRoll || gameState.waitingForTokenMove) && (
+               <div className="flex flex-col items-center py-4 bg-zinc-800/30 rounded-2xl border border-white/5">
+                 {gameState.lastRoll && (
+                   <>
+                     <span className="text-[10px] text-zinc-500 font-bold mb-2 uppercase tracking-widest">
+                       {gameState.lastRoll.userId === user?.id ? 'YOU' : currentRoller?.username || 'Someone'} ROLLED
+                     </span>
+                     <motion.div
+                       key={`${gameState.lastRoll.userId}-${gameState.lastRoll.value}-${gameState.dieValue}`}
+                       initial={{ scale: 0.5, rotate: -45, opacity: 0 }}
+                       animate={{ scale: 1.0, rotate: 0, opacity: 1 }}
+                       className={`text-5xl font-black ${gameState.dieValue ? 'text-white' : 'text-zinc-600'} flex items-center gap-3`}
+                     >
+                       <Dice6 className="w-8 h-8 opacity-40 shrink-0" />
+                       {gameState.lastRoll.value}
+                     </motion.div>
+                   </>
+                 )}
                  {isMyTurn && gameState.waitingForTokenMove && (
-                   <span className="text-[10px] text-blue-400 mt-2 font-black uppercase animate-pulse letter-spacing-[0.1em]">Select a token</span>
+                   <span className="text-[10px] text-emerald-400 mt-2 font-black uppercase animate-pulse tracking-widest">Select Token</span>
                  )}
                </div>
              )}
           </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-4 sm:p-6 shadow-xl">
+            <h3 className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-4">Participants</h3>
+            <div className="space-y-3">
+              {gameState.participants.map((p: any) => (
+                <div key={p.userId} className={`flex flex-col gap-2 p-3 rounded-2xl border transition-all ${
+                  gameState.currentTurnPlayerId === p.userId
+                    ? 'bg-zinc-800/80 border-blue-500/30 ring-1 ring-blue-500/10'
+                    : 'bg-zinc-800/10 border-transparent opacity-60'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${COLOR_MAP[p.color]}`} />
+                      <span className="text-sm font-bold text-white truncate max-w-[100px]">{p.username}</span>
+                    </div>
+                    {p.rank ? (
+                      <div className="flex items-center gap-1 text-yellow-500 font-black italic text-xs">
+                        <Trophy className="w-3 h-3" /> #{p.rank}
+                      </div>
+                    ) : (
+                      <div className="text-[10px] font-mono text-zinc-500 font-bold">{p.score}/4 IN</div>
+                    )}
+                  </div>
+
+                  {p.status === 'disconnected' && (
+                    <div className="flex items-center justify-between bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-lg animate-pulse">
+                       <span className="text-[9px] text-red-500 font-bold uppercase">Disconnected</span>
+                       <span className="text-[10px] text-red-500 font-black font-mono">300s</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Board */}
-        <div className="relative order-1 lg:order-2 w-full max-w-[600px]">
-          <div className="bg-zinc-900 p-2 sm:p-4 rounded-[32px] sm:rounded-[40px] shadow-2xl border border-zinc-800">
+        {/* Board - Center */}
+        <div className="relative order-2 lg:order-2 w-full max-w-[500px]">
+          <div className="bg-zinc-900 p-2 sm:p-4 rounded-[40px] shadow-2xl border border-zinc-800 ring-1 ring-white/5">
             <div className="grid grid-cols-15 grid-rows-15 aspect-square w-full relative">
               {/* Render background cells */}
               {Array.from({ length: 15 }).map((_, r) =>
@@ -353,7 +407,7 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
               ))}
             </div>
           </div>
-          
+
           {/* Legend */}
           <div className="absolute -top-4 -right-4 bg-zinc-900 border border-zinc-800 p-3 rounded-2xl shadow-xl hidden sm:block">
             <div className="flex gap-4">
