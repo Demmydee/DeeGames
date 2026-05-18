@@ -34,7 +34,7 @@ export class LudoEngine implements GameEngine {
     }
 
     // Assign positions based on participant order
-    const participantIndices = participants.length === 2 ? [0, 2] :
+    const participantIndices = participants.length === 2 ? [0, 2] : 
                                participants.length === 3 ? [0, 1, 2] : [0, 1, 2, 3];
 
     const ludoParticipants = participants.slice(0, 4).map((p, idx) => ({
@@ -77,11 +77,11 @@ export class LudoEngine implements GameEngine {
 
     if (moveData.type === 'roll_die') {
       if (newState.waitingForTokenMove) throw new Error('Waiting for token move');
-
+      
       const roll = Math.floor(Math.random() * 6) + 1;
       newState.dieValue = roll;
       newState.lastRoll = { userId, value: roll };
-
+      
       // Check if player has any valid moves
       const playerIndex = newState.activePlayerIds.indexOf(userId);
       const participant = newState.participants[playerIndex] as any;
@@ -108,7 +108,7 @@ export class LudoEngine implements GameEngine {
       const roll = newState.dieValue!;
       const playerIndex = newState.activePlayerIds.indexOf(userId);
       const participant = newState.participants[playerIndex] as any;
-
+      
       if (!this.isValidMove(participant.tokens[tokenIndex], roll)) {
         throw new Error('Invalid move for this token');
       }
@@ -123,13 +123,13 @@ export class LudoEngine implements GameEngine {
       if (captures.length > 0) {
         events.push({ type: 'capture', payload: { capturer: userId, captured: captures } });
         newState.extraTurn = true; // Capture gives another turn
-
+        
         // NEW RULE: The token that does the capturing automatically completes its mission
         if (participant.tokens[tokenIndex] !== 56) {
           participant.tokens[tokenIndex] = 56;
           participant.score += 1;
           events.push({ type: 'token_home_via_capture', payload: { userId, tokenIndex } });
-
+          
           if (participant.score === 4) {
             this.finalizeGame(newState, events);
             return { newState, events };
@@ -142,7 +142,7 @@ export class LudoEngine implements GameEngine {
         participant.score += 1;
         events.push({ type: 'token_home', payload: { userId, tokenIndex } });
         newState.extraTurn = true; // Reaching home gives another turn
-
+        
         if (participant.score === 4) {
           this.finalizeGame(newState, events);
           return { newState, events };
@@ -176,7 +176,7 @@ export class LudoEngine implements GameEngine {
     participant.defeatReason = reason;
 
     newState.activePlayerIds = newState.activePlayerIds.filter(id => id !== userId);
-
+    
     if (newState.currentTurnPlayerId === userId) {
       this.advanceTurn(newState);
     }
@@ -242,22 +242,22 @@ export class LudoEngine implements GameEngine {
   private handleCaptures(state: GameState, movingPlayerIdx: number, tokenIdx: number): any[] {
     const movingParticipant = state.participants[movingPlayerIdx];
     const newPos = movingParticipant.tokens[tokenIdx];
-
+    
     // Can only capture on common path
     if (newPos < 0 || newPos > 50) return [];
 
     const startSquare = LudoEngine.PLAYERS_INFO[movingPlayerIdx].start;
     const realBoardPos = (startSquare + newPos) % LudoEngine.PATH_LENGTH;
-
+    
     // Check if safe zone
-    // EXCEPTION: A player's own start square is NOT safe if an opponent is on it
+    // EXCEPTION: A player's own start square is NOT safe if an opponent is on it 
     // when the owner is coming out of home.
-    // Actually, usually star squares ARE safe.
+    // Actually, usually star squares ARE safe. 
     // But the user says "capture logic doesn't work if player plays 6".
     // 6 means they are coming out to square 0 (realBoardPos = startSquare).
     // If square 0 is in safe squares, they can't capture.
     if (LudoEngine.SAFE_SQUARES.includes(realBoardPos)) {
-       // Only allow capture on start square if it's the moving player's OWN start square
+       // Only allow capture on start square if it's the moving player's OWN start square 
        // AND they are moving OUT of home (newPos 0)
        if (!(realBoardPos === startSquare && newPos === 0)) {
          return [];

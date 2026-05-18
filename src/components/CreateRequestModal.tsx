@@ -115,11 +115,13 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
       setFormData(prev => ({
         ...prev,
         required_players: Math.max(selectedGame.min_players, Math.min(prev.required_players, selectedGame.max_players)),
-        game_variant: selectedGame.name.toLowerCase().includes('ludo')
-          ? 'classic'
+        game_variant: selectedGame.name.toLowerCase().includes('ludo') 
+          ? 'classic' 
           : selectedGame.name.toLowerCase().includes('chess')
             ? (prev.game_variant === 'blitz' || prev.game_variant === 'rapid' ? prev.game_variant : 'blitz')
-            : (prev.game_variant === 'sudden_drop' || prev.game_variant === 'marathon' ? prev.game_variant : 'sudden_drop')
+            : selectedGame.name.toLowerCase().includes('whot')
+              ? (prev.game_variant === 'classic' || prev.game_variant === 'scored' ? prev.game_variant : 'classic')
+              : (prev.game_variant === 'sudden_drop' || prev.game_variant === 'marathon' ? prev.game_variant : 'sudden_drop')
       }));
     }
   }, [formData.game_type_id, selectedGame]);
@@ -301,6 +303,42 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
                   >
                     <div className="font-bold text-xs">Classic</div>
                     <div className="text-[8px] opacity-60 uppercase tracking-wider">Standard rules</div>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Variant Selection (Only for Whot) */}
+            {selectedGame?.name.toLowerCase().includes('whot') && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                  <Trophy className="w-3 h-3" />
+                  Whot Variant
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, game_variant: 'classic' })}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      formData.game_variant === 'classic' 
+                        ? 'border-emerald-500 bg-emerald-500/10 text-white' 
+                        : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
+                    }`}
+                  >
+                    <div className="font-bold text-xs">Classic</div>
+                    <div className="text-[8px] opacity-60 uppercase tracking-wider">Order of finish</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, game_variant: 'scored' })}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      formData.game_variant === 'scored' 
+                        ? 'border-emerald-500 bg-emerald-500/10 text-white' 
+                        : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
+                    }`}
+                  >
+                    <div className="font-bold text-xs">Scored</div>
+                    <div className="text-[8px] opacity-60 uppercase tracking-wider">Card values tally</div>
                   </button>
                 </div>
               </div>

@@ -2,6 +2,7 @@ import { supabase } from '../config/supabase';
 import { DiceGameEngine } from '../engines/DiceGameEngine';
 import { ChessEngine } from '../engines/ChessEngine';
 import { LudoEngine } from '../engines/LudoEngine';
+import { WhotEngine } from '../engines/WhotEngine';
 import { GameEngine, GameState, MoveData, GameConfig } from '../engines/types';
 import { SettlementService } from './settlementService';
 import { Match } from '../../src/types/multiplayer';
@@ -11,13 +12,15 @@ export class GameStateService {
   private static engines: Record<string, GameEngine> = {
     'dice': new DiceGameEngine(),
     'chess': new ChessEngine(),
-    'ludo': new LudoEngine()
+    'ludo': new LudoEngine(),
+    'whot': new WhotEngine()
   };
 
   private static getEngine(gameType: string): GameEngine {
     const normalized = (gameType || 'dice').trim().toLowerCase();
     if (normalized.includes('chess')) return this.engines['chess'];
     if (normalized.includes('ludo')) return this.engines['ludo'];
+    if (normalized.includes('whot')) return this.engines['whot'];
     return this.engines['dice'];
   }
 
@@ -33,6 +36,10 @@ export class GameStateService {
         variant: match.game_request?.game_variant || 'blitz'
       };
     } else if (gameTypeName.includes('ludo')) {
+      config = {
+        variant: match.game_request?.game_variant || 'classic'
+      };
+    } else if (gameTypeName.includes('whot')) {
       config = {
         variant: match.game_request?.game_variant || 'classic'
       };
@@ -85,7 +92,7 @@ export class GameStateService {
     }
   }
 
-  static async getGameState(matchId: string) {
+  static async getGameState(matchId: string, userId?: string) {
     const { data: gameState, error } = await supabase
       .from('game_states')
       .select('*')
@@ -93,6 +100,8 @@ export class GameStateService {
       .single();
 
     if (error) throw error;
+
+    const engine = this.getEngine(gameState.game_type);
 
     // Check for pending draw offers if it's chess
     if ((gameState.game_type || '').toLowerCase().includes('chess')) {
@@ -110,13 +119,20 @@ export class GameStateService {
       }
     }
 
+    // Scrub state if engine supports it and userId is provided
+    if (userId && engine.scrubState) {
+      gameState.state = engine.scrubState(gameState.state, userId);
+    }
+
     return gameState;
   }
 
   static async processMove(matchId: string, userId: string, moveData: MoveData) {
     const gameStateRecord = await this.getGameState(matchId);
+    if (!gameStateRecord) throw new Error('Game state not found');
     const engine = this.getEngine(gameStateRecord.game_type);
     
+    // Use full state for processing
     const { newState, events } = engine.processMove(gameStateRecord.state, userId, moveData);
 
     // Save move
@@ -160,8 +176,8 @@ export class GameStateService {
       await this.handleGameEnd(matchId, newState);
     }
 
-    // Always get enriched state at the end
-    return { state: await this.getGameState(matchId), events };
+    // Always get enriched and scrubbed state at the end
+    return { state: await this.getGameState(matchId, userId), events };
   }
 
   static async handlePlayerDefeat(matchId: string, userId: string, reason: 'left' | 'disconnected' | 'time_forfeit') {
@@ -210,7 +226,7 @@ export class GameStateService {
     }
 
     // Always get enriched state at the end
-    return { state: await this.getGameState(matchId), events };
+    return { state: await this.getGameState(matchId, userId), events };
   }
 
   private static async handleGameEnd(matchId: string, state: GameState, forcedResult?: any) {

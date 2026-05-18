@@ -28,6 +28,7 @@ import ReportModal from '../components/ReportModal';
 import DiceGameUI from '../components/DiceGameUI';
 import ChessGameUI from '../components/ChessGameUI';
 import LudoGameUI from '../components/LudoGameUI';
+import { WhotGameUI } from '../components/WhotGameUI';
 import MatchResultScreen from '../components/MatchResultScreen';
 
 const GameRoomShell: React.FC = () => {
@@ -243,6 +244,12 @@ const GameRoomShell: React.FC = () => {
               <LudoGameUI
                 matchId={id!}
                 matchParticipants={match.participants}
+                onGameEnd={(result) => setMatchResult(result)}
+              />
+            ) : match.game_type?.name.toLowerCase().includes('whot') ? (
+              <WhotGameUI
+                matchId={id!}
+                match={match}
                 onGameEnd={(result) => setMatchResult(result)}
               />
             ) : (

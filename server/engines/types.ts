@@ -87,4 +87,12 @@ export interface GameEngine {
   getRankings(
     currentState: GameState
   ): RankedParticipant[];
+
+  /**
+   * Filter the state to remove private information based on the requesting user.
+   */
+  scrubState?(
+    state: GameState,
+    userId: string
+  ): GameState;
 }

@@ -1,5 +1,5 @@
 {
   "name": "DeeGames",
-  "description": "A production-ready P2P gaming platform foundation with secure authentication.",
+  "description": "Multiplayer P2P wager platform featuring Dice, Chess, Ludo, and Whot Card Games with voice chat and automated announcements.",
   "requestFramePermissions": ["camera", "microphone"]
 }

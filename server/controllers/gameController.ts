@@ -7,7 +7,8 @@ import { ChessService } from '../services/chessService';
 export const getGameState = async (req: Request, res: Response) => {
   try {
     const { matchId } = req.params;
-    const state = await GameStateService.getGameState(matchId);
+    const userId = (req as any).user?.id;
+    const state = await GameStateService.getGameState(matchId, userId);
     res.json(state);
   } catch (error: any) {
     res.status(404).json({ error: error.message });

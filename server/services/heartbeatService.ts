@@ -110,10 +110,16 @@ export class HeartbeatService {
     for (const game of activeChessGames) {
       try {
         const state = game.state;
-        if (!state || !state.turn_started_at) continue;
+        if (!state) continue;
+        
+        const turnStartedAtRaw = state.turn_started_at || state.turnStartedAt;
+        if (!turnStartedAtRaw) continue;
         
         const now = Date.now();
-        const turnStartedAt = new Date(state.turn_started_at).getTime();
+        const turnStartedAt = typeof turnStartedAtRaw === 'number' 
+          ? turnStartedAtRaw 
+          : new Date(turnStartedAtRaw).getTime();
+        
         const elapsed = now - turnStartedAt;
         
         const currentTurnUserId = state.currentTurnPlayerId;
@@ -126,6 +132,36 @@ export class HeartbeatService {
         }
       } catch (gameError) {
         console.error(`Error checking chess clock for match ${game.match_id}:`, JSON.stringify(gameError, null, 2));
+      }
+    }
+  }
+
+  static async checkWhotTimers() {
+    const { data: activeWhotGames, error } = await supabase
+      .from('game_states')
+      .select('*')
+      .ilike('game_type', '%whot%')
+      .eq('status', 'active');
+
+    if (error || !activeWhotGames) return;
+
+    for (const game of activeWhotGames) {
+      try {
+        const state = game.state;
+        if (!state || !state.turnStartedAt || !state.currentTurnPlayerId) continue;
+
+        const now = Date.now();
+        const turnStartedAt = state.turnStartedAt;
+        const elapsed = now - turnStartedAt;
+        const limit = (state.turnTimeLimitSeconds || 15) * 1000;
+
+        if (elapsed > limit) {
+          console.log(`Whot timeout detected for match ${game.match_id}, player ${state.currentTurnPlayerId}`);
+          // Auto pick and pass turn
+          await GameStateService.processMove(game.match_id, state.currentTurnPlayerId, { type: 'auto_pick' });
+        }
+      } catch (gameError) {
+        console.error(`Error checking Whot timer for match ${game.match_id}:`, JSON.stringify(gameError, null, 2));
       }
     }
   }

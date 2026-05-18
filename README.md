@@ -50,8 +50,26 @@ The app will be available at `http://localhost:3000`.
 4. Set the build output directory to `dist`.
 5. Add `VITE_API_URL` pointing to your Render backend URL.
 
-## Phase 1 Features
-- **Landing Page:** Modern, gaming-branded UI.
-- **Registration:** Secure validation (username, email, phone uniqueness, 18+ check).
-- **Login:** Identifier-based (username or email) with JWT.
-- **Dashboard:** Protected route with user-specific welcome message and placeholders for future modules.
+## Phase 5D: Whot Card Game
+- **Game Engine:** Custom Whot Card Engine supporting 2-4 players.
+- **Card Specification:** 44-card Nigerian Whot deck (Circle, Triangle, Cross, Square, Star, and Whot bits).
+- **Variants:**
+  - **Classic Whot:** Traditional "last card" mechanics with order-of-finish rankings.
+  - **Scored Whot:** First to finish wins; others ranked by hand value tally (Star cards doubled).
+- **Special Cards:**
+  - **1 (Check Here):** Change requested suit.
+  - **2 (Pick Two):** Next player picks 2 or stacks.
+  - **3 (Pick Three):** Next player picks 3 or stacks.
+  - **8 (Hold On):** Skip next player.
+  - **14 (General Market):** Everyone else picks 1 unless they have a 14.
+  - **20 (Whot):** Wild card, can be played on anything.
+- **Automated Voice Announcements:** Uses Web Speech API for immersive Nigerian game culture atmosphere.
+- **Privacy:** Server-authoritative deck; opponent hands are strictly hidden in API responses.
+- **Timers:** 15-second turn timers with automated timeout actions.
+
+## Previous Phases
+- **Phase 1:** Auth, landing page, dashboard.
+- **Phase 2:** Wallet, Paystack, transactions.
+- **Phase 3:** Lobby, matches, wagers.
+- **Phase 4:** Chat, cliques, support.
+- **Phase 5A-C:** Dice, Chess, and Ludo game engines.
