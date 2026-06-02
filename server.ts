@@ -22,11 +22,18 @@ import supportRoutes from "./server/routes/supportRoutes";
 import presenceRoutes from "./server/routes/presenceRoutes";
 import socialRoutes from "./server/routes/socialRoutes";
 import gameRoutes from "./server/routes/gameRoutes";
+import adminRoutes from "./server/routes/adminRoutes";
 import { HeartbeatService } from "./server/services/heartbeatService";
+import { AdminDbInitService } from "./server/services/adminDbInitService";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Initialize Admin DB, check tables and seed super-admin if empty
+  await AdminDbInitService.init().catch(err => {
+    console.error('Failed to initialize Admin DB checks:', err);
+  });
 
   // Basic Middleware
   app.use(cors());
@@ -54,6 +61,7 @@ async function startServer() {
   app.use("/api/support", supportRoutes);
   app.use("/api/presence", presenceRoutes);
   app.use("/api/social", socialRoutes);
+  app.use("/api/admin", adminRoutes);
   
   // Debug log for game routes
   app.use("/api/game", (req, res, next) => {

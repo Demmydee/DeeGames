@@ -18,6 +18,10 @@ import Cliques from './pages/Cliques';
 import FAQ from './pages/FAQ';
 import Support from './pages/Support';
 import Navbar from './components/layout/Navbar';
+import { useAdminAuth } from './context/AdminAuthContext';
+import AdminLogin from './pages/admin/AdminLogin';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import { useLocation } from 'react-router-dom';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { token, loading } = useAuth();
@@ -33,7 +37,24 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const ProtectedAdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { adminToken, adminLoading } = useAdminAuth();
+  if (adminLoading) return <div className="flex items-center justify-center h-screen bg-neutral-950 text-orange-500">Authenticating admin session...</div>;
+  if (!adminToken) return <Navigate to="/admin/login" />;
+  return <>{children}</>;
+};
+
+const PublicAdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { adminToken, adminLoading } = useAdminAuth();
+  if (adminLoading) return <div className="flex items-center justify-center h-screen bg-neutral-950 text-orange-500">Checking auth state...</div>;
+  if (adminToken) return <Navigate to="/admin/dashboard" />;
+  return <>{children}</>;
+};
+
 export default function App() {
+  const location = useLocation();
+  const isAdminPath = location.pathname.startsWith('/admin');
+
   React.useEffect(() => {
     const apiUrl = import.meta.env.VITE_API_URL || 'Local Server (Relative)';
     console.log(`%c🚀 DeeGames API: ${apiUrl}`, 'color: #f97316; font-weight: bold; font-size: 12px;');
@@ -41,11 +62,16 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans">
-      <Navbar />
+      {!isAdminPath && <Navbar />}
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+        
+        {/* Admin Console Paths */}
+        <Route path="/admin/login" element={<PublicAdminRoute><AdminLogin /></PublicAdminRoute>} />
+        <Route path="/admin/dashboard" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
+
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
         <Route path="/deposit" element={<ProtectedRoute><Deposit /></ProtectedRoute>} />
