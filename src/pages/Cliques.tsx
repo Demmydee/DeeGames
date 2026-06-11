@@ -85,7 +85,7 @@ const Cliques: React.FC = () => {
       await friendApi.acceptRequest(id);
       fetchData();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
     }
   };
 
@@ -94,7 +94,7 @@ const Cliques: React.FC = () => {
       await friendApi.rejectRequest(id);
       fetchData();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
     }
   };
 
@@ -104,7 +104,7 @@ const Cliques: React.FC = () => {
       await friendApi.removeFriend(id);
       fetchData();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
     }
   };
 
@@ -114,7 +114,7 @@ const Cliques: React.FC = () => {
       alert('Friend request sent!');
       fetchData();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
     }
   };
 
@@ -155,8 +155,8 @@ const Cliques: React.FC = () => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={`px-4 sm:px-6 py-3 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all flex items-center gap-3 ${
-                activeTab === tab.id 
-                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20' 
+                activeTab === tab.id
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20'
                   : 'text-gray-500 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -235,10 +235,20 @@ const Cliques: React.FC = () => {
                         </span>
                       ) : outgoing.some(o => o.addressee_user_id === res.id) ? (
                         <span className="flex items-center gap-2 text-amber-500 text-[10px] font-black uppercase tracking-widest px-4">
-                          <Clock className="w-4 h-4" /> Pending
+                          <Clock className="w-4 h-4" /> Requested
                         </span>
+                      ) : incoming.some(i => i.requester_user_id === res.id) ? (
+                        <button
+                          onClick={() => {
+                            const req = incoming.find(i => i.requester_user_id === res.id);
+                            if (req) handleAccept(req.id);
+                          }}
+                          className="px-6 py-2 rounded-xl bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-amber-700 transition-all shadow-lg"
+                        >
+                          Accept Request
+                        </button>
                       ) : (
-                        <button 
+                        <button
                           onClick={() => handleAddFriend(res.id)}
                           className="px-6 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-900/20"
                         >
@@ -283,7 +293,7 @@ const Cliques: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button 
+                      <button
                         onClick={() => handleRemove(friend.friendship_id)}
                         className="p-3 rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20"
                       >
@@ -313,13 +323,13 @@ const Cliques: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <button 
+                            <button
                               onClick={() => handleAccept(req.id)}
                               className="p-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
                             >
                               <Check className="w-5 h-5" />
                             </button>
-                            <button 
+                            <button
                               onClick={() => handleReject(req.id)}
                               className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-red-500/20 hover:text-red-500 transition-all"
                             >
@@ -395,12 +405,32 @@ const Cliques: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {!friends.some(f => f.id === opp.id) && !outgoing.some(o => o.addressee_user_id === opp.id) && (
-                        <button 
+                      {opp.id === user?.id ? (
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-4">You</span>
+                      ) : friends.some(f => f.id === opp.id) ? (
+                        <span className="flex items-center gap-2 text-emerald-500 text-[10px] font-black uppercase tracking-widest px-4">
+                          <Check className="w-4 h-4" /> Friend
+                        </span>
+                      ) : outgoing.some(o => o.addressee_user_id === opp.id) ? (
+                        <span className="flex items-center gap-2 text-amber-500 text-[10px] font-black uppercase tracking-widest px-4">
+                          <Clock className="w-4 h-4" /> Requested
+                        </span>
+                      ) : incoming.some(i => i.requester_user_id === opp.id) ? (
+                        <button
+                          onClick={() => {
+                            const req = incoming.find(i => i.requester_user_id === opp.id);
+                            if (req) handleAccept(req.id);
+                          }}
+                          className="px-4 py-2 rounded-xl bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-amber-700 transition-all shadow-lg"
+                        >
+                          Accept
+                        </button>
+                      ) : (
+                        <button
                           onClick={() => handleAddFriend(opp.id)}
                           className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-900/20"
                         >
-                          Add Friend
+                           Add Friend
                         </button>
                       )}
                     </div>

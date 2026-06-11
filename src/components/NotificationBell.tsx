@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bell, X, Check, Loader2, AlertCircle, UserPlus, Gamepad2, Wallet, ShieldAlert } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
-import { notificationApi } from '../services/multiplayerApi';
+import { notificationApi, friendApi } from '../services/multiplayerApi';
 import { useAuth } from '../context/AuthContext';
 
 const NotificationBell: React.FC = () => {
@@ -11,6 +11,7 @@ const NotificationBell: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [actioningId, setActioningId] = useState<string | null>(null);
 
   const fetchData = async () => {
     if (!user) return;
@@ -40,6 +41,36 @@ const NotificationBell: React.FC = () => {
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (err) {
       console.error('Failed to mark as read:', err);
+    }
+  };
+
+  const handleAcceptRequest = async (e: React.MouseEvent, notificationId: string, friendshipId: string) => {
+    e.stopPropagation();
+    if (actioningId) return;
+    setActioningId(notificationId);
+    try {
+      await friendApi.acceptRequest(friendshipId);
+      await handleMarkAsRead(notificationId);
+      await fetchData();
+    } catch (err: any) {
+      console.error('Failed to accept friend request:', err);
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleRejectRequest = async (e: React.MouseEvent, notificationId: string, friendshipId: string) => {
+    e.stopPropagation();
+    if (actioningId) return;
+    setActioningId(notificationId);
+    try {
+      await friendApi.rejectRequest(friendshipId);
+      await handleMarkAsRead(notificationId);
+      await fetchData();
+    } catch (err: any) {
+      console.error('Failed to reject friend request:', err);
+    } finally {
+      setActioningId(null);
     }
   };
 
@@ -88,9 +119,9 @@ const NotificationBell: React.FC = () => {
       <AnimatePresence>
         {isOpen && (
           <>
-            <div 
-              className="fixed inset-0 z-40" 
-              onClick={() => setIsOpen(false)} 
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setIsOpen(false)}
             />
             <motion.div
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -142,6 +173,40 @@ const NotificationBell: React.FC = () => {
                           <p className="text-[10px] text-gray-400 leading-relaxed">
                             {notif.message}
                           </p>
+                          {notif.type === 'friend_request_received' && !notif.is_read && (
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={(e) => {
+                                  const payload = typeof notif.data === 'string' ? JSON.parse(notif.data) : notif.data;
+                                  if (payload?.friendship_id) {
+                                    handleAcceptRequest(e, notif.id, payload.friendship_id);
+                                  }
+                                }}
+                                disabled={actioningId === notif.id}
+                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-800 text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                {actioningId === notif.id ? (
+                                  <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                ) : (
+                                  <Check className="w-2.5 h-2.5" />
+                                )}
+                                Accept
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  const payload = typeof notif.data === 'string' ? JSON.parse(notif.data) : notif.data;
+                                  if (payload?.friendship_id) {
+                                    handleRejectRequest(e, notif.id, payload.friendship_id);
+                                  }
+                                }}
+                                disabled={actioningId === notif.id}
+                                className="px-3 py-1 bg-white/5 hover:bg-red-500/20 hover:text-red-500 disabled:opacity-55 text-gray-400 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                <X className="w-2.5 h-2.5" />
+                                Reject
+                              </button>
+                            </div>
+                          )}
                         </div>
                         {!notif.is_read && (
                           <button

@@ -6,7 +6,7 @@ export const sendFriendRequest = async (requesterId: string, addresseeId: string
     throw new Error('You cannot send a friend request to yourself');
   }
 
-  // Check if relationship already exists
+  // Check if relationship already exists (including rejected, removed, declined, etc.)
   const { data: existing, error: findError } = await supabase
     .from('friendships')
     .select('*')
@@ -14,10 +14,38 @@ export const sendFriendRequest = async (requesterId: string, addresseeId: string
     .maybeSingle();
 
   if (findError) throw new Error(`Failed to check existing friendship: ${findError.message}`);
+
   if (existing) {
     if (existing.status === 'accepted') throw new Error('You are already friends');
     if (existing.status === 'pending') throw new Error('A friend request is already pending');
     if (existing.status === 'blocked') throw new Error('This user is blocked');
+
+    // If it was rejected or removed, update the entry back to pending
+    const { data: updated, error: updateError } = await supabase
+      .from('friendships')
+      .update({
+        requester_user_id: requesterId,
+        addressee_user_id: addresseeId,
+        status: 'pending',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', existing.id)
+      .select()
+      .single();
+
+    if (updateError) throw new Error(`Failed to update friend request: ${updateError.message}`);
+
+    // Notify the addressee
+    const { data: requester } = await supabase.from('users').select('username').eq('id', requesterId).single();
+    await createNotification(
+      addresseeId,
+      'friend_request_received',
+      'New Friend Request',
+      `${requester?.username || 'Someone'} sent you a friend request`,
+      { requester_id: requesterId, friendship_id: updated.id }
+    );
+
+    return updated;
   }
 
   const { data: created, error: createError } = await supabase
@@ -58,8 +86,8 @@ export const acceptFriendRequest = async (userId: string, friendshipId: string) 
 
   const { error: updateError } = await supabase
     .from('friendships')
-    .update({ 
-      status: 'accepted', 
+    .update({
+      status: 'accepted',
       responded_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
@@ -83,8 +111,8 @@ export const acceptFriendRequest = async (userId: string, friendshipId: string) 
 export const rejectFriendRequest = async (userId: string, friendshipId: string) => {
   const { error } = await supabase
     .from('friendships')
-    .update({ 
-      status: 'rejected', 
+    .update({
+      status: 'rejected',
       responded_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
@@ -99,8 +127,8 @@ export const rejectFriendRequest = async (userId: string, friendshipId: string) 
 export const removeFriend = async (userId: string, friendshipId: string) => {
   const { error } = await supabase
     .from('friendships')
-    .update({ 
-      status: 'removed', 
+    .update({
+      status: 'removed',
       updated_at: new Date().toISOString()
     })
     .eq('id', friendshipId)
@@ -125,9 +153,14 @@ export const getFriends = async (userId: string) => {
     .eq('status', 'accepted');
 
   if (error) throw new Error(`Failed to fetch friends: ${error.message}`);
-  
-  return data.map(f => {
-    const friend = f.requester_user_id === userId ? f.addressee : f.requester;
+
+  return (data || []).map(f => {
+    let reqUser: any = f.requester;
+    if (Array.isArray(reqUser)) reqUser = reqUser[0];
+    let addUser: any = f.addressee;
+    if (Array.isArray(addUser)) addUser = addUser[0];
+
+    const friend = f.requester_user_id === userId ? addUser : reqUser;
     return {
       friendship_id: f.id,
       ...friend
@@ -143,7 +176,15 @@ export const getIncomingRequests = async (userId: string) => {
     .eq('status', 'pending');
 
   if (error) throw new Error(`Failed to fetch incoming requests: ${error.message}`);
-  return data;
+
+  return (data || []).map(req => {
+    let r = req.requester;
+    if (Array.isArray(r)) r = r[0];
+    return {
+      ...req,
+      requester: r
+    };
+  });
 };
 
 export const getOutgoingRequests = async (userId: string) => {
@@ -154,5 +195,13 @@ export const getOutgoingRequests = async (userId: string) => {
     .eq('status', 'pending');
 
   if (error) throw new Error(`Failed to fetch outgoing requests: ${error.message}`);
-  return data;
+
+  return (data || []).map(req => {
+    let a = req.addressee;
+    if (Array.isArray(a)) a = a[0];
+    return {
+      ...req,
+      addressee: a
+    };
+  });
 };

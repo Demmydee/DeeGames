@@ -16,10 +16,15 @@ export interface AuditLogPayload {
 export class AdminAuditService {
   static async log(payload: AuditLogPayload) {
     try {
+      let resolvedUserId: string | null = payload.adminUserId || null;
+      if (resolvedUserId === '00000000-0000-0000-0000-000000000000' || resolvedUserId === '') {
+        resolvedUserId = null;
+      }
+
       const { error } = await supabase
         .from('admin_audit_logs')
         .insert({
-          admin_user_id: payload.adminUserId,
+          admin_user_id: resolvedUserId,
           admin_email: payload.adminEmail,
           action_type: payload.actionType,
           resource_type: payload.resourceType,
@@ -32,7 +37,7 @@ export class AdminAuditService {
         });
 
       if (error) {
-        console.error('[AdminAuditService] Error saving audit log:', error);
+        console.error('[AdminAuditService] Error saving audit log:', JSON.stringify(error, null, 2));
       }
     } catch (err) {
       console.error('[AdminAuditService] Failed to execute administrative audit logging:', err);

@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
-import { 
-  Wallet, 
-  Trophy, 
-  History, 
-  Settings, 
-  Gamepad2, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  User, 
-  ChevronRight, 
-  Building2, 
-  Loader2, 
-  AlertCircle, 
+import {
+  Wallet,
+  Trophy,
+  History,
+  Settings,
+  Gamepad2,
+  ArrowUpRight,
+  ArrowDownLeft,
+  User,
+  ChevronRight,
+  Building2,
+  Loader2,
+  AlertCircle,
   Play,
   Users,
   HelpCircle,
@@ -33,6 +33,9 @@ const Dashboard = () => {
   const [wallet, setWallet] = useState<any>(null);
   const [status, setStatus] = useState<DashboardStatus | null>(null);
   const [recentOpponents, setRecentOpponents] = useState<any[]>([]);
+  const [friends, setFriends] = useState<any[]>([]);
+  const [friendsHovered, setFriendsHovered] = useState(false);
+  const [showFriendsPopup, setShowFriendsPopup] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +45,8 @@ const Dashboard = () => {
         const results = await Promise.allSettled([
           apiClient.get('/api/wallet'),
           dashboardApi.getStatus(),
-          socialApi.getRecentOpponents()
+          socialApi.getRecentOpponents(),
+          friendApi.getFriends()
         ]);
 
         // Handle Wallet
@@ -65,6 +69,13 @@ const Dashboard = () => {
         } else {
           console.error('Opponents fetch error:', results[2].reason);
         }
+
+        // Handle Friends
+        if (results[3].status === 'fulfilled') {
+          setFriends(results[3].value);
+        } else {
+          console.error('Friends fetch error:', results[3].reason);
+        }
       } catch (error: any) {
         console.error('Unexpected dashboard error:', error);
         setError('An unexpected error occurred. Please refresh.');
@@ -82,6 +93,14 @@ const Dashboard = () => {
     } catch (err: any) {
       setError(err.message);
     }
+  };
+
+  const isOnline = (lastSeenAt: string | null) => {
+    if (!lastSeenAt) return false;
+    const lastSeenDate = new Date(lastSeenAt);
+    const now = new Date();
+    const diffInMinutes = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60);
+    return diffInMinutes < 5;
   };
 
   const formatCurrency = (amount: number) => {
@@ -144,7 +163,7 @@ const Dashboard = () => {
               <Gamepad2 className="w-6 h-6 text-orange-500" />
               Multiplayer Arena
             </h2>
-            
+
             {status?.active ? (
               <div className="bg-neutral-900 border border-orange-500/30 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-6">
@@ -160,7 +179,7 @@ const Dashboard = () => {
                     </p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => navigate(status.type === 'match' ? `/match/${status.id}` : `/lobby/room/${status.details?.room_category_id}`)}
                   className="px-8 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-orange-900/20"
                 >
@@ -170,7 +189,7 @@ const Dashboard = () => {
             ) : (
               <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-12 text-center">
                 <p className="text-neutral-500 mb-6">You are not currently in any active game or request.</p>
-                <Link 
+                <Link
                   to="/lobby"
                   className="inline-block bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 rounded-full font-bold transition-all shadow-lg shadow-orange-900/20"
                 >
@@ -206,7 +225,7 @@ const Dashboard = () => {
                           <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Matched recently</p>
                         </div>
                       </div>
-                      <button 
+                      <button
                         onClick={() => handleAddFriend(opp.id)}
                         className="p-2 rounded-lg bg-neutral-800 hover:bg-orange-600 text-neutral-400 hover:text-white transition-all"
                         title="Add Friend"
@@ -226,7 +245,7 @@ const Dashboard = () => {
           <div className="bg-orange-600 rounded-3xl p-6 text-white">
             <h3 className="text-xl font-black uppercase mb-4">Quick Deposit</h3>
             <p className="text-orange-100 text-sm mb-6">Fund your wallet to start wagering against other players.</p>
-            <Link 
+            <Link
               to="/deposit"
               className="w-full bg-white text-orange-600 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-orange-50 transition-colors"
             >
@@ -238,12 +257,82 @@ const Dashboard = () => {
           <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6">
             <h3 className="text-xl font-bold mb-4">Quick Navigation</h3>
             <div className="space-y-2">
-              <Link to="/cliques" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
-                <span className="flex items-center gap-3">
-                  <Users className="w-5 h-5" /> Cliques
-                </span>
-                <ChevronRight className="w-4 h-4" />
-              </Link>
+              <div
+                className="relative"
+                onMouseEnter={() => setFriendsHovered(true)}
+                onMouseLeave={() => setFriendsHovered(false)}
+              >
+                <div className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
+                  <Link to="/cliques" className="flex items-center gap-3 flex-1">
+                    <Users className="w-5 h-5 animate-pulse text-emerald-500" />
+                    <span>Cliques</span>
+                  </Link>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowFriendsPopup(!showFriendsPopup)}
+                      className="px-2 py-0.5 rounded bg-emerald-500/10 text-[10px] font-black text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer"
+                    >
+                      {friends.filter(f => isOnline(f.last_seen_at)).length}/{friends.length} online
+                    </button>
+                    <Link to="/cliques">
+                      <ChevronRight className="w-4 h-4 text-neutral-500" />
+                    </Link>
+                  </div>
+                </div>
+
+                <AnimatePresence>
+                  {(friendsHovered || showFriendsPopup) && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                      className="absolute right-0 bottom-full mb-2 w-64 bg-neutral-950 border border-neutral-800 rounded-2xl shadow-2xl z-50 p-3 max-h-72 flex flex-col"
+                    >
+                      <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-2">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400">Friends list</span>
+                        <Link to="/cliques" className="text-[9px] font-bad text-emerald-500 hover:underline uppercase tracking-wider font-extrabold">View all</Link>
+                      </div>
+                      <div className="overflow-y-auto space-y-1.5 flex-1 min-h-0 pr-1 select-none">
+                        {friends.length === 0 ? (
+                          <div className="text-center py-4 text-[10px] text-neutral-500">
+                            No friends yet. Find opponents or search for users!
+                          </div>
+                        ) : (
+                          [...friends]
+                            .sort((a, b) => {
+                              const aOn = isOnline(a.last_seen_at);
+                              const bOn = isOnline(b.last_seen_at);
+                              if (aOn && !bOn) return -1;
+                              if (!aOn && bOn) return 1;
+                              return (a.username || '').localeCompare(b.username || '');
+                            })
+                            .map((friend) => {
+                              const online = isOnline(friend.last_seen_at);
+                              return (
+                                <div key={friend.id} className="flex items-center justify-between p-1.5 rounded-xl hover:bg-white/5 transition-colors">
+                                  <div className="flex items-center gap-2 max-w-[70%]">
+                                    <div className="relative shrink-0">
+                                      <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center font-black text-[10px] text-emerald-500 border border-emerald-500/20">
+                                        {(friend.username || 'UN').substring(0, 2).toUpperCase()}
+                                      </div>
+                                      <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-neutral-950 ${
+                                        online ? 'bg-emerald-500' : 'bg-neutral-600'
+                                      }`} />
+                                    </div>
+                                    <span className="text-xs font-bold text-neutral-200 truncate">{friend.username}</span>
+                                  </div>
+                                  <span className={`text-[8px] font-black uppercase tracking-wider ${online ? 'text-emerald-500' : 'text-neutral-500'}`}>
+                                    {online ? 'Online' : 'Offline'}
+                                  </span>
+                                </div>
+                              );
+                            })
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
               <Link to="/faq" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
                 <span className="flex items-center gap-3">
                   <HelpCircle className="w-5 h-5" /> FAQ
