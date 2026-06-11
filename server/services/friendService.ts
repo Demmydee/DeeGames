@@ -139,28 +139,32 @@ export const removeFriend = async (userId: string, friendshipId: string) => {
 };
 
 export const getFriends = async (userId: string) => {
-  const { data, error } = await supabase
+  const { data: friendships, error } = await supabase
     .from('friendships')
-    .select(`
-      id,
-      status,
-      requester_user_id,
-      addressee_user_id,
-      requester:requester_user_id(id, username, last_seen_at),
-      addressee:addressee_user_id(id, username, last_seen_at)
-    `)
+    .select('*')
     .or(`requester_user_id.eq.${userId},addressee_user_id.eq.${userId}`)
     .eq('status', 'accepted');
 
   if (error) throw new Error(`Failed to fetch friends: ${error.message}`);
+  if (!friendships || friendships.length === 0) return [];
 
-  return (data || []).map(f => {
-    let reqUser: any = f.requester;
-    if (Array.isArray(reqUser)) reqUser = reqUser[0];
-    let addUser: any = f.addressee;
-    if (Array.isArray(addUser)) addUser = addUser[0];
+  const friendUserIds = friendships.map(f => f.requester_user_id === userId ? f.addressee_user_id : f.requester_user_id);
+  const uniqueUserIds = Array.from(new Set(friendUserIds));
 
-    const friend = f.requester_user_id === userId ? addUser : reqUser;
+  if (uniqueUserIds.length === 0) return [];
+
+  const { data: users, error: usersError } = await supabase
+    .from('users')
+    .select('id, username, last_seen_at')
+    .in('id', uniqueUserIds);
+
+  if (usersError) throw new Error(`Failed to fetch friends profiles: ${usersError.message}`);
+
+  const userMap = new Map((users || []).map(u => [u.id, u]));
+
+  return friendships.map(f => {
+    const friendId = f.requester_user_id === userId ? f.addressee_user_id : f.requester_user_id;
+    const friend = userMap.get(friendId) || { id: friendId, username: 'Unknown User', last_seen_at: null };
     return {
       friendship_id: f.id,
       ...friend
@@ -169,39 +173,63 @@ export const getFriends = async (userId: string) => {
 };
 
 export const getIncomingRequests = async (userId: string) => {
-  const { data, error } = await supabase
+  const { data: requests, error } = await supabase
     .from('friendships')
-    .select('*, requester:requester_user_id(id, username)')
+    .select('*')
     .eq('addressee_user_id', userId)
     .eq('status', 'pending');
 
   if (error) throw new Error(`Failed to fetch incoming requests: ${error.message}`);
+  if (!requests || requests.length === 0) return [];
 
-  return (data || []).map(req => {
-    let r = req.requester;
-    if (Array.isArray(r)) r = r[0];
+  const requesterIds = requests.map(r => r.requester_user_id);
+  const uniqueRequesterIds = Array.from(new Set(requesterIds));
+
+  const { data: users, error: usersError } = await supabase
+    .from('users')
+    .select('id, username, last_seen_at')
+    .in('id', uniqueRequesterIds);
+
+  if (usersError) throw new Error(`Failed to fetch incoming request profiles: ${usersError.message}`);
+
+  const userMap = new Map((users || []).map(u => [u.id, u]));
+
+  return requests.map(req => {
+    const requester = userMap.get(req.requester_user_id) || { id: req.requester_user_id, username: 'Unknown User', last_seen_at: null };
     return {
       ...req,
-      requester: r
+      requester
     };
   });
 };
 
 export const getOutgoingRequests = async (userId: string) => {
-  const { data, error } = await supabase
+  const { data: requests, error } = await supabase
     .from('friendships')
-    .select('*, addressee:addressee_user_id(id, username)')
+    .select('*')
     .eq('requester_user_id', userId)
     .eq('status', 'pending');
 
   if (error) throw new Error(`Failed to fetch outgoing requests: ${error.message}`);
+  if (!requests || requests.length === 0) return [];
 
-  return (data || []).map(req => {
-    let a = req.addressee;
-    if (Array.isArray(a)) a = a[0];
+  const addresseeIds = requests.map(r => r.addressee_user_id);
+  const uniqueAddresseeIds = Array.from(new Set(addresseeIds));
+
+  const { data: users, error: usersError } = await supabase
+    .from('users')
+    .select('id, username, last_seen_at')
+    .in('id', uniqueAddresseeIds);
+
+  if (usersError) throw new Error(`Failed to fetch outgoing request profiles: ${usersError.message}`);
+
+  const userMap = new Map((users || []).map(u => [u.id, u]));
+
+  return requests.map(req => {
+    const addressee = userMap.get(req.addressee_user_id) || { id: req.addressee_user_id, username: 'Unknown User', last_seen_at: null };
     return {
       ...req,
-      addressee: a
+      addressee
     };
   });
 };
