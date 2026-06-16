@@ -267,12 +267,14 @@ const Dashboard = () => {
                     <Users className="w-5 h-5 animate-pulse text-emerald-500" />
                     <span>Cliques</span>
                   </Link>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 relative z-50">
                     <button
                       onClick={() => setShowFriendsPopup(!showFriendsPopup)}
-                      className="px-2 py-0.5 rounded bg-emerald-500/10 text-[10px] font-black text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer"
+                      className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-[10px] font-black text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer flex items-center gap-1"
                     >
-                      {friends.filter(f => isOnline(f.last_seen_at)).length}/{friends.length} online
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 relative" />
+                      <span>{friends.filter(f => isOnline(f.last_seen_at)).length}/{friends.length}</span>
                     </button>
                     <Link to="/cliques">
                       <ChevronRight className="w-4 h-4 text-neutral-500" />
@@ -280,17 +282,24 @@ const Dashboard = () => {
                   </div>
                 </div>
 
+                {showFriendsPopup && (
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowFriendsPopup(false)}
+                  />
+                )}
+
                 <AnimatePresence>
                   {(friendsHovered || showFriendsPopup) && (
                     <motion.div
                       initial={{ opacity: 0, scale: 0.95, y: -10 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                      className="absolute right-0 bottom-full mb-2 w-64 bg-neutral-950 border border-neutral-800 rounded-2xl shadow-2xl z-50 p-3 max-h-72 flex flex-col"
+                      className="absolute right-0 bottom-full mb-2 w-64 bg-neutral-950 border border-neutral-800 rounded-2xl shadow-2xl z-50 p-3 max-h-72 flex flex-col pointer-events-auto"
                     >
                       <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-2">
                         <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400">Friends list</span>
-                        <Link to="/cliques" className="text-[9px] font-bad text-emerald-500 hover:underline uppercase tracking-wider font-extrabold">View all</Link>
+                        <Link to="/cliques" className="text-[9px] font-bold text-emerald-500 hover:underline uppercase tracking-wider font-extrabold">View all</Link>
                       </div>
                       <div className="overflow-y-auto space-y-1.5 flex-1 min-h-0 pr-1 select-none">
                         {friends.length === 0 ? (

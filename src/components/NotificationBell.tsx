@@ -142,13 +142,13 @@ const NotificationBell: React.FC = () => {
               </div>
 
               <div className="max-h-[400px] overflow-y-auto">
-                {notifications.length === 0 ? (
+                {notifications.filter(n => !n.is_read).length === 0 ? (
                   <div className="p-8 text-center opacity-40">
                     <Bell className="w-8 h-8 mx-auto mb-2" />
                     <p className="text-[10px] font-bold uppercase tracking-widest">No notifications yet</p>
                   </div>
                 ) : (
-                  notifications.map((notif) => (
+                  notifications.filter(n => !n.is_read).map((notif) => (
                     <div
                       key={notif.id}
                       className={`p-4 border-b border-white/5 last:border-0 transition-colors relative group ${
