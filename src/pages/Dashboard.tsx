@@ -270,10 +270,12 @@ const Dashboard = () => {
                   <div className="flex items-center gap-2 relative z-50">
                     <button
                       onClick={() => setShowFriendsPopup(!showFriendsPopup)}
-                      className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-[10px] font-black text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer flex items-center gap-1"
+                      className="relative px-2.5 py-1 rounded-full bg-emerald-500/10 text-[10px] font-black text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer flex items-center gap-1.5"
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute" />
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 relative" />
+                      <span className="relative flex h-1.5 w-1.5 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                      </span>
                       <span>{friends.filter(f => isOnline(f.last_seen_at)).length}/{friends.length}</span>
                     </button>
                     <Link to="/cliques">

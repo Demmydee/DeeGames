@@ -1,13 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Gamepad2, LogOut, User, Users, HelpCircle, MessageSquare, Menu, X as CloseIcon } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import { motion, AnimatePresence } from 'motion/react';
+import { friendApi } from '../../services/multiplayerApi';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [friends, setFriends] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchFriends = async () => {
+      try {
+        const data = await friendApi.getFriends();
+        setFriends(data);
+      } catch (err) {
+        console.error('Navbar: failed to load friends:', err);
+      }
+    };
+    fetchFriends();
+  }, [user]);
+
+  const isOnline = (lastSeenAt: string | null) => {
+    if (!lastSeenAt) return false;
+    const lastSeenDate = new Date(lastSeenAt);
+    const now = new Date();
+    const diffInMinutes = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60);
+    return diffInMinutes < 5;
+  };
 
   const navLinks = [
     { to: '/cliques', label: 'Cliques', icon: Users },
@@ -29,17 +52,26 @@ const Navbar = () => {
               <>
                 <div className="hidden md:flex items-center gap-6 mr-4">
                   {navLinks.map((link) => (
-                    <Link 
+                    <Link
                       key={link.to}
-                      to={link.to} 
+                      to={link.to}
                       className="text-xs font-black uppercase tracking-widest text-neutral-400 hover:text-emerald-500 transition-colors flex items-center gap-2"
                     >
                       <link.icon className="w-4 h-4" />
-                      {link.label}
+                      <span>{link.label}</span>
+                      {link.to === '/cliques' && (
+                        <span className="flex items-center gap-1 bg-emerald-500/10 text-[9px] font-black text-emerald-500 border border-emerald-500/20 px-1.5 py-0.5 rounded-full select-none">
+                          <span className="relative flex h-1.5 w-1.5 shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                          </span>
+                          <span>{friends.filter(f => isOnline(f.last_seen_at)).length}/{friends.length}</span>
+                        </span>
+                      )}
                     </Link>
                   ))}
                 </div>
-                
+
                 <NotificationBell />
 
                 <div className="h-6 w-px bg-neutral-800 mx-2 hidden sm:block" />
@@ -98,10 +130,21 @@ const Navbar = () => {
                   key={link.to}
                   to={link.to}
                   onClick={() => setIsMenuOpen(false)}
-                  className="flex items-center gap-4 p-4 rounded-2xl bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white hover:border-orange-500/50 transition-all"
+                  className="flex items-center justify-between p-4 rounded-2xl bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white hover:border-orange-500/50 transition-all"
                 >
-                  <link.icon className="w-6 h-6 text-orange-500" />
-                  <span className="font-black uppercase tracking-widest text-sm">{link.label}</span>
+                  <div className="flex items-center gap-4">
+                    <link.icon className="w-6 h-6 text-orange-500" />
+                    <span className="font-black uppercase tracking-widest text-sm">{link.label}</span>
+                  </div>
+                  {link.to === '/cliques' && (
+                    <span className="flex items-center gap-1.5 bg-emerald-500/10 text-[10px] font-black text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded-full pointer-events-none">
+                      <span className="relative flex h-1.5 w-1.5 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                      </span>
+                      <span>{friends.filter(f => isOnline(f.last_seen_at)).length}/{friends.length}</span>
+                    </span>
+                  )}
                 </Link>
               ))}
               <button
