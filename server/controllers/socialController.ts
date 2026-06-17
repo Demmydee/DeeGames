@@ -62,7 +62,7 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
     // 3. Get user profiles for these IDs
     const { data: userProfiles, error: userError } = await client
       .from('users')
-      .select('id, username, last_login_at')
+      .select('id, username, last_seen_at')
       .in('id', uniqueUserIds);
 
     if (userError) {
@@ -81,7 +81,7 @@ export const getRecentOpponents = async (req: Request, res: Response) => {
           uniqueOpponents.set(p.user_id, {
             id: p.user_id,
             username: profile.username,
-            last_seen_at: profile.last_login_at,
+            last_seen_at: profile.last_seen_at,
             last_match_at: p.joined_at
           });
         }

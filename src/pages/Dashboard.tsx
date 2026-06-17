@@ -86,6 +86,23 @@ const Dashboard = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const pollFriends = async () => {
+      try {
+        const data = await friendApi.getFriends();
+        setFriends(data);
+      } catch (err) {
+        console.error('Dashboard: failed to poll friends:', err);
+      }
+    };
+
+    // Poll every 10 seconds to keep friends status live
+    const interval = setInterval(pollFriends, 10000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   const handleAddFriend = async (userId: string) => {
     try {
       await friendApi.sendRequest(userId);

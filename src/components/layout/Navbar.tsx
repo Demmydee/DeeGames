@@ -22,6 +22,10 @@ const Navbar = () => {
       }
     };
     fetchFriends();
+
+    // Poll every 10 seconds to keep navbar badge live
+    const interval = setInterval(fetchFriends, 10000);
+    return () => clearInterval(interval);
   }, [user]);
 
   const isOnline = (lastSeenAt: string | null) => {

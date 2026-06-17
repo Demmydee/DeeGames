@@ -22,6 +22,7 @@ import { useAdminAuth } from './context/AdminAuthContext';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import { useLocation } from 'react-router-dom';
+import { presenceApi } from './services/multiplayerApi';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { token, loading } = useAuth();
@@ -54,11 +55,32 @@ const PublicAdminRoute = ({ children }: { children: React.ReactNode }) => {
 export default function App() {
   const location = useLocation();
   const isAdminPath = location.pathname.startsWith('/admin');
+  const { token } = useAuth();
 
   React.useEffect(() => {
     const apiUrl = import.meta.env.VITE_API_URL || 'Local Server (Relative)';
     console.log(`%c🚀 DeeGames API: ${apiUrl}`, 'color: #f97316; font-weight: bold; font-size: 12px;');
   }, []);
+
+  React.useEffect(() => {
+    if (!token) return;
+
+    // Run custom immediate ping
+    const doPing = async () => {
+      try {
+        await presenceApi.ping();
+      } catch (err) {
+        console.warn('Presence ping failed:', err);
+      }
+    };
+
+    doPing();
+
+    // Ping every 30 seconds
+    const interval = setInterval(doPing, 30000);
+
+    return () => clearInterval(interval);
+  }, [token]);
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans">

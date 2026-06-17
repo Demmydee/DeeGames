@@ -37,9 +37,9 @@ const Cliques: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       const [f, inc, out, opp] = await Promise.all([
         friendApi.getFriends(),
         friendApi.getIncomingRequests(),
@@ -53,18 +53,25 @@ const Cliques: React.FC = () => {
     } catch (err: any) {
       setError(err.message || 'Failed to fetch data');
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchData();
+
+    // Poll silently every 10 seconds to keep statuses up-to-date
+    const interval = setInterval(() => {
+      fetchData(true);
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-    
+
     setSearching(true);
     setError(null);
     try {
