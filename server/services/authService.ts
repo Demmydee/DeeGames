@@ -135,7 +135,7 @@ export const getUserById = async (id: string) => {
   try {
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, username, email, phone, created_at, kyc_status, kyc_verified_at')
+      .select('id, username, email, phone, full_name, avatar_url, created_at, kyc_status, kyc_verified_at')
       .eq('id', id)
       .single();
 
@@ -146,7 +146,7 @@ export const getUserById = async (id: string) => {
       }
 
       console.warn(`User profile not found in public.users for ID: ${id}. Attempting self-healing sync...`);
-      
+
       // Fallback: Check if we have the service key to use admin methods
       if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
         console.error('Self-healing failed: SUPABASE_SERVICE_ROLE_KEY is missing.');
@@ -155,7 +155,7 @@ export const getUserById = async (id: string) => {
 
       // Check if the user exists in Supabase Auth
       const { data: { user: authUser }, error: authError } = await supabase.auth.admin.getUserById(id);
-      
+
       if (authError || !authUser) {
         console.error(`Self-healing failed: User ${id} does not exist in Auth.`, authError);
         throw { status: 404, message: 'User not found in any system' };
@@ -163,7 +163,7 @@ export const getUserById = async (id: string) => {
 
       // Attempt manual sync to public.users
       const username = COALESCE(
-        authUser.user_metadata?.username, 
+        authUser.user_metadata?.username,
         authUser.email?.split('@')[0],
         `user_${id.substring(0, 8)}`
       );
@@ -178,7 +178,7 @@ export const getUserById = async (id: string) => {
           full_name: authUser.user_metadata?.full_name,
           avatar_url: authUser.user_metadata?.avatar_url
         })
-        .select('id, username, email, phone, created_at, kyc_status, kyc_verified_at')
+        .select('id, username, email, phone, full_name, avatar_url, created_at, kyc_status, kyc_verified_at')
         .single();
 
       if (syncError) {
@@ -216,11 +216,96 @@ export const refreshToken = async (refreshToken: string) => {
 
   return {
     message: 'Session refreshed',
-    user: { 
-      id: data.user?.id, 
+    user: {
+      id: data.user?.id,
       email: data.user?.email,
-      username: data.user?.user_metadata?.username 
+      username: data.user?.user_metadata?.username
     },
     session: data.session
   };
 };
+
+export const updateUserProfile = async (id: string, updates: { username?: string, phone?: string, full_name?: string, avatar_url?: string }) => {
+  try {
+    const cleanUpdates: any = {};
+
+    if (updates.username !== undefined) {
+      const normalizedUsername = updates.username.trim().toLowerCase();
+      const usernameRegex = /^[a-zA-Z0-9_]{3,15}$/;
+      if (!usernameRegex.test(normalizedUsername)) {
+        throw { status: 400, message: 'Username must be between 3 and 15 alphanumeric characters or underscores.' };
+      }
+
+      // Check uniqueness in public.users
+      const { data: existingUser, error: checkError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', normalizedUsername)
+        .neq('id', id)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking username uniqueness:', checkError);
+        throw { status: 500, message: 'Failed to verify username uniqueness' };
+      }
+
+      if (existingUser) {
+        throw { status: 400, message: 'Username is already taken' };
+      }
+      cleanUpdates.username = normalizedUsername;
+    }
+
+    if (updates.phone !== undefined) {
+      cleanUpdates.phone = updates.phone.trim() || null;
+    }
+
+    if (updates.full_name !== undefined) {
+      cleanUpdates.full_name = updates.full_name.trim() || null;
+    }
+
+    if (updates.avatar_url !== undefined) {
+      cleanUpdates.avatar_url = updates.avatar_url.trim() || null;
+    }
+
+    const { data: updatedUser, error: updateError } = await supabase
+      .from('users')
+      .update({
+        ...cleanUpdates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select('id, username, email, phone, full_name, avatar_url, created_at, kyc_status, kyc_verified_at')
+      .single();
+
+    if (updateError) {
+      console.error('Error updating public.users:', updateError);
+      throw { status: 500, message: updateError.message || 'Failed to update user profile' };
+    }
+
+    // Try to update Auth metadata too, if service role key is present
+    try {
+      if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        const authUpdates: any = {};
+        if (cleanUpdates.username) authUpdates.username = cleanUpdates.username;
+        if (cleanUpdates.full_name) authUpdates.full_name = cleanUpdates.full_name;
+        if (cleanUpdates.avatar_url) authUpdates.avatar_url = cleanUpdates.avatar_url;
+        if (cleanUpdates.phone) authUpdates.phone = cleanUpdates.phone;
+
+        if (Object.keys(authUpdates).length > 0) {
+          await supabase.auth.admin.updateUserById(id, {
+            user_metadata: authUpdates
+          });
+        }
+      }
+    } catch (authErr) {
+      console.warn('Silent warning: Auth metadata sync failed:', authErr);
+    }
+
+    return updatedUser;
+  } catch (error: any) {
+    if (error.status) throw error;
+    console.error('updateUserProfile Uncaught Error:', error);
+    throw { status: 500, message: error.message || 'Internal server error occurred profile update' };
+  }
+};
+

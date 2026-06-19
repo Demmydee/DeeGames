@@ -29,6 +29,15 @@ export const getMe = async (req: any, res: Response) => {
   }
 };
 
+export const updateProfile = async (req: any, res: Response) => {
+  try {
+    const updatedUser = await authService.updateUserProfile(req.user.id, req.body);
+    res.status(200).json({ user: updatedUser });
+  } catch (error: any) {
+    res.status(error.status || 400).json({ error: error.message });
+  }
+};
+
 export const refresh = async (req: Request, res: Response) => {
   try {
     const { refreshToken } = req.body;

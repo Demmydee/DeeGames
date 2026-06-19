@@ -17,6 +17,7 @@ import GameRoomShell from './pages/GameRoomShell';
 import Cliques from './pages/Cliques';
 import FAQ from './pages/FAQ';
 import Support from './pages/Support';
+import Profile from './pages/Profile';
 import Navbar from './components/layout/Navbar';
 import { useAdminAuth } from './context/AdminAuthContext';
 import AdminLogin from './pages/admin/AdminLogin';
@@ -89,7 +90,7 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-        
+
         {/* Admin Console Paths */}
         <Route path="/admin/login" element={<PublicAdminRoute><AdminLogin /></PublicAdminRoute>} />
         <Route path="/admin/dashboard" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
@@ -105,6 +106,7 @@ export default function App() {
         <Route path="/lobby/room/:id" element={<ProtectedRoute><Room /></ProtectedRoute>} />
         <Route path="/match/:id" element={<ProtectedRoute><GameRoomShell /></ProtectedRoute>} />
         <Route path="/cliques" element={<ProtectedRoute><Cliques /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/faq" element={<FAQ />} />
         <Route path="/support" element={<Support />} />
         <Route path="*" element={<Navigate to="/" />} />

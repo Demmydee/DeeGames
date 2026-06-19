@@ -5,6 +5,9 @@ interface User {
   id: string;
   username: string;
   email: string;
+  phone?: string | null;
+  full_name?: string | null;
+  avatar_url?: string | null;
 }
 
 interface AuthContextType {
@@ -14,6 +17,7 @@ interface AuthContextType {
   login: (session: any, user: User) => void;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  updateUser: (updatedUser: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,6 +45,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  const updateUser = (updatedUser: User) => {
+    setUser(updatedUser);
+  };
+
   const refreshUser = async () => {
     if (!token) {
       setLoading(false);
@@ -62,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [token]);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout, refreshUser, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
