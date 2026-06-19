@@ -135,7 +135,7 @@ export const getUserById = async (id: string) => {
   try {
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, username, email, phone, full_name, avatar_url, created_at, kyc_status, kyc_verified_at')
+      .select('id, username, email, phone, created_at, kyc_status, kyc_verified_at')
       .eq('id', id)
       .single();
 
@@ -174,11 +174,9 @@ export const getUserById = async (id: string) => {
           id: authUser.id,
           username: username.toLowerCase(),
           email: authUser.email?.toLowerCase() || '',
-          phone: authUser.user_metadata?.phone,
-          full_name: authUser.user_metadata?.full_name,
-          avatar_url: authUser.user_metadata?.avatar_url
+          phone: authUser.user_metadata?.phone
         })
-        .select('id, username, email, phone, full_name, avatar_url, created_at, kyc_status, kyc_verified_at')
+        .select('id, username, email, phone, created_at, kyc_status, kyc_verified_at')
         .single();
 
       if (syncError) {
@@ -195,8 +193,31 @@ export const getUserById = async (id: string) => {
       }
 
       console.info(`Self-healing successful for user: ${username} (${id})`);
-      return newUser;
+      return {
+        ...newUser,
+        full_name: authUser.user_metadata?.full_name || '',
+        avatar_url: authUser.user_metadata?.avatar_url || ''
+      };
     }
+
+    // For the found user, load full_name and avatar_url from Auth metadata dynamically
+    let fullName = '';
+    let avatarUrl = '';
+    try {
+      const { data: { user: authUser } } = await supabase.auth.admin.getUserById(id);
+      if (authUser) {
+        fullName = authUser.user_metadata?.full_name || '';
+        avatarUrl = authUser.user_metadata?.avatar_url || '';
+      }
+    } catch (metaErr) {
+      console.warn(`Could not fetch Auth metadata for ${id}:`, metaErr);
+    }
+
+    return {
+      ...user,
+      full_name: fullName,
+      avatar_url: avatarUrl
+    };
 
     return user;
   } catch (error: any) {
@@ -259,49 +280,71 @@ export const updateUserProfile = async (id: string, updates: { username?: string
       cleanUpdates.phone = updates.phone.trim() || null;
     }
 
-    if (updates.full_name !== undefined) {
-      cleanUpdates.full_name = updates.full_name.trim() || null;
-    }
+    const dbUpdates: any = {};
+    if (cleanUpdates.username !== undefined) dbUpdates.username = cleanUpdates.username;
+    if (cleanUpdates.phone !== undefined) dbUpdates.phone = cleanUpdates.phone;
 
-    if (updates.avatar_url !== undefined) {
-      cleanUpdates.avatar_url = updates.avatar_url.trim() || null;
-    }
+    let updatedUser: any;
+    if (Object.keys(dbUpdates).length > 0) {
+      const { data: result, error: updateError } = await supabase
+        .from('users')
+        .update({
+          ...dbUpdates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select('id, username, email, phone, created_at, kyc_status, kyc_verified_at')
+        .single();
 
-    const { data: updatedUser, error: updateError } = await supabase
-      .from('users')
-      .update({
-        ...cleanUpdates,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select('id, username, email, phone, full_name, avatar_url, created_at, kyc_status, kyc_verified_at')
-      .single();
+      if (updateError) {
+        console.error('Error updating public.users:', updateError);
+        throw { status: 500, message: updateError.message || 'Failed to update user profile' };
+      }
+      updatedUser = result;
+    } else {
+      const { data: result, error: fetchError } = await supabase
+        .from('users')
+        .select('id, username, email, phone, created_at, kyc_status, kyc_verified_at')
+        .eq('id', id)
+        .single();
 
-    if (updateError) {
-      console.error('Error updating public.users:', updateError);
-      throw { status: 500, message: updateError.message || 'Failed to update user profile' };
+      if (fetchError) {
+        throw { status: 500, message: 'Failed to retrieve profile record' };
+      }
+      updatedUser = result;
     }
 
     // Try to update Auth metadata too, if service role key is present
+    let finalFullName = updates.full_name || '';
+    let finalAvatarUrl = updates.avatar_url || '';
+
     try {
       if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
         const authUpdates: any = {};
-        if (cleanUpdates.username) authUpdates.username = cleanUpdates.username;
-        if (cleanUpdates.full_name) authUpdates.full_name = cleanUpdates.full_name;
-        if (cleanUpdates.avatar_url) authUpdates.avatar_url = cleanUpdates.avatar_url;
-        if (cleanUpdates.phone) authUpdates.phone = cleanUpdates.phone;
+        if (cleanUpdates.username !== undefined) authUpdates.username = cleanUpdates.username;
+        if (updates.full_name !== undefined) authUpdates.full_name = updates.full_name.trim();
+        if (updates.avatar_url !== undefined) authUpdates.avatar_url = updates.avatar_url.trim();
+        if (cleanUpdates.phone !== undefined) authUpdates.phone = cleanUpdates.phone;
 
         if (Object.keys(authUpdates).length > 0) {
-          await supabase.auth.admin.updateUserById(id, {
+          const { data: authResult, error: authUpdateErr } = await supabase.auth.admin.updateUserById(id, {
             user_metadata: authUpdates
           });
+          if (!authUpdateErr && authResult?.user) {
+            finalFullName = authResult.user.user_metadata?.full_name || '';
+            finalAvatarUrl = authResult.user.user_metadata?.avatar_url || '';
+          }
         }
       }
     } catch (authErr) {
       console.warn('Silent warning: Auth metadata sync failed:', authErr);
     }
 
-    return updatedUser;
+    return {
+      ...updatedUser,
+      full_name: finalFullName,
+      avatar_url: finalAvatarUrl
+    };
   } catch (error: any) {
     if (error.status) throw error;
     console.error('updateUserProfile Uncaught Error:', error);
