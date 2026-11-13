@@ -1,19 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Gamepad2, LogOut, User, Users, HelpCircle, MessageSquare, Menu, Settings, X as CloseIcon } from 'lucide-react';
+import { Gamepad2, LogOut, User, Users, HelpCircle, MessageSquare, Menu, Settings, X as CloseIcon, UserPlus, Bot } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import { motion, AnimatePresence } from 'motion/react';
 import { friendApi } from '../../services/multiplayerApi';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [friends, setFriends] = useState<any[]>([]);
   const [cliquesHovered, setCliquesHovered] = useState(false);
 
+  const isGuest = Boolean(user?.is_guest);
+
   useEffect(() => {
-    if (!user) return;
+    if (!user || isGuest) {
+      setFriends([]);
+      return;
+    }
     const fetchFriends = async () => {
       try {
         const data = await friendApi.getFriends();
@@ -27,7 +33,7 @@ const Navbar = () => {
     // Poll every 10 seconds to keep navbar badge live
     const interval = setInterval(fetchFriends, 10000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, isGuest]);
 
   const isOnline = (lastSeenAt: string | null) => {
     if (!lastSeenAt) return false;
@@ -37,11 +43,23 @@ const Navbar = () => {
     return diffInMinutes < 5;
   };
 
-  const navLinks = [
-    { to: '/cliques', label: 'Cliques', icon: Users },
-    { to: '/faq', label: 'FAQ', icon: HelpCircle },
-    { to: '/support', label: 'Support', icon: MessageSquare },
-  ];
+  const navLinks = isGuest
+    ? [
+        { to: '/lobby', label: 'Demo Lobby', icon: Bot },
+        { to: '/faq', label: 'FAQ', icon: HelpCircle },
+        { to: '/support', label: 'Support', icon: MessageSquare },
+      ]
+    : [
+        { to: '/cliques', label: 'Cliques', icon: Users },
+        { to: '/faq', label: 'FAQ', icon: HelpCircle },
+        { to: '/support', label: 'Support', icon: MessageSquare },
+      ];
+
+  const handleUpgrade = () => {
+    setIsMenuOpen(false);
+    logout();
+    navigate('/register');
+  };
 
   return (
     <nav className="sticky top-0 z-50 border-b border-neutral-800 bg-neutral-950/80 backdrop-blur-md">
@@ -60,16 +78,16 @@ const Navbar = () => {
                     <div
                       key={link.to}
                       className="relative py-2"
-                      onMouseEnter={() => link.to === '/cliques' && setCliquesHovered(true)}
-                      onMouseLeave={() => link.to === '/cliques' && setCliquesHovered(false)}
+                      onMouseEnter={() => !isGuest && link.to === '/cliques' && setCliquesHovered(true)}
+                      onMouseLeave={() => !isGuest && link.to === '/cliques' && setCliquesHovered(false)}
                     >
-                      <Link
-                        to={link.to}
-                        className="text-xs font-black uppercase tracking-widest text-neutral-400 hover:text-emerald-500 transition-colors flex items-center gap-2"
+                      <Link 
+                        to={link.to} 
+                        className="text-xs font-black uppercase tracking-widest text-neutral-400 hover:text-emerald-500 transition-colors flex items-center gap-2 whitespace-nowrap"
                       >
                         <link.icon className="w-4 h-4" />
                         <span>{link.label}</span>
-                        {link.to === '/cliques' && (
+                        {!isGuest && link.to === '/cliques' && (
                           <span className="flex items-center gap-1 bg-emerald-500/10 text-[9px] font-black text-emerald-500 border border-emerald-500/20 px-1.5 py-0.5 rounded-full select-none">
                             <span className="relative flex h-1.5 w-1.5 shrink-0">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -80,7 +98,7 @@ const Navbar = () => {
                         )}
                       </Link>
 
-                      {link.to === '/cliques' && (
+                      {!isGuest && link.to === '/cliques' && (
                         <AnimatePresence>
                           {cliquesHovered && (
                             <motion.div
@@ -114,9 +132,9 @@ const Navbar = () => {
                                           <div className="flex items-center gap-2 max-w-[70%]">
                                             <div className="relative shrink-0">
                                               {friend.avatar_url ? (
-                                                <img
-                                                  src={friend.avatar_url}
-                                                  alt={friend.username}
+                                                <img 
+                                                  src={friend.avatar_url} 
+                                                  alt={friend.username} 
                                                   referrerPolicy="no-referrer"
                                                   className="w-6 h-6 rounded-lg object-cover border border-white/10"
                                                 />
@@ -146,29 +164,47 @@ const Navbar = () => {
                     </div>
                   ))}
                 </div>
+                
+                {!isGuest && <NotificationBell />}
 
-                <NotificationBell />
+                {isGuest && (
+                  <button
+                    type="button"
+                    onClick={handleUpgrade}
+                    className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-600 hover:bg-orange-500 text-white text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Create Account</span>
+                  </button>
+                )}
 
-                <div className="h-6 w-px bg-neutral-800 mx-2 hidden sm:block" />
+                <div className="h-6 w-px bg-neutral-800 mx-1 hidden sm:block" />
 
                 <Link to="/dashboard" className="text-sm font-black uppercase italic tracking-tight hover:text-emerald-500 transition-colors flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>
                   <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-500/20 overflow-hidden">
                     {user.avatar_url ? (
                       <img src={user.avatar_url} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                    ) : isGuest ? (
+                      <Bot className="w-4 h-4" />
                     ) : (
                       <User className="w-4 h-4" />
                     )}
                   </div>
-                  <span className="hidden sm:inline">{user.username}</span>
+                  <div className="hidden sm:flex flex-col leading-tight">
+                    <span>{user.username}</span>
+                    {isGuest && <span className="text-[9px] not-italic font-black tracking-widest text-amber-400">Guest Demo</span>}
+                  </div>
                 </Link>
 
-                <Link
-                  to="/profile"
-                  className="hidden sm:flex p-2 rounded-lg hover:bg-orange-500/10 text-neutral-500 hover:text-orange-500 transition-all"
-                  title="Profile Settings"
-                >
-                  <Settings className="w-5 h-5" />
-                </Link>
+                {!isGuest && (
+                  <Link
+                    to="/profile"
+                    className="hidden sm:flex p-2 rounded-lg hover:bg-orange-500/10 text-neutral-500 hover:text-orange-500 transition-all"
+                    title="Profile Settings"
+                  >
+                    <Settings className="w-5 h-5" />
+                  </Link>
+                )}
 
                 <button
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -223,7 +259,7 @@ const Navbar = () => {
                     <link.icon className="w-6 h-6 text-orange-500" />
                     <span className="font-black uppercase tracking-widest text-sm">{link.label}</span>
                   </div>
-                  {link.to === '/cliques' && (
+                  {!isGuest && link.to === '/cliques' && (
                     <span className="flex items-center gap-1.5 bg-emerald-500/10 text-[10px] font-black text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded-full pointer-events-none">
                       <span className="relative flex h-1.5 w-1.5 shrink-0">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -234,14 +270,24 @@ const Navbar = () => {
                   )}
                 </Link>
               ))}
-              <Link
-                to="/profile"
-                onClick={() => setIsMenuOpen(false)}
-                className="flex items-center gap-4 p-4 rounded-2xl bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white hover:border-orange-500/50 transition-all"
-              >
-                <Settings className="w-6 h-6 text-orange-500" />
-                <span className="font-black uppercase tracking-widest text-sm">Profile Settings</span>
-              </Link>
+              {isGuest ? (
+                <button
+                  onClick={handleUpgrade}
+                  className="w-full flex items-center gap-4 p-4 rounded-2xl bg-orange-600/20 border border-orange-500/30 text-orange-400 hover:bg-orange-600/30 transition-all"
+                >
+                  <UserPlus className="w-6 h-6" />
+                  <span className="font-black uppercase tracking-widest text-sm">Create Full Account</span>
+                </button>
+              ) : (
+                <Link
+                  to="/profile"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="flex items-center gap-4 p-4 rounded-2xl bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white hover:border-orange-500/50 transition-all"
+                >
+                  <Settings className="w-6 h-6 text-orange-500" />
+                  <span className="font-black uppercase tracking-widest text-sm">Profile Settings</span>
+                </Link>
+              )}
               <button
                 onClick={() => {
                   logout();

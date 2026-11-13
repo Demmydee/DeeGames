@@ -10,16 +10,21 @@ import {
   ChevronRight,
   ChevronLeft,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Lock
 } from 'lucide-react';
 import { lobbyApi } from '../services/multiplayerApi';
 import { RoomCategory } from '../types/multiplayer';
+import { useAuth } from '../context/AuthContext';
+import InstantDemoSection from '../components/InstantDemoSection';
 
 const Lobby: React.FC = () => {
   const [rooms, setRooms] = useState<RoomCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isGuest = Boolean(user?.is_guest);
 
   useEffect(() => {
     const fetchRooms = async () => {
@@ -97,68 +102,105 @@ const Lobby: React.FC = () => {
           Game Lobby
         </h1>
         <p className="text-gray-400 max-w-2xl mx-auto">
-          Choose your arena. From casual street games to high-stakes professional leagues, 
-          find your match and prove your skills.
+          Jump straight into an Instant Demo Room against DeeBot AI, or choose a live multiplayer arena below.
         </p>
       </div>
 
+      {/* Instant Demo Room · Play vs Bot */}
+      <InstantDemoSection />
+
+      {/* Live Arena Rooms */}
+      <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-black uppercase italic tracking-tight text-white">
+            Live Multiplayer Arenas
+          </h2>
+          <p className="text-xs text-neutral-400 mt-1">
+            {isGuest
+              ? 'Guest Demo users can browse the Free arena; paid wager rooms and creating/joining PvP matches require a registered account.'
+              : 'Available live games: Whot, Ludo, and Dice. Chess is Coming Soon.'}
+          </p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {rooms.map((room, index) => (
-          <motion.div
-            key={room.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            onClick={() => navigate(`/lobby/room/${room.id}`)}
-            className={`group relative overflow-hidden rounded-2xl border-2 p-6 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] ${getRoomColor(room.name)}`}
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 rounded-xl bg-black/40 border border-white/10 group-hover:border-white/20 transition-colors">
-                {getIcon(room.icon_name)}
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                {room.is_free ? (
-                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider border border-emerald-500/30">
-                    Free to Play
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold uppercase tracking-wider border border-orange-500/30">
-                    Paid Wagers
-                  </span>
-                )}
-                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest opacity-60">
-                  <Users className="w-3 h-3" />
-                  <span>{(room as any).occupancy || 0} Players</span>
+        {rooms.map((room, index) => {
+          const isLockedForGuest = isGuest && !room.is_free;
+
+          return (
+            <motion.div
+              key={room.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.08 }}
+              onClick={() => {
+                if (!isLockedForGuest) {
+                  navigate(`/lobby/room/${room.id}`);
+                }
+              }}
+              className={`group relative overflow-hidden rounded-2xl border-2 p-6 transition-all ${getRoomColor(room.name)} ${
+                isLockedForGuest
+                  ? 'opacity-55 cursor-not-allowed'
+                  : 'cursor-pointer hover:scale-[1.02] active:scale-[0.98]'
+              }`}
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-3 rounded-xl bg-black/40 border border-white/10 group-hover:border-white/20 transition-colors">
+                  {getIcon(room.icon_name)}
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  {isLockedForGuest ? (
+                    <span className="px-3 py-1 rounded-full bg-neutral-800 text-neutral-300 text-xs font-bold uppercase tracking-wider border border-neutral-700 flex items-center gap-1.5">
+                      <Lock className="w-3 h-3" />
+                      <span>Registered Only</span>
+                    </span>
+                  ) : room.is_free ? (
+                    <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider border border-emerald-500/30">
+                      Free to Play
+                    </span>
+                  ) : (
+                    <span className="px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold uppercase tracking-wider border border-orange-500/30">
+                      Paid Wagers
+                    </span>
+                  )}
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest opacity-60">
+                    <Users className="w-3 h-3" />
+                    <span>{(room as any).occupancy || 0} Players</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <h3 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tight">
-              {room.name}
-            </h3>
-            <p className="text-gray-400 text-sm mb-6 line-clamp-2">
-              {room.description}
-            </p>
+              <h3 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tight">
+                {room.name}
+              </h3>
+              <p className="text-gray-400 text-sm mb-6 line-clamp-2">
+                {room.description}
+              </p>
 
-            <div className="flex items-center justify-between mt-auto">
-              <div className="text-xs font-mono uppercase tracking-widest opacity-60">
-                {room.is_free ? (
-                  'No Entry Fee'
+              <div className="flex items-center justify-between mt-auto">
+                <div className="text-xs font-mono uppercase tracking-widest opacity-60">
+                  {room.is_free ? (
+                    'No Entry Fee'
+                  ) : (
+                    `Wager Range: ₦${room.min_wager.toLocaleString()} ${room.max_wager ? `- ₦${room.max_wager.toLocaleString()}` : '+'}`
+                  )}
+                </div>
+                {isLockedForGuest ? (
+                  <Lock className="w-4 h-4 text-neutral-500" />
                 ) : (
-                  `Wager Range: ₦${room.min_wager.toLocaleString()} ${room.max_wager ? `- ₦${room.max_wager.toLocaleString()}` : '+'}`
+                  <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 )}
               </div>
-              <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </div>
 
-            {/* Decorative background element */}
-            <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
-              <div className="scale-[4]">
-                {getIcon(room.icon_name)}
+              {/* Decorative background element */}
+              <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <div className="scale-[4]">
+                  {getIcon(room.icon_name)}
+                </div>
               </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </div>
 
       <div className="mt-16 p-8 rounded-3xl bg-white/5 border border-white/10 text-center">

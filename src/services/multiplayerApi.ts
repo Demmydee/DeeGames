@@ -56,20 +56,36 @@ export const gameRequestApi = {
   }
 };
 
+const isDemoMatch = (id: string) => id.startsWith('demo-');
+
 export const matchApi = {
   getById: async (id: string): Promise<Match> => {
-    const response = await apiClient.get(`${API_BASE}/matches/${id}`);
+    const url = isDemoMatch(id) ? `${API_BASE}/demo/matches/${id}` : `${API_BASE}/matches/${id}`;
+    const response = await apiClient.get(url);
     return response.data;
   },
   leave: async (id: string): Promise<{ success: boolean }> => {
-    const response = await apiClient.post(`${API_BASE}/matches/${id}/leave`);
+    const url = isDemoMatch(id) ? `${API_BASE}/demo/matches/${id}/leave` : `${API_BASE}/matches/${id}/leave`;
+    const response = await apiClient.post(url);
     return response.data;
   },
   updatePresence: async (id: string): Promise<void> => {
-    await apiClient.post(`${API_BASE}/matches/${id}/presence`);
+    const url = isDemoMatch(id) ? `${API_BASE}/demo/matches/${id}/heartbeat` : `${API_BASE}/matches/${id}/presence`;
+    await apiClient.post(url);
   },
   getActive: async (): Promise<Match | null> => {
     const response = await apiClient.get(`${API_BASE}/matches/active`);
+    return response.data;
+  }
+};
+
+export const demoApi = {
+  createMatch: async (gameType: 'whot' | 'ludo' | 'dice', variant?: string): Promise<Match> => {
+    const response = await apiClient.post(`${API_BASE}/demo/matches`, { gameType, variant });
+    return response.data;
+  },
+  restartMatch: async (matchId: string): Promise<Match> => {
+    const response = await apiClient.post(`${API_BASE}/demo/matches/${matchId}/restart`);
     return response.data;
   }
 };
@@ -195,27 +211,33 @@ export const presenceApi = {
 
 export const gameApi = {
   getState: async (matchId: string) => {
-    const response = await apiClient.get(`${API_BASE}/game/${matchId}/state`);
+    const url = isDemoMatch(matchId) ? `${API_BASE}/demo/matches/${matchId}/state` : `${API_BASE}/game/${matchId}/state`;
+    const response = await apiClient.get(url);
     return response.data;
   },
   move: async (matchId: string, moveData: any) => {
-    const response = await apiClient.post(`${API_BASE}/game/${matchId}/move`, moveData);
+    const url = isDemoMatch(matchId) ? `${API_BASE}/demo/matches/${matchId}/move` : `${API_BASE}/game/${matchId}/move`;
+    const response = await apiClient.post(url, moveData);
     return response.data;
   },
   getResult: async (matchId: string) => {
-    const response = await apiClient.get(`${API_BASE}/game/${matchId}/result`);
+    const url = isDemoMatch(matchId) ? `${API_BASE}/demo/matches/${matchId}/result` : `${API_BASE}/game/${matchId}/result`;
+    const response = await apiClient.get(url);
     return response.data;
   },
   heartbeat: async (matchId: string) => {
-    const response = await apiClient.post(`${API_BASE}/game/${matchId}/heartbeat`);
+    const url = isDemoMatch(matchId) ? `${API_BASE}/demo/matches/${matchId}/heartbeat` : `${API_BASE}/game/${matchId}/heartbeat`;
+    const response = await apiClient.post(url);
     return response.data;
   },
   leave: async (matchId: string) => {
-    const response = await apiClient.post(`${API_BASE}/game/${matchId}/leave`);
+    const url = isDemoMatch(matchId) ? `${API_BASE}/demo/matches/${matchId}/leave` : `${API_BASE}/game/${matchId}/leave`;
+    const response = await apiClient.post(url);
     return response.data;
   },
   processMove: async (matchId: string, moveData: any) => {
-    const response = await apiClient.post(`${API_BASE}/game/${matchId}/move`, moveData);
+    const url = isDemoMatch(matchId) ? `${API_BASE}/demo/matches/${matchId}/move` : `${API_BASE}/game/${matchId}/move`;
+    const response = await apiClient.post(url, moveData);
     return response.data;
   },
   createDrawOffer: async (matchId: string) => {

@@ -8,6 +8,9 @@ interface User {
   phone?: string | null;
   full_name?: string | null;
   avatar_url?: string | null;
+  is_guest?: boolean;
+  kyc_status?: string | null;
+  created_at?: string | null;
 }
 
 interface AuthContextType {
@@ -33,6 +36,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('dee_token', newToken);
     if (newRefreshToken) {
       localStorage.setItem('dee_refresh_token', newRefreshToken);
+    } else {
+      localStorage.removeItem('dee_refresh_token');
     }
     setToken(newToken);
     setUser(newUser);

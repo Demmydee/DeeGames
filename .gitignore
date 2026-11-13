@@ -10,3 +10,5 @@ pyvenv.cfg
 *.log
 .env*
 !.env.example
+__pycache__/
+.idea/

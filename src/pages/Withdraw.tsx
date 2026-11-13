@@ -3,8 +3,12 @@ import { motion } from 'motion/react';
 import { Minus, Building2, AlertCircle, ArrowRight, Loader2, Plus, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import apiClient from '../api/client';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import GuestRestrictedNotice from '../components/GuestRestrictedNotice';
 
 const Withdraw = () => {
+  const { user } = useAuth();
+  const isGuest = Boolean(user?.is_guest);
   const navigate = useNavigate();
   const [amount, setAmount] = useState('');
   const [payoutAccounts, setPayoutAccounts] = useState<any[]>([]);
@@ -33,6 +37,10 @@ const Withdraw = () => {
   }, [success, navigate]);
 
   useEffect(() => {
+    if (isGuest) {
+      setFetchingAccounts(false);
+      return;
+    }
     const fetchData = async () => {
       try {
         const [accountsRes, walletRes] = await Promise.all([
@@ -56,7 +64,11 @@ const Withdraw = () => {
     };
 
     fetchData();
-  }, []);
+  }, [isGuest]);
+
+  if (isGuest) {
+    return <GuestRestrictedNotice featureName="Withdrawals" />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

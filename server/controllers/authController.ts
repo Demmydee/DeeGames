@@ -20,8 +20,30 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
+export const guestLogin = async (_req: Request, res: Response) => {
+  try {
+    const result = authService.createGuestSession();
+    res.status(200).json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to start guest demo' });
+  }
+};
+
 export const getMe = async (req: any, res: Response) => {
   try {
+    if (req.user?.is_guest) {
+      return res.status(200).json({
+        user: {
+          id: req.user.id,
+          username: req.user.username,
+          email: req.user.email,
+          is_guest: true,
+          full_name: 'Guest Demo Player',
+          avatar_url: '',
+          kyc_status: 'guest'
+        }
+      });
+    }
     const user = await authService.getUserById(req.user.id);
     res.status(200).json({ user });
   } catch (error: any) {

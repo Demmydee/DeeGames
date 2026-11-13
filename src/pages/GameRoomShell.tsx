@@ -2,26 +2,18 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Users, 
   Gamepad2, 
-  Trophy, 
-  ChevronLeft, 
   Loader2, 
   AlertCircle,
   MessageSquare,
-  Settings,
   LogOut,
   Shield,
   Clock,
   Zap,
-  ShieldAlert,
-  Mic,
-  MicOff,
-  Volume2
+  Bot
 } from 'lucide-react';
-import { matchApi, gameApi } from '../services/multiplayerApi';
+import { matchApi, gameApi, demoApi } from '../services/multiplayerApi';
 import { Match } from '../types/multiplayer';
-import { useAuth } from '../context/AuthContext';
 import VoiceChat from '../components/VoiceChat';
 import Chat from '../components/Chat';
 import ReportModal from '../components/ReportModal';
@@ -34,7 +26,6 @@ import MatchResultScreen from '../components/MatchResultScreen';
 const GameRoomShell: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +33,9 @@ const GameRoomShell: React.FC = () => {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [reportingPlayer, setReportingPlayer] = useState<{ id: string, username: string } | null>(null);
   const [matchResult, setMatchResult] = useState<any>(null);
+  const [demoRoundKey, setDemoRoundKey] = useState(0);
+
+  const isDemo = Boolean(id?.startsWith('demo-') || match?.is_demo);
 
   const fetchMatch = useCallback(async () => {
     if (!id) return;
@@ -49,7 +43,6 @@ const GameRoomShell: React.FC = () => {
       const data = await matchApi.getById(id);
       setMatch(data);
       if (data.status === 'finished' || data.status === 'cancelled') {
-        // If finished, try to fetch result
         try {
           const result = await gameApi.getResult(id);
           setMatchResult(result);
@@ -58,7 +51,7 @@ const GameRoomShell: React.FC = () => {
         }
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to load match');
+      setError(err.response?.data?.error || err.message || 'Failed to load match');
     } finally {
       setLoading(false);
     }
@@ -66,18 +59,17 @@ const GameRoomShell: React.FC = () => {
 
   useEffect(() => {
     fetchMatch();
-    const interval = setInterval(fetchMatch, 5000);
+    const interval = setInterval(fetchMatch, id?.startsWith('demo-') ? 1500 : 5000);
     
-    // Heartbeat for presence
     const heartbeatInterval = setInterval(async () => {
-      if (id) {
+      if (id && !id.startsWith('demo-')) {
         try {
           await matchApi.updatePresence(id);
         } catch (err) {
           console.error('Heartbeat failed');
         }
       }
-    }, 10000); // Every 10 seconds
+    }, 10000);
 
     return () => {
       clearInterval(interval);
@@ -91,9 +83,25 @@ const GameRoomShell: React.FC = () => {
       await gameApi.leave(id!);
       navigate('/lobby');
     } catch (err: any) {
-      alert(err.message);
+      if (isDemo) {
+        navigate('/lobby');
+        return;
+      }
+      setError(err.response?.data?.error || err.message);
       setLeaving(false);
       setShowLeaveConfirm(false);
+    }
+  };
+
+  const handlePlayAgain = async () => {
+    if (!id || !isDemo) return;
+    try {
+      const restarted = await demoApi.restartMatch(id);
+      setMatchResult(null);
+      setMatch(restarted);
+      setDemoRoundKey((prev) => prev + 1);
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.message || 'Failed to restart demo match');
     }
   };
 
@@ -140,45 +148,49 @@ const GameRoomShell: React.FC = () => {
                 {match.game_type?.name}
               </h2>
               <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">
-                {match.room?.name} Arena
+                {match.room?.name} {isDemo ? 'Room' : 'Arena'}
               </p>
             </div>
           </div>
           <div className="h-8 w-px bg-white/10 mx-2" />
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Live</span>
-          </div>
+          {isDemo ? (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
+              <Bot className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-[10px] font-bold text-amber-300 uppercase tracking-widest whitespace-nowrap">Demo vs Bot</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Live</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-6 mr-4">
             <div className="text-center">
-              <div className="text-xs font-black text-white">₦{totalPrizePool.toLocaleString()}</div>
-              <div className="text-[8px] text-gray-500 uppercase tracking-widest">Prize Pool</div>
+              <div className="text-xs font-black text-white">{isDemo ? 'FREE' : `₦${totalPrizePool.toLocaleString()}`}</div>
+              <div className="text-[8px] text-gray-500 uppercase tracking-widest">{isDemo ? 'Practice Mode' : 'Prize Pool'}</div>
             </div>
             <div className="text-center">
               <div className="text-xs font-black text-white">{totalParticipants}</div>
               <div className="text-[8px] text-gray-500 uppercase tracking-widest">Players</div>
             </div>
           </div>
-          <button className="p-2 rounded-lg hover:bg-white/5 text-gray-400 transition-colors">
-            <Settings className="w-5 h-5" />
-          </button>
           <button 
-            onClick={() => setShowLeaveConfirm(true)}
+            onClick={() => (isDemo ? handleLeave() : setShowLeaveConfirm(true))}
             disabled={leaving}
-            className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-xs font-bold uppercase tracking-widest transition-all border border-red-500/20"
+            className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-xs font-bold uppercase tracking-widest transition-all border border-red-500/20 whitespace-nowrap"
           >
             {leaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
-            <span>Leave</span>
+            <span>{isDemo ? 'Exit Demo' : 'Leave'}</span>
           </button>
         </div>
       </div>
 
-      {/* Leave Confirmation Modal */}
+      {/* Leave Confirmation Modal (PvP only) */}
       <AnimatePresence>
-        {showLeaveConfirm && (
+        {showLeaveConfirm && !isDemo && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -219,10 +231,22 @@ const GameRoomShell: React.FC = () => {
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Game Viewport */}
         <div className="flex-1 relative bg-black flex flex-col overflow-hidden">
-          {/* Voice Chat Integrated Bar */}
+          {/* Voice Chat / Demo Bar */}
           <div className="px-6 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-center">
             <div className="w-full max-w-4xl">
-              <VoiceChat matchId={id!} />
+              {isDemo ? (
+                <div className="flex items-center justify-between gap-4 text-xs">
+                  <div className="flex items-center gap-2.5 text-emerald-400 font-bold">
+                    <Bot className="w-4 h-4 shrink-0" />
+                    <span>Instant Demo Room · Opponent: DeeBot (AI)</span>
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500">
+                    No Wagers · Practice Session
+                  </span>
+                </div>
+              ) : (
+                <VoiceChat matchId={id!} />
+              )}
             </div>
           </div>
           
@@ -230,27 +254,32 @@ const GameRoomShell: React.FC = () => {
           <div className="flex-1 w-full flex items-start justify-center pt-8 overflow-hidden md:overflow-y-auto">
             {match.game_type?.name.toLowerCase().includes('dice') ? (
               <DiceGameUI 
+                key={`dice-${demoRoundKey}`}
                 matchId={id!} 
                 matchParticipants={match.participants}
                 onGameEnd={(result) => setMatchResult(result)} 
               />
             ) : match.game_type?.name.toLowerCase().includes('chess') ? (
               <ChessGameUI
+                key={`chess-${demoRoundKey}`}
                 matchId={id!}
                 matchParticipants={match.participants}
                 onGameEnd={(result) => setMatchResult(result)}
               />
             ) : match.game_type?.name.toLowerCase().includes('ludo') ? (
               <LudoGameUI
+                key={`ludo-${demoRoundKey}`}
                 matchId={id!}
                 matchParticipants={match.participants}
                 onGameEnd={(result) => setMatchResult(result)}
               />
             ) : match.game_type?.name.toLowerCase().includes('whot') ? (
               <WhotGameUI
+                key={`whot-${demoRoundKey}`}
                 matchId={id!}
                 match={match}
                 onGameEnd={(result) => setMatchResult(result)}
+                onPlayAgain={isDemo ? handlePlayAgain : undefined}
               />
             ) : (
               <div className="relative z-10 text-center p-8 max-w-lg">
@@ -266,8 +295,7 @@ const GameRoomShell: React.FC = () => {
                     Game Engine Shell
                   </h1>
                   <p className="text-gray-400 text-lg leading-relaxed">
-                    The multiplayer orchestration is active. Wagers are locked. 
-                    The {match.game_type?.name} module will be plugged in here in the next phase.
+                    The multiplayer orchestration is active.
                   </p>
                 </motion.div>
 
@@ -286,28 +314,45 @@ const GameRoomShell: React.FC = () => {
               </div>
             )}
           </div>
-
-          {/* HUD Elements */}
-          <div className="absolute bottom-8 left-8 right-8 flex justify-between items-end pointer-events-none">
-            {/* Presence info will be moved to DiceGameUI */}
-          </div>
         </div>
 
-        {/* Sidebar (Chat/Log) */}
+        {/* Sidebar (Chat/Log or Demo Info) */}
         <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-white/10 bg-black/20 flex flex-col">
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-emerald-500" />
-                <span className="text-xs font-black uppercase tracking-widest text-white/60">Match Chat</span>
+          {isDemo ? (
+            <div className="flex-1 p-6 space-y-6">
+              <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+                <Bot className="w-4 h-4 text-emerald-500" />
+                <span className="text-xs font-black uppercase tracking-widest text-white/70">Bot Match Info</span>
               </div>
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2 text-xs text-gray-300">
+                <p className="font-bold text-white">DeeBot (AI) is active</p>
+                <p className="text-gray-400 leading-relaxed">
+                  You are playing a live engine match against our automated opponent. Every turn runs the same server rules as real multiplayer arenas.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handlePlayAgain}
+                className="w-full py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-black uppercase tracking-widest text-white transition-all"
+              >
+                Reset Demo Match
+              </button>
             </div>
-            <Chat 
-              contextType="match" 
-              contextId={id!} 
-              className="flex-1 border-0 rounded-none bg-transparent" 
-            />
-          </div>
+          ) : (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-emerald-500" />
+                  <span className="text-xs font-black uppercase tracking-widest text-white/60">Match Chat</span>
+                </div>
+              </div>
+              <Chat 
+                contextType="match" 
+                contextId={id!} 
+                className="flex-1 border-0 rounded-none bg-transparent" 
+              />
+            </div>
+          )}
 
           <div className="h-48 border-t border-white/10 flex flex-col overflow-hidden bg-black/40">
             <div className="p-3 border-b border-white/10 flex items-center gap-2">
@@ -316,7 +361,7 @@ const GameRoomShell: React.FC = () => {
             </div>
             <div className="flex-1 p-4 overflow-y-auto space-y-2">
               <div className="text-[9px] text-emerald-500/60 font-mono">
-                [{new Date(match.started_at).toLocaleTimeString()}] Match started
+                [{new Date(match.started_at).toLocaleTimeString()}] {isDemo ? 'Demo match started' : 'Match started'}
               </div>
               {match.participants?.map((p) => (
                 <div key={p.id} className="text-[9px] text-gray-600 font-mono">
@@ -347,6 +392,7 @@ const GameRoomShell: React.FC = () => {
             result={matchResult} 
             onClose={() => setMatchResult(null)} 
             onExit={handleLeave}
+            onPlayAgain={isDemo ? handlePlayAgain : undefined}
           />
         )}
       </AnimatePresence>

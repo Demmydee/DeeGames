@@ -1,17 +1,18 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Trophy, 
   User, 
   Loader2, 
   AlertCircle, 
-  ChevronRight, 
   Volume2, 
   VolumeX,
-  CreditCard,
   Hand,
   Layers,
-  ArrowRight
+  ArrowRight,
+  RotateCcw,
+  UserPlus
 } from 'lucide-react';
 import { gameApi } from '../services/multiplayerApi';
 import { useAuth } from '../context/AuthContext';
@@ -101,13 +102,16 @@ interface WhotGameUIProps {
   matchId: string;
   match: any;
   onGameEnd?: (winnerId: string | null) => void;
+  onPlayAgain?: () => void;
 }
 
-export const WhotGameUI: React.FC<WhotGameUIProps> = ({ matchId, match, onGameEnd }) => {
-  const { user } = useAuth();
+export const WhotGameUI: React.FC<WhotGameUIProps> = ({ matchId, match, onGameEnd, onPlayAgain }) => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [gameState, setGameState] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
   const [moveLoading, setMoveLoading] = useState(false);
   const [showSuitSelector, setShowSuitSelector] = useState(false);
   const [pendingCardToPlay, setPendingCardToPlay] = useState<any>(null);
@@ -140,9 +144,9 @@ export const WhotGameUI: React.FC<WhotGameUIProps> = ({ matchId, match, onGameEn
 
   useEffect(() => {
     fetchGameState();
-    const interval = setInterval(fetchGameState, 3000);
+    const interval = setInterval(fetchGameState, matchId.startsWith('demo-') ? 1000 : 3000);
     return () => clearInterval(interval);
-  }, [fetchGameState]);
+  }, [fetchGameState, matchId]);
 
   useEffect(() => {
     if (!gameState || gameState.status !== 'active') return;
@@ -184,6 +188,7 @@ export const WhotGameUI: React.FC<WhotGameUIProps> = ({ matchId, match, onGameEn
     }
 
     setMoveLoading(true);
+    setMoveError(null);
     try {
       await gameApi.processMove(matchId, {
         type: 'play_card',
@@ -191,7 +196,7 @@ export const WhotGameUI: React.FC<WhotGameUIProps> = ({ matchId, match, onGameEn
       });
       await fetchGameState();
     } catch (err: any) {
-      alert(err.message);
+      setMoveError(err.response?.data?.error || err.message);
     } finally {
       setMoveLoading(false);
     }
@@ -201,6 +206,7 @@ export const WhotGameUI: React.FC<WhotGameUIProps> = ({ matchId, match, onGameEn
     if (!pendingCardToPlay) return;
     
     setMoveLoading(true);
+    setMoveError(null);
     setShowSuitSelector(false);
     try {
       await gameApi.processMove(matchId, {
@@ -211,7 +217,7 @@ export const WhotGameUI: React.FC<WhotGameUIProps> = ({ matchId, match, onGameEn
       setPendingCardToPlay(null);
       await fetchGameState();
     } catch (err: any) {
-      alert(err.message);
+      setMoveError(err.response?.data?.error || err.message);
     } finally {
       setMoveLoading(false);
     }
@@ -220,11 +226,12 @@ export const WhotGameUI: React.FC<WhotGameUIProps> = ({ matchId, match, onGameEn
   const handlePickCard = async () => {
     if (moveLoading) return;
     setMoveLoading(true);
+    setMoveError(null);
     try {
       await gameApi.processMove(matchId, { type: 'pick_card' });
       await fetchGameState();
     } catch (err: any) {
-      alert(err.message);
+      setMoveError(err.response?.data?.error || err.message);
     } finally {
       setMoveLoading(false);
     }
@@ -401,6 +408,13 @@ export const WhotGameUI: React.FC<WhotGameUIProps> = ({ matchId, match, onGameEn
 
         {/* Turn Indicators & Alerts */}
         <div className="flex flex-col items-center gap-4 text-center mt-4">
+           {moveError && (
+             <div className="bg-red-500/15 border border-red-500/30 text-red-400 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2">
+               <AlertCircle className="w-4 h-4 shrink-0" />
+               <span>{moveError}</span>
+             </div>
+           )}
+
            {gameState.pendingPenalty && (
              <motion.div 
                animate={{ scale: [1, 1.05, 1] }}
@@ -576,13 +590,34 @@ export const WhotGameUI: React.FC<WhotGameUIProps> = ({ matchId, match, onGameEn
                  ))}
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex flex-wrap justify-center gap-4">
+                  {onPlayAgain && (
+                    <button
+                      onClick={onPlayAgain}
+                      className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-widest transition-all flex items-center gap-2 whitespace-nowrap"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Play Again vs Bot</span>
+                    </button>
+                  )}
                   <button 
-                    onClick={() => window.location.href = '/lobby'}
-                    className="px-12 py-4 bg-zinc-800 text-white rounded-2xl font-black uppercase tracking-widest transition-all hover:bg-zinc-700"
+                    onClick={() => navigate('/lobby')}
+                    className="px-8 py-4 bg-zinc-800 text-white rounded-2xl font-black uppercase tracking-widest transition-all hover:bg-zinc-700 whitespace-nowrap"
                   >
                     Return to Lobby
                   </button>
+                  {user?.is_guest && (
+                    <button
+                      onClick={() => {
+                        logout();
+                        navigate('/register');
+                      }}
+                      className="px-8 py-4 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl font-black uppercase tracking-widest transition-all flex items-center gap-2 whitespace-nowrap"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      <span>Create Account</span>
+                    </button>
+                  )}
               </div>
            </div>
         </div>

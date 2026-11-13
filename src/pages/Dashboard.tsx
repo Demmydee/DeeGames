@@ -1,35 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
-import {
-  Wallet,
-  Trophy,
-  History,
-  Settings,
-  Gamepad2,
-  ArrowUpRight,
-  ArrowDownLeft,
-  User,
-  ChevronRight,
-  Building2,
-  Loader2,
-  AlertCircle,
+import { 
+  Wallet, 
+  Trophy, 
+  History, 
+  Settings, 
+  Gamepad2, 
+  ArrowUpRight, 
+  ChevronRight, 
+  Building2, 
+  Loader2, 
   Play,
   Users,
   HelpCircle,
   MessageSquare,
-  UserPlus
+  UserPlus,
+  Lock,
+  Bot
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '../api/client';
 import { dashboardApi, socialApi, friendApi } from '../services/multiplayerApi';
 import { DashboardStatus } from '../types/multiplayer';
-
+import InstantDemoSection from '../components/InstantDemoSection';
 import ErrorMessage from '../components/ui/ErrorMessage';
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const isGuest = Boolean(user?.is_guest);
   const [wallet, setWallet] = useState<any>(null);
   const [status, setStatus] = useState<DashboardStatus | null>(null);
   const [recentOpponents, setRecentOpponents] = useState<any[]>([]);
@@ -40,6 +40,12 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!user) return;
+    if (isGuest) {
+      setLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       try {
         const results = await Promise.allSettled([
@@ -84,10 +90,10 @@ const Dashboard = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [user, isGuest]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || isGuest) return;
 
     const pollFriends = async () => {
       try {
@@ -101,15 +107,20 @@ const Dashboard = () => {
     // Poll every 10 seconds to keep friends status live
     const interval = setInterval(pollFriends, 10000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, isGuest]);
 
   const handleAddFriend = async (userId: string) => {
     try {
       await friendApi.sendRequest(userId);
-      alert('Friend request sent!');
+      setError(null);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
     }
+  };
+
+  const handleUpgradeAccount = () => {
+    logout();
+    navigate('/register');
   };
 
   const isOnline = (lastSeenAt: string | null) => {
@@ -128,7 +139,7 @@ const Dashboard = () => {
   };
 
   const stats = [
-    { label: 'Wallet Balance', value: loading ? '...' : formatCurrency(wallet?.available_balance || 0), icon: Wallet, color: 'text-green-500', link: '/wallet' },
+    { label: 'Wallet Balance', value: isGuest ? 'Locked (Demo)' : (loading ? '...' : formatCurrency(wallet?.available_balance || 0)), icon: Wallet, color: 'text-green-500', link: isGuest ? '#' : '/wallet' },
     { label: 'Games Won', value: '0', icon: Trophy, color: 'text-orange-500', link: '#' },
     { label: 'Total Wagered', value: '₦0.00', icon: History, color: 'text-blue-500', link: '#' },
   ];
@@ -138,13 +149,52 @@ const Dashboard = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-12"
+        className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4"
       >
-        <h1 className="text-4xl font-black uppercase italic mb-2">
-          Welcome back, <span className="text-orange-500">{user?.username}</span>!
-        </h1>
-        <p className="text-neutral-400">Ready for your next challenge?</p>
+        <div>
+          <h1 className="text-4xl font-black uppercase italic mb-2">
+            Welcome{isGuest ? '' : ' back'}, <span className="text-orange-500">{user?.username}</span>!
+          </h1>
+          <p className="text-neutral-400">
+            {isGuest
+              ? 'Guest Demo Mode active — try Whot, Ludo, or Dice against DeeBot AI.'
+              : 'Ready for your next challenge?'}
+          </p>
+        </div>
+
+        {isGuest && (
+          <button
+            type="button"
+            onClick={handleUpgradeAccount}
+            className="px-6 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-black uppercase tracking-widest text-xs transition-all flex items-center gap-2 whitespace-nowrap shrink-0 self-start md:self-auto"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Register Full Account</span>
+          </button>
+        )}
       </motion.div>
+
+      {isGuest && (
+        <div className="mb-8 p-5 rounded-3xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <Bot className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-wider text-amber-300">
+                Limited Guest Demo Session
+              </h2>
+              <p className="text-xs text-neutral-300 mt-1">
+                You can test Whot, Ludo, and Dice in the Instant Demo Room vs DeeBot AI. Real-money wagers, wallet deposits/withdrawals, Cliques, and live PvP matches require a registered account.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/lobby"
+            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-xs transition-all whitespace-nowrap shrink-0 text-center"
+          >
+            Open Demo Lobby
+          </Link>
+        </div>
+      )}
 
       <ErrorMessage message={error} className="mb-8" />
 
@@ -156,20 +206,31 @@ const Dashboard = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="bg-neutral-900 border border-neutral-800 p-6 rounded-3xl group hover:border-orange-500/50 transition-all"
+            className={`bg-neutral-900 border border-neutral-800 p-6 rounded-3xl group transition-all ${
+              isGuest && stat.label === 'Wallet Balance' ? 'opacity-70' : 'hover:border-orange-500/50'
+            }`}
           >
             <Link to={stat.link} className="block">
               <div className="flex justify-between items-start mb-4">
                 <div className={`p-3 rounded-2xl bg-neutral-950 ${stat.color}`}>
                   <stat.icon className="w-6 h-6" />
                 </div>
-                <ArrowUpRight className="w-5 h-5 text-neutral-700 group-hover:text-orange-500 transition-colors" />
+                {isGuest && stat.label === 'Wallet Balance' ? (
+                  <Lock className="w-5 h-5 text-neutral-600" />
+                ) : (
+                  <ArrowUpRight className="w-5 h-5 text-neutral-700 group-hover:text-orange-500 transition-colors" />
+                )}
               </div>
               <p className="text-neutral-500 text-sm font-medium mb-1">{stat.label}</p>
               <p className="text-3xl font-black">{stat.value}</p>
             </Link>
           </motion.div>
         ))}
+      </div>
+
+      {/* Instant Demo Room Play vs Bot Launcher */}
+      <div className="mb-12">
+        <InstantDemoSection compact />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -180,8 +241,31 @@ const Dashboard = () => {
               <Gamepad2 className="w-6 h-6 text-orange-500" />
               Multiplayer Arena
             </h2>
-
-            {status?.active ? (
+            
+            {isGuest ? (
+              <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-10 text-center space-y-4">
+                <Lock className="w-10 h-10 text-neutral-600 mx-auto" />
+                <h3 className="text-lg font-bold text-white">Live PvP Arena Locked for Guests</h3>
+                <p className="text-neutral-400 text-sm max-w-md mx-auto">
+                  Use the Instant Demo Room above to play against DeeBot AI, or create an account to wager and compete against real players.
+                </p>
+                <div className="flex flex-wrap justify-center gap-3 pt-2">
+                  <Link
+                    to="/lobby"
+                    className="bg-neutral-800 hover:bg-neutral-700 text-white px-6 py-2.5 rounded-full font-bold text-sm transition-all"
+                  >
+                    Browse Lobby
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleUpgradeAccount}
+                    className="bg-orange-600 hover:bg-orange-500 text-white px-6 py-2.5 rounded-full font-bold text-sm transition-all"
+                  >
+                    Create Account
+                  </button>
+                </div>
+              </div>
+            ) : status?.active ? (
               <div className="bg-neutral-900 border border-orange-500/30 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-6">
                   <div className="p-4 rounded-2xl bg-orange-500/10 text-orange-500">
@@ -196,7 +280,7 @@ const Dashboard = () => {
                     </p>
                   </div>
                 </div>
-                <button
+                <button 
                   onClick={() => navigate(status.type === 'match' ? `/match/${status.id}` : `/lobby/room/${status.details?.room_category_id}`)}
                   className="px-8 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-orange-900/20"
                 >
@@ -206,7 +290,7 @@ const Dashboard = () => {
             ) : (
               <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-12 text-center">
                 <p className="text-neutral-500 mb-6">You are not currently in any active game or request.</p>
-                <Link
+                <Link 
                   to="/lobby"
                   className="inline-block bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 rounded-full font-bold transition-all shadow-lg shadow-orange-900/20"
                 >
@@ -222,10 +306,16 @@ const Dashboard = () => {
                 <Users className="w-6 h-6 text-orange-500" />
                 Recent Opponents
               </div>
-              <Link to="/cliques" className="text-sm text-orange-500 hover:underline font-bold uppercase tracking-widest">View All</Link>
+              {!isGuest && (
+                <Link to="/cliques" className="text-sm text-orange-500 hover:underline font-bold uppercase tracking-widest">View All</Link>
+              )}
             </h2>
             <div className="bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden">
-              {recentOpponents.length === 0 ? (
+              {isGuest ? (
+                <div className="p-8 text-center text-neutral-500 text-sm">
+                  Social features and opponent history are available for registered accounts.
+                </div>
+              ) : recentOpponents.length === 0 ? (
                 <div className="p-8 text-center text-neutral-500">
                   Your recent opponents will appear here after you play some matches.
                 </div>
@@ -242,7 +332,7 @@ const Dashboard = () => {
                           <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Matched recently</p>
                         </div>
                       </div>
-                      <button
+                      <button 
                         onClick={() => handleAddFriend(opp.id)}
                         className="p-2 rounded-lg bg-neutral-800 hover:bg-orange-600 text-neutral-400 hover:text-white transition-all"
                         title="Add Friend"
@@ -259,33 +349,53 @@ const Dashboard = () => {
 
         {/* Sidebar Actions */}
         <div className="space-y-6">
-          <div className="bg-orange-600 rounded-3xl p-6 text-white">
-            <h3 className="text-xl font-black uppercase mb-4">Quick Deposit</h3>
-            <p className="text-orange-100 text-sm mb-6">Fund your wallet to start wagering against other players.</p>
-            <Link
-              to="/deposit"
-              className="w-full bg-white text-orange-600 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-orange-50 transition-colors"
-            >
-              <ArrowUpRight className="w-5 h-5" />
-              Deposit Now
-            </Link>
-          </div>
+          {isGuest ? (
+            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 text-white">
+              <div className="flex items-center gap-2 text-amber-400 text-xs font-black uppercase tracking-widest mb-2">
+                <Lock className="w-4 h-4" />
+                <span>Wallet Locked</span>
+              </div>
+              <h3 className="text-xl font-black uppercase mb-3">Unlock Real Wagers</h3>
+              <p className="text-neutral-400 text-sm mb-5">Create a verified DeeGames account to deposit funds, wager with friends, and withdraw winnings.</p>
+              <button 
+                type="button"
+                onClick={handleUpgradeAccount}
+                className="w-full bg-orange-600 hover:bg-orange-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
+              >
+                <UserPlus className="w-5 h-5" />
+                <span>Register Account</span>
+              </button>
+            </div>
+          ) : (
+            <div className="bg-orange-600 rounded-3xl p-6 text-white">
+              <h3 className="text-xl font-black uppercase mb-4">Quick Deposit</h3>
+              <p className="text-orange-100 text-sm mb-6">Fund your wallet to start wagering against other players.</p>
+              <Link 
+                to="/deposit"
+                className="w-full bg-white text-orange-600 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-orange-50 transition-colors"
+              >
+                <ArrowUpRight className="w-5 h-5" />
+                Deposit Now
+              </Link>
+            </div>
+          )}
 
           <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6">
             <h3 className="text-xl font-bold mb-4">Quick Navigation</h3>
             <div className="space-y-2">
-              <div
-                className="relative"
-                onMouseEnter={() => setFriendsHovered(true)}
-                onMouseLeave={() => setFriendsHovered(false)}
-              >
+              {!isGuest && (
+                <div 
+                  className="relative"
+                  onMouseEnter={() => setFriendsHovered(true)}
+                  onMouseLeave={() => setFriendsHovered(false)}
+                >
                 <div className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
                   <Link to="/cliques" className="flex items-center gap-3 flex-1">
                     <Users className="w-5 h-5 animate-pulse text-emerald-500" />
                     <span>Cliques</span>
                   </Link>
                   <div className="flex items-center gap-2 relative z-50">
-                    <button
+                    <button 
                       onClick={() => setShowFriendsPopup(!showFriendsPopup)}
                       className="relative px-2.5 py-1 rounded-full bg-emerald-500/10 text-[10px] font-black text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer flex items-center gap-1.5"
                     >
@@ -302,9 +412,9 @@ const Dashboard = () => {
                 </div>
 
                 {showFriendsPopup && (
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowFriendsPopup(false)}
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setShowFriendsPopup(false)} 
                   />
                 )}
 
@@ -361,6 +471,7 @@ const Dashboard = () => {
                   )}
                 </AnimatePresence>
               </div>
+              )}
               <Link to="/faq" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
                 <span className="flex items-center gap-3">
                   <HelpCircle className="w-5 h-5" /> FAQ
@@ -376,29 +487,31 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6">
-            <h3 className="text-xl font-bold mb-4">Account Settings</h3>
-            <div className="space-y-2">
-              <Link to="/wallet" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
-                <span className="flex items-center gap-3">
-                  <Wallet className="w-5 h-5" /> Wallet
-                </span>
-                <ChevronRight className="w-4 h-4" />
-              </Link>
-              <Link to="/payout-accounts" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
-                <span className="flex items-center gap-3">
-                  <Building2 className="w-5 h-5" /> Payout Accounts
-                </span>
-                <ChevronRight className="w-4 h-4" />
-              </Link>
-              <button className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
-                <span className="flex items-center gap-3">
-                  <Settings className="w-5 h-5" /> Security
-                </span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
+          {!isGuest && (
+            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6">
+              <h3 className="text-xl font-bold mb-4">Account Settings</h3>
+              <div className="space-y-2">
+                <Link to="/wallet" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
+                  <span className="flex items-center gap-3">
+                    <Wallet className="w-5 h-5" /> Wallet
+                  </span>
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+                <Link to="/payout-accounts" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
+                  <span className="flex items-center gap-3">
+                    <Building2 className="w-5 h-5" /> Payout Accounts
+                  </span>
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+                <Link to="/profile" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-neutral-800 transition-colors text-neutral-300">
+                  <span className="flex items-center gap-3">
+                    <Settings className="w-5 h-5" /> Profile &amp; Security
+                  </span>
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

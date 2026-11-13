@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/client';
 import { motion } from 'motion/react';
 import { User, Shield, Phone, Mail, UserCheck, Save, AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
+import GuestRestrictedNotice from '../components/GuestRestrictedNotice';
 
 const AVATAR_OPTIONS = [
   'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=150&auto=format&fit=crop&q=80', // Gamer 1
@@ -16,7 +17,15 @@ const AVATAR_OPTIONS = [
 export default function Profile() {
   const { user, updateUser, refreshUser } = useAuth();
 
-  // Guard if not loaded
+  const [username, setUsername] = useState(user?.username || '');
+  const [fullName, setFullName] = useState(user?.full_name || '');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || '');
+
+  const [saving, setSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
   if (!user) {
     return (
       <div className="min-h-screen bg-neutral-950 flex items-center justify-center p-4">
@@ -27,14 +36,9 @@ export default function Profile() {
     );
   }
 
-  const [username, setUsername] = useState(user.username || '');
-  const [fullName, setFullName] = useState(user.full_name || '');
-  const [phone, setPhone] = useState(user.phone || '');
-  const [avatarUrl, setAvatarUrl] = useState(user.avatar_url || '');
-
-  const [saving, setSaving] = useState(false);
-  const [successMsg, setSuccessMsg] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  if (user.is_guest) {
+    return <GuestRestrictedNotice featureName="Profile Settings" />;
+  }
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,16 +99,16 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-neutral-950 py-12 px-4 sm:px-6 lg:px-8 font-sans">
       <div className="max-w-4xl mx-auto">
-
+        
         {/* Banner header */}
         <div className="relative mb-8 rounded-3xl bg-neutral-900 border border-neutral-800 p-6 md:p-8 overflow-hidden flex flex-col md:flex-row items-center gap-6 justify-between select-none">
           <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 via-transparent to-transparent opacity-40 pointer-events-none" />
           <div className="flex items-center gap-5 relative z-10">
             <div className="relative">
               {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt="Avatar"
+                <img 
+                  src={avatarUrl} 
+                  alt="Avatar" 
                   referrerPolicy="no-referrer"
                   className="w-20 h-20 rounded-2xl object-cover border-2 border-orange-500/30 shadow-xl"
                 />
@@ -130,7 +134,7 @@ export default function Profile() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-
+          
           {/* Main profile form */}
           <div className="md:col-span-2 bg-neutral-900 border border-neutral-800 rounded-3xl p-6 md:p-8 shadow-xl">
             <h2 className="text-lg font-black uppercase tracking-wider text-neutral-200 mb-6 border-b border-white/5 pb-3">
@@ -138,7 +142,7 @@ export default function Profile() {
             </h2>
 
             <form onSubmit={handleUpdate} className="space-y-5">
-
+              
               {/* Alert Notifications */}
               {successMsg && (
                 <div className="flex items-center gap-2.5 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold font-sans">
@@ -266,7 +270,7 @@ export default function Profile() {
               <h3 className="text-sm font-black uppercase tracking-widest text-neutral-300 mb-4 border-b border-white/5 pb-2">
                 Epic Identity
               </h3>
-
+              
               <div className="space-y-4">
                 <div>
                   <span className="block text-[8px] font-black uppercase tracking-widest text-neutral-500">Registered Email</span>

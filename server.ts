@@ -23,6 +23,7 @@ import presenceRoutes from "./server/routes/presenceRoutes";
 import socialRoutes from "./server/routes/socialRoutes";
 import gameRoutes from "./server/routes/gameRoutes";
 import adminRoutes from "./server/routes/adminRoutes";
+import demoRoutes from "./server/routes/demoRoutes";
 import { HeartbeatService } from "./server/services/heartbeatService";
 import { AdminDbInitService } from "./server/services/adminDbInitService";
 
@@ -62,6 +63,7 @@ async function startServer() {
   app.use("/api/presence", presenceRoutes);
   app.use("/api/social", socialRoutes);
   app.use("/api/admin", adminRoutes);
+  app.use("/api/demo", demoRoutes);
   
   // Debug log for game routes
   app.use("/api/game", (req, res, next) => {

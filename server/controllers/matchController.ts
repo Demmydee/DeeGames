@@ -12,6 +12,9 @@ export const getMatchById = async (req: Request, res: Response) => {
 
 export const leaveMatch = async (req: Request, res: Response) => {
   try {
+    if ((req as any).user?.is_guest) {
+      return res.status(403).json({ error: 'Guest demo accounts cannot access live multiplayer matches.' });
+    }
     const userId = (req as any).user.id;
     const result = await matchService.leaveMatch(userId, req.params.id);
     res.json(result);
@@ -22,6 +25,9 @@ export const leaveMatch = async (req: Request, res: Response) => {
 
 export const updateMatchPresence = async (req: Request, res: Response) => {
   try {
+    if ((req as any).user?.is_guest) {
+      return res.json({ success: true, is_guest: true });
+    }
     const userId = (req as any).user.id;
     const result = await matchService.updateMatchPresence(userId, req.params.id);
     res.json(result);
@@ -32,6 +38,9 @@ export const updateMatchPresence = async (req: Request, res: Response) => {
 
 export const getUserActiveMatch = async (req: Request, res: Response) => {
   try {
+    if ((req as any).user?.is_guest) {
+      return res.json(null);
+    }
     const userId = (req as any).user.id;
     const match = await matchService.getUserActiveMatch(userId);
     res.json(match);

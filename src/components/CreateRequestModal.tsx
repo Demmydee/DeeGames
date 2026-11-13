@@ -44,10 +44,11 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
         const data = await lobbyApi.getGameTypes();
         setGameTypes(data);
         if (data.length > 0) {
+          const initialGame = data.find((g) => !g.name.toLowerCase().includes('chess')) || data[0];
           setFormData(prev => ({ 
             ...prev, 
-            game_type_id: data[0].id,
-            required_players: data[0].min_players
+            game_type_id: initialGame.id,
+            required_players: initialGame.min_players
           }));
         }
       } catch (err: any) {
@@ -191,23 +192,40 @@ const CreateRequestModal: React.FC<Props> = ({ room, onClose, onSuccess }) => {
                     <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
                   </div>
                 ) : (
-                  gameTypes.map((game) => (
-                    <button
-                      key={game.id}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, game_type_id: game.id })}
-                      className={`p-4 rounded-xl border-2 text-left transition-all ${
-                        formData.game_type_id === game.id 
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white' 
-                          : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
-                      }`}
-                    >
-                      <div className="font-bold text-sm mb-1">{game.name}</div>
-                      <div className="text-[10px] opacity-60 uppercase tracking-wider">
-                        {game.min_players}-{game.max_players} Players
-                      </div>
-                    </button>
-                  ))
+                  gameTypes.map((game) => {
+                    const isChess = game.name.toLowerCase().includes('chess');
+                    return (
+                      <button
+                        key={game.id}
+                        type="button"
+                        disabled={isChess}
+                        onClick={() => {
+                          if (!isChess) {
+                            setFormData({ ...formData, game_type_id: game.id });
+                          }
+                        }}
+                        className={`p-4 rounded-xl border-2 text-left transition-all relative ${
+                          isChess
+                            ? 'border-white/5 bg-white/[0.02] text-gray-500 opacity-60 cursor-not-allowed'
+                            : formData.game_type_id === game.id 
+                              ? 'border-emerald-500 bg-emerald-500/10 text-white' 
+                              : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <div className="font-bold text-sm">{game.name}</div>
+                          {isChess && (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[9px] font-black uppercase tracking-wider whitespace-nowrap">
+                              Coming Soon
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] opacity-60 uppercase tracking-wider">
+                          {isChess ? 'Temporarily paused' : `${game.min_players}-${game.max_players} Players`}
+                        </div>
+                      </button>
+                    );
+                  })
                 )}
               </div>
             </div>

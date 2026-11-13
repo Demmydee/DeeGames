@@ -1,4 +1,49 @@
 import { supabase, supabaseAuth } from '../config/supabase';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import { GUEST_JWT_SECRET } from '../middleware/auth';
+
+export const DEMO_ACCOUNT = {
+  username: 'demo_player',
+  email: 'demo@deegames.app',
+  password: 'DemoPass123!'
+};
+
+export const createGuestSession = () => {
+  const shortId = crypto.randomBytes(2).toString('hex').toUpperCase();
+  const guestId = `guest-${crypto.randomUUID()}`;
+  const username = `Guest_${shortId}`;
+  const email = `guest_${shortId.toLowerCase()}@demo.deegames.app`;
+
+  const accessToken = jwt.sign(
+    {
+      id: guestId,
+      username,
+      email,
+      is_guest: true
+    },
+    GUEST_JWT_SECRET,
+    { expiresIn: '12h' }
+  );
+
+  return {
+    message: 'Guest demo session started',
+    user: {
+      id: guestId,
+      username,
+      email,
+      is_guest: true,
+      full_name: 'Guest Demo Player',
+      avatar_url: '',
+      kyc_status: 'guest'
+    },
+    session: {
+      access_token: accessToken,
+      token_type: 'bearer',
+      expires_in: 43200
+    }
+  };
+};
 
 export const registerUser = async (userData: any) => {
   const { username, email, phone, password, isAdultConfirmed, termsAccepted } = userData;
@@ -77,7 +122,15 @@ export const registerUser = async (userData: any) => {
 
 export const loginUser = async (identifier: string, password: string) => {
   // Case-insensitive identifier
-  const lowerIdentifier = identifier.toLowerCase();
+  const lowerIdentifier = identifier.trim().toLowerCase();
+
+  // Support pre-filled demo test account directly without Supabase email verification
+  if (
+    (lowerIdentifier === DEMO_ACCOUNT.username || lowerIdentifier === DEMO_ACCOUNT.email) &&
+    password === DEMO_ACCOUNT.password
+  ) {
+    return createGuestSession();
+  }
 
   // Supabase Auth requires email for signInWithPassword
   // If the identifier is a username, we first need to find the email
@@ -146,7 +199,7 @@ export const getUserById = async (id: string) => {
       }
 
       console.warn(`User profile not found in public.users for ID: ${id}. Attempting self-healing sync...`);
-
+      
       // Fallback: Check if we have the service key to use admin methods
       if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
         console.error('Self-healing failed: SUPABASE_SERVICE_ROLE_KEY is missing.');
@@ -155,7 +208,7 @@ export const getUserById = async (id: string) => {
 
       // Check if the user exists in Supabase Auth
       const { data: { user: authUser }, error: authError } = await supabase.auth.admin.getUserById(id);
-
+      
       if (authError || !authUser) {
         console.error(`Self-healing failed: User ${id} does not exist in Auth.`, authError);
         throw { status: 404, message: 'User not found in any system' };
@@ -163,7 +216,7 @@ export const getUserById = async (id: string) => {
 
       // Attempt manual sync to public.users
       const username = COALESCE(
-        authUser.user_metadata?.username,
+        authUser.user_metadata?.username, 
         authUser.email?.split('@')[0],
         `user_${id.substring(0, 8)}`
       );
@@ -237,10 +290,10 @@ export const refreshToken = async (refreshToken: string) => {
 
   return {
     message: 'Session refreshed',
-    user: {
-      id: data.user?.id,
+    user: { 
+      id: data.user?.id, 
       email: data.user?.email,
-      username: data.user?.user_metadata?.username
+      username: data.user?.user_metadata?.username 
     },
     session: data.session
   };
@@ -307,7 +360,7 @@ export const updateUserProfile = async (id: string, updates: { username?: string
         .select('id, username, email, phone, created_at, kyc_status, kyc_verified_at')
         .eq('id', id)
         .single();
-
+      
       if (fetchError) {
         throw { status: 500, message: 'Failed to retrieve profile record' };
       }

@@ -3,6 +3,9 @@ import { supabase, createClientWithToken } from '../config/supabase';
 
 export const getDashboardStatus = async (req: Request, res: Response) => {
   try {
+    if ((req as any).user?.is_guest) {
+      return res.json({ active: false, type: null, id: null, details: null });
+    }
     const userId = (req as any).user.id;
     const token = (req as any).token;
 

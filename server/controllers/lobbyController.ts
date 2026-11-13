@@ -48,6 +48,9 @@ export const getGameTypes = async (req: Request, res: Response) => {
 
 export const updatePresence = async (req: Request, res: Response) => {
   try {
+    if ((req as any).user?.is_guest) {
+      return res.json({ success: true, is_guest: true });
+    }
     const userId = (req as any).user.id;
     const roomId = req.params.id;
     await lobbyService.updateRoomPresence(roomId, userId);

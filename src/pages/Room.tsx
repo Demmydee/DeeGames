@@ -27,7 +27,8 @@ import Chat from '../components/Chat';
 const Room: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const isGuest = Boolean(user?.is_guest);
   const [room, setRoom] = useState<RoomCategory | null>(null);
   const [requests, setRequests] = useState<GameRequest[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -64,9 +65,9 @@ const Room: React.FC = () => {
     // Set up polling for real-time updates (every 5 seconds)
     const interval = setInterval(() => fetchData(true), 5000);
     
-    // Presence tracking
+    // Presence tracking (registered users only)
     const updatePresence = async () => {
-      if (id) {
+      if (id && !isGuest) {
         try {
           await lobbyApi.updatePresence(id);
         } catch (err) {
@@ -82,7 +83,7 @@ const Room: React.FC = () => {
       clearInterval(interval);
       clearInterval(presenceInterval);
     };
-  }, [fetchData, id]);
+  }, [fetchData, id, isGuest]);
 
   // Point 1: Auto-redirect participants when game starts
   useEffect(() => {
@@ -98,6 +99,10 @@ const Room: React.FC = () => {
   }, [matches, user?.id, navigate]);
 
   const handleJoinRequest = async (requestId: string) => {
+    if (isGuest) {
+      setError('Guest demo accounts cannot join live PvP matches. Play vs DeeBot AI in the Instant Demo Room or register a full account.');
+      return;
+    }
     try {
       await gameRequestApi.join(requestId);
       fetchData(true);
@@ -243,14 +248,52 @@ const Room: React.FC = () => {
             <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
           <button 
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20"
+            onClick={() => {
+              if (isGuest) {
+                setError('Guest demo accounts cannot create live PvP requests. Try the Instant Demo Room vs DeeBot AI from the Lobby or register a full account.');
+                return;
+              }
+              setShowCreateModal(true);
+            }}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${
+              isGuest
+                ? 'bg-neutral-800 text-neutral-400 border border-neutral-700 cursor-not-allowed'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20'
+            }`}
           >
-            <Plus className="w-5 h-5" />
-            <span>Create Request</span>
+            {isGuest ? <Lock className="w-4 h-4" /> : <Plus className="w-5 h-5" />}
+            <span>{isGuest ? 'Registered Only' : 'Create Request'}</span>
           </button>
         </div>
       </div>
+
+      {isGuest && (
+        <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="text-xs text-amber-200">
+            <span className="font-black uppercase tracking-wider text-amber-400">Guest View Only: </span>
+            Live PvP matchmaking and chat require a registered account. You can test all live games vs DeeBot AI in the Instant Demo Room.
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => navigate('/lobby')}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold whitespace-nowrap"
+            >
+              Demo Room
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                logout();
+                navigate('/register');
+              }}
+              className="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold whitespace-nowrap"
+            >
+              Register
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stats & Filters */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

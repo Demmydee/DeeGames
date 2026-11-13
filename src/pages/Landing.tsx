@@ -78,7 +78,7 @@ const Landing = () => {
             <div className="flex-1">
               <h2 className="text-4xl md:text-5xl font-black uppercase italic mb-6">Coming Soon to <span className="text-orange-500">DeeGames</span></h2>
               <ul className="space-y-4">
-                {['Whot', 'Ludo', 'Chess', 'Dice Roll', 'Snakes & Ladders'].map((game) => (
+                {['Whot', 'Ludo', 'Dice Roll', 'Chess (Coming Soon)', 'Snakes & Ladders (Coming Soon)'].map((game) => (
                   <li key={game} className="flex items-center gap-3 text-xl font-bold text-neutral-300">
                     <Trophy className="w-6 h-6 text-orange-500" />
                     {game}

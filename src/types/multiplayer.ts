@@ -61,6 +61,7 @@ export interface Match {
   started_at: string;
   finished_at: string | null;
   winner_user_id: string | null;
+  is_demo?: boolean;
   game_type?: GameType;
   room?: RoomCategory;
   started_by?: { username: string };

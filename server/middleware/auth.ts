@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabase, supabaseAuth } from '../config/supabase';
+import jwt from 'jsonwebtoken';
+import { supabaseAuth } from '../config/supabase';
+
+export const GUEST_JWT_SECRET = process.env.JWT_SECRET || 'deegames-guest-demo-secret-key';
 
 export const authenticateToken = async (req: any, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
@@ -7,6 +10,27 @@ export const authenticateToken = async (req: any, res: Response, next: NextFunct
 
   if (!token) {
     return res.status(401).json({ error: 'Access denied. No token provided.' });
+  }
+
+  // Check if token is a Guest Demo JWT first
+  try {
+    const decoded = jwt.verify(token, GUEST_JWT_SECRET) as any;
+    if (decoded && decoded.is_guest === true && decoded.id) {
+      req.user = {
+        id: decoded.id,
+        email: decoded.email,
+        username: decoded.username,
+        is_guest: true,
+        user_metadata: {
+          username: decoded.username,
+          is_guest: true
+        }
+      };
+      req.token = token;
+      return next();
+    }
+  } catch {
+    // Not a guest token; continue to Supabase token verification
   }
 
   try {
@@ -30,3 +54,14 @@ export const authenticateToken = async (req: any, res: Response, next: NextFunct
     res.status(401).json({ error: 'Authentication failed.' });
   }
 };
+
+export const requireRegisteredUser = (req: any, res: Response, next: NextFunction) => {
+  if (req.user?.is_guest) {
+    return res.status(403).json({
+      error: 'Guest demo accounts have limited access. Please register a free account to unlock this feature.',
+      code: 'guest_restricted'
+    });
+  }
+  next();
+};
+

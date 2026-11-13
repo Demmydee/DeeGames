@@ -9,7 +9,9 @@ import {
   History,
   Medal,
   Award,
-  ShieldAlert
+  RotateCcw,
+  UserPlus,
+  Bot
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -18,11 +20,13 @@ interface Props {
   result: any;
   onClose: () => void;
   onExit?: () => void;
+  onPlayAgain?: () => void;
 }
 
-const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
+const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit, onPlayAgain }) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const isDemo = Boolean(result?.is_demo);
 
   // Robust winner detection
   const myRanking = result.rankings?.find((r: any) => 
@@ -96,7 +100,28 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 sm:p-10 pt-4 sm:pt-6 space-y-8 sm:space-y-12 custom-scrollbar">
-            {/* Earnings Summary */}
+            {/* Earnings / Demo Summary */}
+            {isDemo ? (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="p-6 sm:p-8 rounded-3xl border-2 bg-emerald-500/10 border-emerald-500/30 flex items-center justify-between gap-4"
+              >
+                <div>
+                  <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2">Instant Demo Room</p>
+                  <h2 className="text-2xl sm:text-3xl font-black uppercase italic text-white">Practice Match Complete</h2>
+                  <p className="text-xs text-gray-400 mt-2">
+                    {user?.is_guest
+                      ? 'Playing in Guest Demo mode vs DeeBot AI. Register a full account to wager for real payouts.'
+                      : 'Free practice match vs DeeBot AI — no wallet funds were wagered.'}
+                  </p>
+                </div>
+                <div className="hidden sm:flex w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-400 items-center justify-center shrink-0">
+                  <Bot className="w-8 h-8" />
+                </div>
+              </motion.div>
+            ) : (
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -130,6 +155,7 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
                 </div>
               </div>
             </motion.div>
+            )}
 
             {/* Match History Table */}
             {result.history && result.history.length > 0 && result.game_type?.toString().toLowerCase().includes('chess') === false && (
@@ -273,17 +299,40 @@ const MatchResultScreen: React.FC<Props> = ({ result, onClose, onExit }) => {
           </div>
 
           {/* Action Footer */}
-          <div className="p-6 sm:p-10 pt-4 pb-8 sm:pb-14">
-            <button
-              onClick={() => {
-                if (onExit) onExit();
-                else navigate('/lobby');
-              }}
-              className="w-full py-5 sm:py-7 bg-white hover:bg-emerald-500 text-black rounded-2xl sm:rounded-[2.5rem] font-black uppercase italic tracking-tighter transition-all shadow-[0_20px_40px_rgba(0,0,0,0.3)] hover:shadow-emerald-500/20 flex items-center justify-center gap-3 sm:gap-5 group"
-            >
-              <LogOut className="w-5 h-5 sm:w-7 sm:h-7 transition-all group-hover:translate-x-2" />
-              <span className="text-lg sm:text-xl">Exit to Lobby</span>
-            </button>
+          <div className="p-6 sm:p-10 pt-4 pb-8 sm:pb-12 space-y-3">
+            {onPlayAgain && (
+              <button
+                onClick={onPlayAgain}
+                className="w-full py-4 sm:py-5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black uppercase italic tracking-tighter transition-all flex items-center justify-center gap-3"
+              >
+                <RotateCcw className="w-5 h-5" />
+                <span className="text-base sm:text-lg">Play Again vs Bot</span>
+              </button>
+            )}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => {
+                  if (onExit) onExit();
+                  else navigate('/lobby');
+                }}
+                className="flex-1 py-4 sm:py-5 bg-white hover:bg-emerald-500 text-black rounded-2xl font-black uppercase italic tracking-tighter transition-all shadow-[0_20px_40px_rgba(0,0,0,0.3)] hover:shadow-emerald-500/20 flex items-center justify-center gap-3 group"
+              >
+                <LogOut className="w-5 h-5 transition-all group-hover:translate-x-1" />
+                <span className="text-base sm:text-lg">Exit to Lobby</span>
+              </button>
+              {user?.is_guest && (
+                <button
+                  onClick={() => {
+                    logout();
+                    navigate('/register');
+                  }}
+                  className="flex-1 py-4 sm:py-5 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl font-black uppercase italic tracking-tighter transition-all flex items-center justify-center gap-3"
+                >
+                  <UserPlus className="w-5 h-5" />
+                  <span className="text-base sm:text-lg">Create Account</span>
+                </button>
+              )}
+            </div>
           </div>
         </motion.div>
       </div>

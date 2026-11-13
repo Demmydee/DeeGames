@@ -246,16 +246,11 @@ export class LudoEngine implements GameEngine {
     // Can only capture on common path
     if (newPos < 0 || newPos > 50) return [];
 
-    const startSquare = LudoEngine.PLAYERS_INFO[movingPlayerIdx].start;
+    const movingInfo = LudoEngine.PLAYERS_INFO.find(i => i.color === movingParticipant.color) || LudoEngine.PLAYERS_INFO[movingPlayerIdx];
+    const startSquare = movingInfo.start;
     const realBoardPos = (startSquare + newPos) % LudoEngine.PATH_LENGTH;
     
     // Check if safe zone
-    // EXCEPTION: A player's own start square is NOT safe if an opponent is on it 
-    // when the owner is coming out of home.
-    // Actually, usually star squares ARE safe. 
-    // But the user says "capture logic doesn't work if player plays 6".
-    // 6 means they are coming out to square 0 (realBoardPos = startSquare).
-    // If square 0 is in safe squares, they can't capture.
     if (LudoEngine.SAFE_SQUARES.includes(realBoardPos)) {
        // Only allow capture on start square if it's the moving player's OWN start square 
        // AND they are moving OUT of home (newPos 0)
@@ -268,11 +263,12 @@ export class LudoEngine implements GameEngine {
 
     state.participants.forEach((p: any, pIdx: number) => {
       if (pIdx === movingPlayerIdx) return;
+      const otherInfo = LudoEngine.PLAYERS_INFO.find(i => i.color === p.color) || LudoEngine.PLAYERS_INFO[pIdx];
       
       p.tokens.forEach((tPos: number, tIdx: number) => {
         if (tPos < 0 || tPos > 50) return;
         
-        const otherRealPos = (LudoEngine.PLAYERS_INFO[pIdx].start + tPos) % LudoEngine.PATH_LENGTH;
+        const otherRealPos = (otherInfo.start + tPos) % LudoEngine.PATH_LENGTH;
         if (otherRealPos === realBoardPos) {
           // CAPTURE!
           p.tokens[tIdx] = -1;

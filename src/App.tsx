@@ -32,10 +32,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-  const { token, loading } = useAuth();
+const PublicRoute = ({ children, allowGuest = false }: { children: React.ReactNode; allowGuest?: boolean }) => {
+  const { token, user, loading } = useAuth();
   if (loading) return <div className="flex items-center justify-center h-screen bg-black text-orange-500">Loading...</div>;
-  if (token) return <Navigate to="/dashboard" />;
+  if (token && !(allowGuest && user?.is_guest)) return <Navigate to="/dashboard" />;
   return <>{children}</>;
 };
 
@@ -56,7 +56,7 @@ const PublicAdminRoute = ({ children }: { children: React.ReactNode }) => {
 export default function App() {
   const location = useLocation();
   const isAdminPath = location.pathname.startsWith('/admin');
-  const { token } = useAuth();
+  const { token, user } = useAuth();
 
   React.useEffect(() => {
     const apiUrl = import.meta.env.VITE_API_URL || 'Local Server (Relative)';
@@ -64,7 +64,7 @@ export default function App() {
   }, []);
 
   React.useEffect(() => {
-    if (!token) return;
+    if (!token || user?.is_guest) return;
 
     // Run custom immediate ping
     const doPing = async () => {
@@ -81,7 +81,7 @@ export default function App() {
     const interval = setInterval(doPing, 30000);
 
     return () => clearInterval(interval);
-  }, [token]);
+  }, [token, user?.is_guest]);
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans">
@@ -89,8 +89,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-
+        <Route path="/register" element={<PublicRoute allowGuest><Register /></PublicRoute>} />
+        
         {/* Admin Console Paths */}
         <Route path="/admin/login" element={<PublicAdminRoute><AdminLogin /></PublicAdminRoute>} />
         <Route path="/admin/dashboard" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />

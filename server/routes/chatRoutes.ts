@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import * as chatController from '../controllers/chatController';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireRegisteredUser } from '../middleware/auth';
 
 const router = Router();
 
 router.get('/rooms/:roomId/messages', authenticateToken, chatController.getRoomMessages);
-router.post('/rooms/:roomId/messages', authenticateToken, chatController.sendRoomMessage);
+router.post('/rooms/:roomId/messages', authenticateToken, requireRegisteredUser, chatController.sendRoomMessage);
 router.get('/matches/:matchId/messages', authenticateToken, chatController.getMatchMessages);
-router.post('/matches/:matchId/messages', authenticateToken, chatController.sendMatchMessage);
+router.post('/matches/:matchId/messages', authenticateToken, requireRegisteredUser, chatController.sendMatchMessage);
 
 export default router;

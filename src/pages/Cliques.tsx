@@ -20,10 +20,12 @@ import { formatDistanceToNow } from 'date-fns';
 import { friendApi, socialApi } from '../services/multiplayerApi';
 import { useAuth } from '../context/AuthContext';
 import ErrorMessage from '../components/ui/ErrorMessage';
+import GuestRestrictedNotice from '../components/GuestRestrictedNotice';
 import apiClient from '../api/client';
 
 const Cliques: React.FC = () => {
   const { user } = useAuth();
+  const isGuest = Boolean(user?.is_guest);
   const [friends, setFriends] = useState<any[]>([]);
   const [incoming, setIncoming] = useState<any[]>([]);
   const [outgoing, setOutgoing] = useState<any[]>([]);
@@ -38,6 +40,7 @@ const Cliques: React.FC = () => {
   const [searching, setSearching] = useState(false);
 
   const fetchData = async (isSilent = false) => {
+    if (isGuest) return;
     try {
       if (!isSilent) setLoading(true);
       const [f, inc, out, opp] = await Promise.all([
@@ -58,6 +61,10 @@ const Cliques: React.FC = () => {
   };
 
   useEffect(() => {
+    if (isGuest) {
+      setLoading(false);
+      return;
+    }
     fetchData();
 
     // Poll silently every 10 seconds to keep statuses up-to-date
@@ -66,12 +73,16 @@ const Cliques: React.FC = () => {
     }, 10000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isGuest]);
+
+  if (isGuest) {
+    return <GuestRestrictedNotice featureName="Cliques & Friends" />;
+  }
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-
+    
     setSearching(true);
     setError(null);
     try {
@@ -162,8 +173,8 @@ const Cliques: React.FC = () => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={`px-4 sm:px-6 py-3 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all flex items-center gap-3 ${
-                activeTab === tab.id
-                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20'
+                activeTab === tab.id 
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20' 
                   : 'text-gray-500 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -255,7 +266,7 @@ const Cliques: React.FC = () => {
                           Accept Request
                         </button>
                       ) : (
-                        <button
+                        <button 
                           onClick={() => handleAddFriend(res.id)}
                           className="px-6 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-900/20"
                         >
@@ -300,7 +311,7 @@ const Cliques: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
+                      <button 
                         onClick={() => handleRemove(friend.friendship_id)}
                         className="p-3 rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20"
                       >
@@ -330,13 +341,13 @@ const Cliques: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <button
+                            <button 
                               onClick={() => handleAccept(req.id)}
                               className="p-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
                             >
                               <Check className="w-5 h-5" />
                             </button>
-                            <button
+                            <button 
                               onClick={() => handleReject(req.id)}
                               className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-red-500/20 hover:text-red-500 transition-all"
                             >
@@ -433,7 +444,7 @@ const Cliques: React.FC = () => {
                           Accept
                         </button>
                       ) : (
-                        <button
+                        <button 
                           onClick={() => handleAddFriend(opp.id)}
                           className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-900/20"
                         >

@@ -3,6 +3,9 @@ import * as notificationService from '../services/notificationService';
 
 export const getNotifications = async (req: Request, res: Response) => {
   try {
+    if ((req as any).user?.is_guest) {
+      return res.json([]);
+    }
     const userId = (req as any).user.id;
     const notifications = await notificationService.getNotifications(userId);
     res.json(notifications);
@@ -13,6 +16,9 @@ export const getNotifications = async (req: Request, res: Response) => {
 
 export const getUnreadCount = async (req: Request, res: Response) => {
   try {
+    if ((req as any).user?.is_guest) {
+      return res.json({ count: 0 });
+    }
     const userId = (req as any).user.id;
     const count = await notificationService.getUnreadCount(userId);
     res.json({ count });

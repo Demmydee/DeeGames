@@ -54,7 +54,7 @@ const DiceGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
 
   useEffect(() => {
     fetchState();
-    const interval = setInterval(fetchState, 3000);
+    const interval = setInterval(fetchState, matchId.startsWith('demo-') ? 1000 : 3000);
     
     // Heartbeat
     const hbInterval = setInterval(async () => {

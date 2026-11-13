@@ -7,9 +7,13 @@ import TransactionList from '../components/wallet/TransactionList';
 import { Link, useNavigate } from 'react-router-dom';
 
 import ErrorMessage from '../components/ui/ErrorMessage';
+import { useAuth } from '../context/AuthContext';
+import GuestRestrictedNotice from '../components/GuestRestrictedNotice';
 
 const Wallet = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const isGuest = Boolean(user?.is_guest);
   const [wallet, setWallet] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [kycStatus, setKycStatus] = useState<any>(null);
@@ -37,8 +41,16 @@ const Wallet = () => {
   };
 
   useEffect(() => {
+    if (isGuest) {
+      setLoading(false);
+      return;
+    }
     fetchData();
-  }, []);
+  }, [isGuest]);
+
+  if (isGuest) {
+    return <GuestRestrictedNotice featureName="Wallet & Funds" />;
+  }
 
   if (loading && !wallet) {
     return (

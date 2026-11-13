@@ -4,6 +4,17 @@ import { GameStateService } from './gameStateService';
 export const createGameRequest = async (userId: string, requestData: any) => {
   let { room_category_id, game_type_id, category, pay_mode, amount, required_players, game_variant } = requestData;
 
+  // 0. Check if game type is temporarily disabled (Chess Coming Soon)
+  const { data: selectedGameType } = await supabase
+    .from('game_types')
+    .select('id, name, code')
+    .eq('id', game_type_id)
+    .single();
+
+  if (selectedGameType && (selectedGameType.name?.toLowerCase().includes('chess') || selectedGameType.code?.toLowerCase() === 'chess')) {
+    throw new Error('Chess is coming soon and temporarily unavailable in the live lobby.');
+  }
+
   // 1. Validate category and pay_mode rules
   if (category === 'duel') {
     pay_mode = 'knockout'; // Duel is always knockout

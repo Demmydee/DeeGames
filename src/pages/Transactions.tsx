@@ -4,8 +4,12 @@ import { History, Search, Filter, Loader2, ChevronLeft, ChevronRight, ArrowLeft 
 import apiClient from '../api/client';
 import TransactionList from '../components/wallet/TransactionList';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import GuestRestrictedNotice from '../components/GuestRestrictedNotice';
 
 const Transactions = () => {
+  const { user } = useAuth();
+  const isGuest = Boolean(user?.is_guest);
   const navigate = useNavigate();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,8 +32,16 @@ const Transactions = () => {
   };
 
   useEffect(() => {
+    if (isGuest) {
+      setLoading(false);
+      return;
+    }
     fetchTransactions(page);
-  }, [page]);
+  }, [page, isGuest]);
+
+  if (isGuest) {
+    return <GuestRestrictedNotice featureName="Transaction History" />;
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">

@@ -3,12 +3,19 @@ import { motion } from 'motion/react';
 import { Plus, CreditCard, AlertCircle, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
 import apiClient from '../api/client';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import GuestRestrictedNotice from '../components/GuestRestrictedNotice';
 
 const Deposit = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (user?.is_guest) {
+    return <GuestRestrictedNotice featureName="Deposits" />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

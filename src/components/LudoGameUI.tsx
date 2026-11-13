@@ -75,6 +75,10 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
   const gameStateRef = useRef<any>(null);
   const onGameEndRef = useRef(onGameEnd);
 
+  useEffect(() => {
+    onGameEndRef.current = onGameEnd;
+  }, [onGameEnd]);
+
   // Turn Timer Effect
   useEffect(() => {
     if (!gameState || gameState.status !== 'active') return;
@@ -113,7 +117,7 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
       setGameState(response.state);
       gameStateRef.current = response.state;
 
-      if (response.status === 'completed' && response.state.game_over) {
+      if (response.status === 'completed' || response.state?.status === 'completed') {
         const result = await gameApi.getResult(matchId);
         onGameEndRef.current(result);
       }
@@ -129,9 +133,9 @@ const LudoGameUI: React.FC<Props> = ({ matchId, matchParticipants, onGameEnd }) 
 
   useEffect(() => {
     fetchGameState();
-    const interval = setInterval(fetchGameState, 2000);
+    const interval = setInterval(fetchGameState, matchId.startsWith('demo-') ? 1000 : 2000);
     return () => clearInterval(interval);
-  }, [fetchGameState]);
+  }, [fetchGameState, matchId]);
 
   const handleRollDie = async () => {
     if (moveLoading || rolling) return;

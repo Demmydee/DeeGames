@@ -3,8 +3,12 @@ import { motion } from 'motion/react';
 import { Building2, Plus, Trash2, AlertCircle, Loader2, CheckCircle2, ArrowLeft } from 'lucide-react';
 import apiClient from '../api/client';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import GuestRestrictedNotice from '../components/GuestRestrictedNotice';
 
 const PayoutAccounts = () => {
+  const { user } = useAuth();
+  const isGuest = Boolean(user?.is_guest);
   const navigate = useNavigate();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,8 +36,16 @@ const PayoutAccounts = () => {
   };
 
   useEffect(() => {
+    if (isGuest) {
+      setLoading(false);
+      return;
+    }
     fetchAccounts();
-  }, []);
+  }, [isGuest]);
+
+  if (isGuest) {
+    return <GuestRestrictedNotice featureName="Payout Accounts" />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
